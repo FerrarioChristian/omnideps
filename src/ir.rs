@@ -49,7 +49,7 @@ pub struct Signature {
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Function {
-    pub name: Identifier,
+    pub name: QualifiedName,
     pub signature: Signature,
 }
 
@@ -78,6 +78,7 @@ pub struct Module {
     pub sub_modules: Vec<Module>,
     pub structured_types: Vec<StructuredType>,
     pub free_functions: Vec<Function>,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub impl_blocks: Vec<ImplBlock>,
     // Convertire le tre tipologie di componenti in un'unica lista di Componenti, Vec<Box<Component>>
 }
@@ -119,7 +120,6 @@ pub struct AnalysisSummary {
     pub total_modules: usize,
     pub total_structured_types: usize,
     pub total_free_functions: usize,
-    pub total_impl_blocks: usize,
     pub resolved_refs: usize,
-    pub failed_refs: usize,
+    pub unknown_refs: usize,
 }

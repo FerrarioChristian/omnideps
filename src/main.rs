@@ -70,7 +70,6 @@ fn analyze_directory(
             total_summary.total_modules += summary.total_modules;
             total_summary.total_structured_types += summary.total_structured_types;
             total_summary.total_free_functions += summary.total_free_functions;
-            total_summary.total_impl_blocks += summary.total_impl_blocks;
             all_graphs.push(graph);
         }
     }
@@ -106,14 +105,13 @@ fn print_summary(s: &AnalysisSummary) {
     println!("Moduli: {}", s.total_modules);
     println!("Structured types: {}", s.total_structured_types);
     println!("Free functions: {}", s.total_free_functions);
-    println!("Impl blocks: {}", s.total_impl_blocks);
 }
 
 /// Appends a CSV header and row detailing the total component counts.
 fn save_summary_csv(s: &AnalysisSummary, path: &std::path::Path) -> Result<()> {
     let csv = format!(
-        "total_modules,total_structured,total_free,total_impl\n{},{},{},{}",
-        s.total_modules, s.total_structured_types, s.total_free_functions, s.total_impl_blocks
+        "total_modules,total_structured,total_free\n{},{},{}",
+        s.total_modules, s.total_structured_types, s.total_free_functions
     );
     fs::write(path, csv)?;
     Ok(())

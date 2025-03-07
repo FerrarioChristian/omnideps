@@ -67,8 +67,9 @@ fn try_parse_structured_type(node: Node, source: &str) -> Option<StructuredType>
         && !kind.contains("argument")
         && !kind.contains("call")
         && !kind.contains("identifier")
-        && !kind.contains("specifier")
-        && !kind.contains("mod");
+        && !kind.contains("reference")
+        && !kind.contains("mod")
+        && !kind.contains("variant");
 
     if !is_structured {
         return None;
@@ -112,8 +113,8 @@ fn try_parse_function(node: Node, source: &str) -> Option<Function> {
     let return_type = extract_return_type(node, source);
 
     Some(Function {
-        name,
-        signature: crate::ir::Signature {
+        name: vec![name],
+        signature: Signature {
             parameters,
             return_type,
         },
@@ -154,13 +155,27 @@ fn node_text(node: Node, source: &str) -> String {
 
 /// Tries to extract a simple identifier (string) from common child field names.
 fn extract_identifier(node: Node, source: &str) -> Option<String> {
-    node.child_by_field_name("name")
+    if let Some(n) = node
+        .child_by_field_name("name")
         .or_else(|| node.child_by_field_name("type_identifier"))
         .or_else(|| node.child_by_field_name("identifier"))
-        .and_then(|n| {
+    {
+        let text = node_text(n, source).trim().to_string();
+        if !text.is_empty() { return Some(text); }
+    }
+
+    if let Some(decl) = node.child_by_field_name("declarator") {
+        if let Some(n) = decl.child_by_field_name("declarator") {
             let text = node_text(n, source).trim().to_string();
-            if !text.is_empty() { Some(text) } else { None }
-        })
+            if !text.is_empty() { return Some(text); }
+        }
+        let text = node_text(decl, source).trim().to_string();
+        // Take just the name before '('
+        let name_part = text.split('(').next().unwrap_or("").trim().to_string();
+        if !name_part.is_empty() { return Some(name_part); }
+    }
+
+    None
 }
 
 /// Extracts a qualified name (e.g. A::B::C) by traversing identifiers.
@@ -320,7 +335,23 @@ fn extract_parameters(node: Node, source: &str) -> Vec<Parameter> {
 }
 
 fn extract_return_type(node: Node, source: &str) -> TypeRef {
-    extract_type_ref(node, source)
+    if let Some(type_node) = node
+        .child_by_field_name("return_type")
+        .or_else(|| node.child_by_field_name("type"))
+    {
+        return extract_type_ref(type_node, source);
+    }
+
+    let text = node_text(node, source);
+    if let Some(arrow_pos) = text.find("->") {
+        let after = text[arrow_pos + 2..].trim();
+        let ret_type: String = after.chars().take_while(|c| c.is_alphanumeric() || *c == '_' || *c == ':').collect();
+        if !ret_type.is_empty() {
+             return TypeRef::Unresolved(split_qualified_name(&ret_type));
+        }
+    }
+
+    TypeRef::Failed(vec![])
 }
 
 // ==================== SUPER TYPES ====================
@@ -384,16 +415,36 @@ fn extract_return_type(node: Node, source: &str) -> TypeRef {
 
 fn extract_super_types(node: Node, source: &str) -> Vec<TypeRef> {
     let mut supers = vec![];
-    let super_node = node
-        .child_by_field_name("super_type")
-        .or_else(|| node.child_by_field_name("extends"))
-        .or_else(|| node.child_by_field_name("implements"))
-        .or_else(|| node.child_by_field_name("base_clause"));
+    let mut super_nodes = vec![];
 
-    if let Some(n) = super_node {
+    if let Some(n) = node.child_by_field_name("super_type") { super_nodes.push(n); }
+    if let Some(n) = node.child_by_field_name("extends") { super_nodes.push(n); }
+    if let Some(n) = node.child_by_field_name("implements") { super_nodes.push(n); }
+    if let Some(n) = node.child_by_field_name("superclass") { super_nodes.push(n); }
+    if let Some(n) = node.child_by_field_name("interfaces") { super_nodes.push(n); }
+    if let Some(n) = node.child_by_field_name("superclasses") { super_nodes.push(n); }
+
+    let mut cursor = node.walk();
+    for child in node.children(&mut cursor) {
+        if child.kind() == "base_class_clause" {
+            super_nodes.push(child);
+        }
+    }
+
+    for n in super_nodes {
         let mut cursor = n.walk();
         for child in n.children(&mut cursor) {
-            supers.push(extract_type_ref(child, source));
+            let kind = child.kind();
+            if matches!(kind, "type_identifier" | "identifier" | "scoped_type_identifier") {
+                supers.push(extract_type_ref(child, source));
+            } else if kind == "type_list" {
+                let mut c2 = child.walk();
+                for c3 in child.children(&mut c2) {
+                    if matches!(c3.kind(), "type_identifier" | "identifier" | "scoped_type_identifier") {
+                        supers.push(extract_type_ref(c3, source));
+                    }
+                }
+            }
         }
     }
     supers

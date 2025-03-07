@@ -27,7 +27,7 @@ pub fn build_symbol_table(modules: &[Module]) -> HashMap<QualifiedName, Componen
         }
         for f in &m.free_functions {
             let mut name = prefix.clone();
-            name.push(f.name.clone());
+            name.extend(f.name.clone());
             table.insert(name, Component::Function(f.clone()));
         }
         for sub in &m.sub_modules {
@@ -99,6 +99,8 @@ fn resolve_module_in_context(ctx: &ResolutionContext, mut module: Module) -> Mod
     let mut new_prefix = ctx.current_prefix.clone();
     new_prefix.extend(module.name.clone());
 
+    module.name = new_prefix.clone();
+
     let new_ctx = ResolutionContext {
         current_prefix: new_prefix.clone(),
         symbol_table: ctx.symbol_table.clone(),
@@ -114,7 +116,7 @@ fn resolve_module_in_context(ctx: &ResolutionContext, mut module: Module) -> Mod
         .into_iter()
         .map(|f| resolve_function(&new_ctx, f))
         .collect();
-    
+
     let resolved_impls: Vec<ImplBlock> = module
         .impl_blocks
         .into_iter()
@@ -124,13 +126,11 @@ fn resolve_module_in_context(ctx: &ResolutionContext, mut module: Module) -> Mod
     for ib in resolved_impls {
         if let TypeRef::Resolved(target_name) = &ib.impl_for {
             if let Some(target_st) = module.structured_types.iter_mut().find(|st| {
-                let mut st_absolute = new_ctx.current_prefix.clone();
-                st_absolute.extend(st.name.clone());
-                &st_absolute == target_name
+                &st.name == target_name
             }) {
-                target_st.methods.extend(ib.methods);
-                target_st.nested_types.extend(ib.nested_types);
-                if let Some(trait_ref) = ib.implements_trait {
+                target_st.methods.extend(ib.methods.clone());
+                target_st.nested_types.extend(ib.nested_types.clone());
+                if let Some(trait_ref) = ib.implements_trait.clone() {
                     target_st.super_types.push(trait_ref);
                 }
             }
@@ -148,33 +148,46 @@ fn resolve_module_in_context(ctx: &ResolutionContext, mut module: Module) -> Mod
 }
 
 fn resolve_structured_type(ctx: &ResolutionContext, mut st: StructuredType) -> StructuredType {
+    let mut new_prefix = ctx.current_prefix.clone();
+    new_prefix.extend(st.name.clone());
+    st.name = new_prefix.clone();
+
+    let new_ctx = ResolutionContext {
+        current_prefix: new_prefix,
+        symbol_table: ctx.symbol_table.clone(),
+    };
+
     st.super_types = st
         .super_types
         .into_iter()
-        .map(|tr| resolve_type_ref(ctx, tr))
+        .map(|tr| resolve_type_ref(&new_ctx, tr))
         .collect();
     st.fields = st
         .fields
         .into_iter()
         .map(|f| Field {
             name: f.name,
-            ty: resolve_type_ref(ctx, f.ty),
+            ty: resolve_type_ref(&new_ctx, f.ty),
         })
         .collect();
     st.methods = st
         .methods
         .into_iter()
-        .map(|m| resolve_function(ctx, m))
+        .map(|m| resolve_function(&new_ctx, m))
         .collect();
     st.nested_types = st
         .nested_types
         .into_iter()
-        .map(|n| resolve_structured_type(ctx, n))
+        .map(|n| resolve_structured_type(&new_ctx, n))
         .collect();
     st
 }
 
 fn resolve_function(ctx: &ResolutionContext, mut f: Function) -> Function {
+    let mut new_prefix = ctx.current_prefix.clone();
+    new_prefix.extend(f.name.clone());
+    f.name = new_prefix;
+
     f.signature.parameters = f
         .signature.parameters
         .into_iter()
@@ -189,17 +202,26 @@ fn resolve_function(ctx: &ResolutionContext, mut f: Function) -> Function {
 }
 
 fn resolve_impl_block(ctx: &ResolutionContext, mut i: ImplBlock) -> ImplBlock {
-    i.impl_for = resolve_type_ref(ctx, i.impl_for);
-    i.implements_trait = i.implements_trait.map(|t| resolve_type_ref(ctx, t));
+    let mut new_prefix = ctx.current_prefix.clone();
+    new_prefix.extend(i.name.clone());
+    i.name = new_prefix.clone();
+
+    let new_ctx = ResolutionContext {
+        current_prefix: new_prefix,
+        symbol_table: ctx.symbol_table.clone(),
+    };
+
+    i.impl_for = resolve_type_ref(&new_ctx, i.impl_for);
+    i.implements_trait = i.implements_trait.map(|t| resolve_type_ref(&new_ctx, t));
     i.methods = i
         .methods
         .into_iter()
-        .map(|m| resolve_function(ctx, m))
+        .map(|m| resolve_function(&new_ctx, m))
         .collect();
     i.nested_types = i
         .nested_types
         .into_iter()
-        .map(|n| resolve_structured_type(ctx, n))
+        .map(|n| resolve_structured_type(&new_ctx, n))
         .collect();
     i
 }
@@ -209,20 +231,76 @@ fn resolve_impl_block(ctx: &ResolutionContext, mut i: ImplBlock) -> ImplBlock {
 pub fn build_dependency_graph(modules: &[Module]) -> DependencyGraph {
     let nodes = flatten_modules(modules);
     let mut edges = vec![];
-
-    for node in &nodes {
-        match node {
-            Component::StructuredType(st) => {
-                add_super_edges(st, &mut edges);
-                add_field_edges(st, &mut edges);
-                add_method_edges(st, &mut edges);
-            }
-            Component::Function(ff) => add_function_edges(ff, &mut edges),
-            _ => {}
-        }
+    
+    for m in modules {
+        traverse_module_for_edges(m, None, &mut edges);
     }
 
     DependencyGraph { nodes, edges }
+}
+
+fn traverse_module_for_edges(m: &Module, parent_id: Option<&QualifiedName>, edges: &mut Vec<Dependency>) {
+    if let Some(parent) = parent_id {
+        edges.push(Dependency {
+            from: parent.clone(),
+            to: m.name.clone(),
+            kind: DependencyEdgeKind::ModuleContainment,
+        });
+    }
+    
+    for st in &m.structured_types {
+        edges.push(Dependency {
+            from: m.name.clone(),
+            to: st.name.clone(),
+            kind: DependencyEdgeKind::ModuleContainment,
+        });
+        traverse_structured_type_edges(st, edges);
+    }
+    
+    for ff in &m.free_functions {
+        edges.push(Dependency {
+            from: m.name.clone(),
+            to: ff.name.clone(),
+            kind: DependencyEdgeKind::ModuleContainment,
+        });
+        add_function_edges(ff, edges);
+    }
+    
+    for ib in &m.impl_blocks {
+        edges.push(Dependency {
+            from: m.name.clone(),
+            to: ib.name.clone(),
+            kind: DependencyEdgeKind::ModuleContainment,
+        });
+        add_impl_edges(ib, edges);
+    }
+    
+    for sub in &m.sub_modules {
+        traverse_module_for_edges(sub, Some(&m.name), edges);
+    }
+}
+
+fn traverse_structured_type_edges(st: &StructuredType, edges: &mut Vec<Dependency>) {
+    add_super_edges(st, edges);
+    add_field_edges(st, edges);
+    
+    for m in &st.methods {
+        edges.push(Dependency {
+            from: st.name.clone(),
+            to: m.name.clone(),
+            kind: DependencyEdgeKind::NestedIn,
+        });
+        add_function_edges(m, edges);
+    }
+    
+    for nested in &st.nested_types {
+        edges.push(Dependency {
+            from: st.name.clone(),
+            to: nested.name.clone(),
+            kind: DependencyEdgeKind::NestedIn,
+        });
+        traverse_structured_type_edges(nested, edges);
+    }
 }
 
 fn add_super_edges(st: &StructuredType, edges: &mut Vec<Dependency>) {
@@ -249,32 +327,11 @@ fn add_field_edges(st: &StructuredType, edges: &mut Vec<Dependency>) {
     }
 }
 
-fn add_method_edges(st: &StructuredType, edges: &mut Vec<Dependency>) {
-    for m in &st.methods {
-        for p in &m.signature.parameters {
-            if let TypeRef::Resolved(to) = &p.ty {
-                edges.push(Dependency {
-                    from: st.name.clone(),
-                    to: to.clone(),
-                    kind: DependencyEdgeKind::UsesParamType,
-                });
-            }
-        }
-        if let TypeRef::Resolved(to) = &m.signature.return_type {
-            edges.push(Dependency {
-                from: st.name.clone(),
-                to: to.clone(),
-                kind: DependencyEdgeKind::UsesReturnType,
-            });
-        }
-    }
-}
-
 fn add_function_edges(ff: &Function, edges: &mut Vec<Dependency>) {
     for p in &ff.signature.parameters {
         if let TypeRef::Resolved(to) = &p.ty {
             edges.push(Dependency {
-                from: vec![ff.name.clone()],
+                from: ff.name.clone(),
                 to: to.clone(),
                 kind: DependencyEdgeKind::UsesParamType,
             });
@@ -282,10 +339,43 @@ fn add_function_edges(ff: &Function, edges: &mut Vec<Dependency>) {
     }
     if let TypeRef::Resolved(to) = &ff.signature.return_type {
         edges.push(Dependency {
-            from: vec![ff.name.clone()],
+            from: ff.name.clone(),
             to: to.clone(),
             kind: DependencyEdgeKind::UsesReturnType,
         });
+    }
+}
+
+fn add_impl_edges(ib: &ImplBlock, edges: &mut Vec<Dependency>) {
+    if let TypeRef::Resolved(to) = &ib.impl_for {
+        edges.push(Dependency {
+            from: ib.name.clone(),
+            to: to.clone(),
+            kind: DependencyEdgeKind::Implements,
+        });
+    }
+    if let Some(TypeRef::Resolved(to)) = &ib.implements_trait {
+        edges.push(Dependency {
+            from: ib.name.clone(),
+            to: to.clone(),
+            kind: DependencyEdgeKind::Implements,
+        });
+    }
+    for m in &ib.methods {
+        edges.push(Dependency {
+            from: ib.name.clone(),
+            to: m.name.clone(),
+            kind: DependencyEdgeKind::NestedIn,
+        });
+        add_function_edges(m, edges);
+    }
+    for nested in &ib.nested_types {
+        edges.push(Dependency {
+            from: ib.name.clone(),
+            to: nested.name.clone(),
+            kind: DependencyEdgeKind::NestedIn,
+        });
+        traverse_structured_type_edges(nested, edges);
     }
 }
 
@@ -293,19 +383,20 @@ fn flatten_modules(modules: &[Module]) -> Vec<Component> {
     let mut flat = vec![];
     for m in modules {
         flat.push(Component::Module(m.clone()));
-        flat.extend(
-            m.structured_types
-                .iter()
-                .cloned()
-                .map(Component::StructuredType),
-        );
-        flat.extend(
-            m.free_functions
-                .iter()
-                .cloned()
-                .map(Component::Function),
-        );
+        for st in &m.structured_types {
+            flat.extend(flatten_structured_type(st));
+        }
+        flat.extend(m.free_functions.iter().cloned().map(Component::Function));
         flat.extend(flatten_modules(&m.sub_modules));
+    }
+    flat
+}
+
+fn flatten_structured_type(st: &StructuredType) -> Vec<Component> {
+    let mut flat = vec![Component::StructuredType(st.clone())];
+    flat.extend(st.methods.iter().cloned().map(Component::Function));
+    for nested in &st.nested_types {
+        flat.extend(flatten_structured_type(nested));
     }
     flat
 }
@@ -313,12 +404,29 @@ fn flatten_modules(modules: &[Module]) -> Vec<Component> {
 // ==================== BENCHMARK ====================
 /// Aggregates basic statistics about the extracted components across all provided modules.
 pub fn build_analysis_summary(modules: &[Module]) -> AnalysisSummary {
-    let mut s = AnalysisSummary::default();
-    s.total_modules = modules.len();
+    let mut s = AnalysisSummary {
+        total_modules: modules.len(),
+        ..Default::default()
+    };
     for m in modules {
         s.total_structured_types += m.structured_types.len();
+        for st in &m.structured_types {
+            s.total_structured_types += count_nested_types(st);
+        }
         s.total_free_functions += m.free_functions.len();
-        s.total_impl_blocks += m.impl_blocks.len();
+
+        let sub_s = build_analysis_summary(&m.sub_modules);
+        s.total_modules += sub_s.total_modules;
+        s.total_structured_types += sub_s.total_structured_types;
+        s.total_free_functions += sub_s.total_free_functions;
     }
     s
+}
+
+fn count_nested_types(st: &StructuredType) -> usize {
+    let mut count = st.nested_types.len();
+    for nested in &st.nested_types {
+        count += count_nested_types(nested);
+    }
+    count
 }
