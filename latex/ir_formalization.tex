@@ -84,9 +84,9 @@ $$\sigma = \vec{P} \times \tau_{ret}$$
 dove $\vec{P}$ è il vettore dei parametri e $\tau_{ret}$ è il tipo di ritorno.
 
 Su questa base, definiamo il tipo universale \textbf{Function}
-($\mathcal{F}$) come contenitore che lega un identificatore a una
+($\mathcal{F}$) come contenitore che lega un nome qualificato a una
 specifica firma:
-$$\mathcal{F} = \langle \mathcal{I}, \sigma \rangle$$
+$$\mathcal{F} = \langle \text{id} \in \mathcal{QN}, \sigma \rangle$$
 
 Il ruolo architetturale di una $\mathcal{F}$ (se funge da Metodo o da
 Free Function) non è codificato nel suo tipo, ma è determinato
