@@ -43,6 +43,7 @@ pub struct Parameter {
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Signature {
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub parameters: Vec<Parameter>,
     pub return_type: TypeRef,
 }
@@ -56,9 +57,11 @@ pub struct Function {
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ImplBlock {
     pub name: QualifiedName,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub methods: Vec<Function>,
     pub impl_for: TypeRef,
     pub implements_trait: Option<TypeRef>,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub nested_types: Vec<StructuredType>,
 }
 
@@ -66,17 +69,24 @@ pub struct ImplBlock {
 pub struct StructuredType {
     pub name: QualifiedName,
     pub kind: StructuredTypeKind,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub fields: Vec<Field>,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub methods: Vec<Function>,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub super_types: Vec<TypeRef>,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub nested_types: Vec<StructuredType>,
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Module {
     pub name: QualifiedName,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub sub_modules: Vec<Module>,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub structured_types: Vec<StructuredType>,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub free_functions: Vec<Function>,
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub impl_blocks: Vec<ImplBlock>,

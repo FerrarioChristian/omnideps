@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Language Agnostic Analyzer - Dependency Graph</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.26.0/cytoscape.min.js"></script>
+    <style>
+        body {
+            font-family: sans-serif;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: #1e1e1e;
+        }
+        #cy {
+            width: 100vw;
+            height: 100vh;
+            display: block;
+        }
+        #info {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(0,0,0,0.8);
+            color: white;
+            padding: 10px 15px;
+            border-radius: 5px;
+            z-index: 10;
+        }
+        select {
+            margin-top: 10px;
+            padding: 5px;
+            width: 100%;
+            background: #333;
+            color: #fff;
+            border: 1px solid #555;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body>
+    <div id="info">
+        <div id="status">Caricamento elenco grafi...</div>
+        <select id="graph-selector" style="display: none;"></select>
+    </div>
+    <div id="cy"></div>
+
+    <script>
+        let cy = null;
+
+        function loadGraph(jsonPath) {
+            document.getElementById('status').innerText = "Caricamento: " + jsonPath;
+            
+            // Assicuriamoci che il path sia assoluto rispetto alla root del server
+            const fetchPath = jsonPath.startsWith('/') ? jsonPath : '/' + jsonPath;
+            
+            fetch(fetchPath)
+                .then(res => res.json())
+                .then(elements => {
+                    document.getElementById('status').innerText = "Visualizzazione: " + jsonPath;
+                    
+                    if (cy) {
+                        cy.destroy();
+                    }
+
+                    cy = cytoscape({
+                        container: document.getElementById('cy'),
+                        elements: elements,
+                    style: [
+                        {
+                            selector: 'node',
+                            style: {
+                                'label': 'data(label)',
+                                'text-valign': 'center',
+                                'text-halign': 'center',
+                                'color': '#fff',
+                                'text-outline-width': 2,
+                                'text-outline-color': '#444',
+                                'background-color': '#555',
+                                'font-size': '12px',
+                                'width': 'label',
+                                'height': 'label',
+                                'padding': '10px',
+                                'shape': 'round-rectangle'
+                            }
+                        },
+                        {
+                            selector: 'node[type = "Module"]',
+                            style: {
+                                'background-color': '#d35400',
+                                'shape': 'hexagon'
+                            }
+                        },
+                        {
+                            selector: 'node[type = "Struct"], node[type = "Class"]',
+                            style: {
+                                'background-color': '#2980b9'
+                            }
+                        },
+                        {
+                            selector: 'node[type = "Trait"], node[type = "Interface"]',
+                            style: {
+                                'background-color': '#27ae60',
+                                'border-style': 'dashed',
+                                'border-width': 2,
+                                'border-color': '#fff'
+                            }
+                        },
+                        {
+                            selector: 'node[type = "Function"]',
+                            style: {
+                                'background-color': '#8e44ad',
+                                'shape': 'ellipse'
+                            }
+                        },
+                        {
+                            selector: 'node[type = "ImplBlock"]',
+                            style: {
+                                'background-color': '#7f8c8d',
+                                'shape': 'rectangle'
+                            }
+                        },
+                        {
+                            selector: 'edge',
+                            style: {
+                                'width': 2,
+                                'line-color': '#aaa',
+                                'target-arrow-color': '#aaa',
+                                'target-arrow-shape': 'triangle',
+                                'curve-style': 'bezier',
+                                'label': 'data(label)',
+                                'font-size': '10px',
+                                'color': '#ccc',
+                                'text-rotation': 'autorotate',
+                                'text-background-opacity': 1,
+                                'text-background-color': '#1e1e1e',
+                                'text-background-padding': '2px'
+                            }
+                        },
+                        {
+                            selector: 'edge[label = "Inherits"], edge[label = "Implements"]',
+                            style: {
+                                'line-style': 'dashed',
+                                'line-color': '#f39c12',
+                                'target-arrow-color': '#f39c12',
+                                'target-arrow-shape': 'triangle-tee'
+                            }
+                        },
+                        {
+                            selector: 'edge[label = "NestedIn"], edge[label = "ModuleContainment"]',
+                            style: {
+                                'line-color': '#34495e',
+                                'target-arrow-color': '#34495e',
+                                'target-arrow-shape': 'circle',
+                                'line-style': 'dotted'
+                            }
+                        }
+                    ],
+                    layout: {
+                        name: 'cose', // 'cose' è un buon layout physics-based
+                        idealEdgeLength: 100,
+                        nodeOverlap: 20,
+                        refresh: 20,
+                        fit: true,
+                        padding: 30,
+                        randomize: false,
+                        componentSpacing: 100,
+                        nodeRepulsion: 400000,
+                        edgeElasticity: 100,
+                        nestingFactor: 5,
+                        gravity: 80,
+                        numIter: 1000,
+                        initialTemp: 200,
+                        coolingFactor: 0.95,
+                        minTemp: 1.0
+                    }
+                });
+            })
+            .catch(err => {
+                document.getElementById('status').innerText = "Errore: impossibile caricare il grafo.";
+                console.error(err);
+            });
+        }
+
+        // Caricamento iniziale della lista dei grafi
+        fetch('/api/list_graphs')
+            .then(res => res.json())
+            .then(files => {
+                const selector = document.getElementById('graph-selector');
+                if (files.length === 0) {
+                    document.getElementById('status').innerText = "Nessun grafo trovato. Esegui 'cargo test' prima.";
+                    return;
+                }
+                
+                files.forEach(f => {
+                    const option = document.createElement('option');
+                    option.value = f;
+                    const filename = f.split('/').pop().replace("cyto_", "");
+                    option.innerText = filename;
+                    selector.appendChild(option);
+                });
+                
+                selector.style.display = 'block';
+                
+                // Carica il primo
+                loadGraph(files[0]);
+                
+                // Gestisci cambio di selezione
+                selector.addEventListener('change', (e) => {
+                    loadGraph(e.target.value);
+                });
+            })
+            .catch(err => {
+                document.getElementById('status').innerText = "Errore nel contattare il server locale per la lista dei grafi.";
+                console.error(err);
+            });
+    </script>
+</body>
+</html>
