@@ -17,6 +17,7 @@ pub enum TypeRef {
     Primitive(PrimitiveType),
     Unresolved(QualifiedName),
     Resolved(QualifiedName),
+    External(QualifiedName),
     Failed(QualifiedName),
 }
 
@@ -80,8 +81,17 @@ pub struct StructuredType {
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct Import {
+    pub path: QualifiedName,
+    pub alias: Option<Identifier>,
+    pub is_wildcard: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Module {
     pub name: QualifiedName,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub imports: Vec<Import>,
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub sub_modules: Vec<Module>,
     #[serde(skip_serializing_if = "Vec::is_empty", default)]

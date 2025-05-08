@@ -44,12 +44,7 @@ pipeline di analisi.
     gerarchica di identificatori ($\langle i_1, \dots, i_n \rangle$)
     che rappresenta il percorso assoluto e univoco di un'entità (es.
     il namespace o il modulo).
-  \item $\tau$ (\textbf{Type Reference}): Un riferimento astratto a
-    un tipo. Rappresentato da un tipo somma a quattro stati che ne
-    modella il ciclo di vita durante l'analisi: \texttt{Prim}
-    (primitivo di base), \texttt{Unresolved} (nome grezzo appena
-    estratto), \texttt{Resolved} (percorso assoluto accertato), o
-    \texttt{Failed} (tentativo di risoluzione non andato a buon fine).
+  \item $\tau$ (\textbf{Type Reference}): Un riferimento astratto a un tipo. Rappresentato da un tipo somma a cinque stati che ne modella il ciclo di vita durante l'analisi: \texttt{Prim} (primitivo di base), \texttt{Unresolved} (nome grezzo appena estratto), \texttt{Resolved} (percorso assoluto accertato nel codebase), \texttt{External} (percorso risolto tramite import ma non analizzato nel codebase), o \texttt{Failed} (tentativo di risoluzione non andato a buon fine).
 \end{itemize}
 
 \subsection{Membri Strutturali e Firme}

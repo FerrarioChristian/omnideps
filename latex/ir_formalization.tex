@@ -36,10 +36,11 @@ di Java, moduli di Rust e scope risolti in C++.
 Un riferimento a un tipo $\tau$ nell'IR modella il ciclo di vita
 della scoperta e della risoluzione dei simboli. Per garantire la
 \textit{Type Safety} tra le fasi di estrazione e la generazione del
-grafo, definiamo $\tau$ come un tipo somma a quattro stati:
+grafo, definiamo $\tau$ come un tipo somma a cinque stati:
 $$\tau ::= \text{Prim}(\mathcal{T}_{p}) \mid
 \text{Unresolved}(\mathcal{QN}_{raw}) \mid
-\text{Resolved}(\mathcal{QN}_{abs}) \mid \text{Failed}$$
+\text{Resolved}(\mathcal{QN}_{abs}) \mid
+\text{External}(\mathcal{QN}_{ext}) \mid \text{Failed}$$
 Dove:
 \begin{itemize}
   \item \textbf{Prim}: Rappresenta i tipi primitivi fondamentali
@@ -53,13 +54,15 @@ Dove:
     per cui la fase di Risoluzione ha trovato una corrispondenza
     univoca nella Tabella dei Simboli. Contiene il nome qualificato
     assoluto (es. \texttt{java::util::List}).
+  \item \textbf{External}: Rappresenta un tipo per cui la fase di Risoluzione ha 
+    trovato una corrispondenza in una clausola di importazione esplicita
+    ma che non appartiene al codice analizzato.
   \item \textbf{Failed}: Indica che la fase di risoluzione ha tentato
-    di associare l'identificatore ma non ha trovato corrispondenze
-    (es. dipendenze da librerie esterne non incluse nell'analisi).
+    di associare l'identificatore ma non ha trovato corrispondenze.
 \end{itemize}
 Questa rigorosa separazione permette al type system di imporre che la
 generazione del grafo avvenga esclusivamente a partire da riferimenti
-\texttt{Resolved}.
+\texttt{Resolved} o \texttt{External}.
 
 \section{Modellazione dei Costrutti Strutturali}
 I Tipi Strutturati rappresentano il nucleo dell'analisi
@@ -158,8 +161,9 @@ $$\mathcal{C} ::= \text{Mod}(\mathcal{M}) \mid
 L'intera struttura del programma è catturata dal tipo \textbf{Modulo}
 ($\mathcal{M}$), definito ricorsivamente per riflettere la gerarchia
 del file system o dei namespace:
-$$\mathcal{M} = \langle \mathcal{QN}, \vec{\mathcal{M}_{nest}},
+$$\mathcal{M} = \langle \mathcal{QN}, \mathcal{I}_{imports}, \vec{\mathcal{M}_{nest}},
 \vec{\mathcal{S}}, \vec{\mathcal{F}}, \vec{\mathcal{B}}_{lk} \rangle$$
+dove $\mathcal{I}_{imports}$ è l'insieme delle dipendenze esplicite (import/use/include) definite nel modulo. Ogni elemento in $\mathcal{I}_{imports}$ contiene il percorso qualificato, un eventuale alias, e un flag per indicare l'inclusione \textit{wildcard}.
 Ogni elemento del software è quindi un nodo in un albero di
 componenti $T \in \mathcal{D}_{IR}$.
 

@@ -151,9 +151,11 @@ La funzione core $\text{resolve}_{\tau} : \Gamma \times \tau \to
         $\mathcal{I}_{imports}$ o super-tipi ereditati).
       \item Nel Global Scope fornito da $\Sigma$.
     \end{itemize}
-  \item Se la ricerca ha successo, la funzione restituisce
-    $\text{Resolved}(qn_{abs})$, dove $qn_{abs}$ è il percorso
-    assoluto registrato in $\Sigma$.
+  \item Se la ricerca ha successo, la funzione restituisce:
+    \begin{itemize}
+      \item $\text{Resolved}(qn_{abs})$ se il percorso assoluto $qn_{abs}$ è registrato e presente nel Global Scope $\Sigma$.
+      \item $\text{External}(qn_{abs})$ se il percorso è stato risolto tramite un import $\mathcal{I}_{imports}$, ma non appartiene al Global Scope analizzato. Questo permette di mappare confini verso librerie esterne e dipendenze di terze parti senza generare falsi fallimenti.
+    \end{itemize}
   \item Se la ricerca fallisce, la funzione restituisce $\text{Failed}$.
 \end{enumerate}
 

@@ -42,10 +42,8 @@ fn test_benchmarks_analysis() {
                 assert!(!graph.nodes.is_empty(), "Il file {:?} ha restituito un grafo vuoto pur non essendo vuoto", path);
             }
             
-            // Assicuriamoci che i moduli siano contati
             assert!(summary.total_modules > 0, "Dovrebbe esserci almeno il root module per {:?}", path);
             
-            // Salva il json generato
             let filename = path.file_name().unwrap().to_str().unwrap();
             let json_path = outputs_dir.join(format!("{}.json", filename));
             let json = serde_json::to_string_pretty(&graph).expect("Impossibile serializzare il grafo");

@@ -7,6 +7,7 @@ use std::collections::HashMap;
 pub struct ResolutionContext {
     pub current_prefix: QualifiedName,
     pub symbol_table: HashMap<QualifiedName, Component>,
+    pub imports: Vec<Import>,
 }
 
 /// Builds a flat symbol table from a list of root modules, indexing every nested component.
@@ -49,6 +50,7 @@ pub fn resolve_type_refs(modules: Vec<Module>) -> Vec<Module> {
     let ctx = ResolutionContext {
         current_prefix: vec![],
         symbol_table,
+        imports: vec![],
     };
     modules
         .into_iter()
@@ -56,17 +58,61 @@ pub fn resolve_type_refs(modules: Vec<Module>) -> Vec<Module> {
         .collect()
 }
 
+enum ResolutionResult {
+    Local(QualifiedName),
+    External(QualifiedName),
+}
+
 // Regole di risoluzione (come formalizzate: assoluto -> relativo -> enclosing)
-fn resolve_name_in_context(ctx: &ResolutionContext, name: &QualifiedName) -> Option<QualifiedName> {
+fn resolve_name_in_context(ctx: &ResolutionContext, name: &QualifiedName) -> Option<ResolutionResult> {
+    // 0. Imports (Punti di salto)
+    if let Some(first_part) = name.first() {
+        for imp in &ctx.imports {
+            if let Some(alias) = &imp.alias {
+                if alias == first_part {
+                    let mut candidate = imp.path.clone();
+                    candidate.extend(name.iter().skip(1).cloned());
+                    if ctx.symbol_table.contains_key(&candidate) {
+                        return Some(ResolutionResult::Local(candidate));
+                    } else {
+                        return Some(ResolutionResult::External(candidate));
+                    }
+                }
+            } else if !imp.is_wildcard {
+                if let Some(last_part) = imp.path.last() {
+                    if last_part == first_part {
+                        let mut candidate = imp.path.clone();
+                        candidate.extend(name.iter().skip(1).cloned());
+                        if ctx.symbol_table.contains_key(&candidate) {
+                            return Some(ResolutionResult::Local(candidate));
+                        } else {
+                            return Some(ResolutionResult::External(candidate));
+                        }
+                    }
+                }
+            }
+        }
+        // Wildcards (richiede validazione in symbol_table)
+        for imp in &ctx.imports {
+            if imp.is_wildcard {
+                let mut candidate = imp.path.clone();
+                candidate.extend(name.clone());
+                if ctx.symbol_table.contains_key(&candidate) {
+                    return Some(ResolutionResult::Local(candidate));
+                }
+            }
+        }
+    }
+
     // 1. Assoluto
     if ctx.symbol_table.contains_key(name) {
-        return Some(name.clone());
+        return Some(ResolutionResult::Local(name.clone()));
     }
     // 2. Relativo al current_prefix
     let mut relative = ctx.current_prefix.clone();
     relative.extend(name.clone());
     if ctx.symbol_table.contains_key(&relative) {
-        return Some(relative);
+        return Some(ResolutionResult::Local(relative));
     }
     // 3. Climb sugli enclosing scopes
     let mut prefix = ctx.current_prefix.clone();
@@ -75,7 +121,7 @@ fn resolve_name_in_context(ctx: &ResolutionContext, name: &QualifiedName) -> Opt
         let mut candidate = prefix.clone();
         candidate.extend(name.clone());
         if ctx.symbol_table.contains_key(&candidate) {
-            return Some(candidate);
+            return Some(ResolutionResult::Local(candidate));
         }
     }
     None
@@ -85,7 +131,10 @@ fn resolve_type_ref(ctx: &ResolutionContext, tr: TypeRef) -> TypeRef {
     match tr {
         TypeRef::Unresolved(name) => {
             if let Some(resolved) = resolve_name_in_context(ctx, &name) {
-                TypeRef::Resolved(resolved)
+                match resolved {
+                    ResolutionResult::Local(n) => TypeRef::Resolved(n),
+                    ResolutionResult::External(n) => TypeRef::External(n),
+                }
             } else {
                 TypeRef::Failed(name)
             }
@@ -100,10 +149,10 @@ fn resolve_module_in_context(ctx: &ResolutionContext, mut module: Module) -> Mod
     new_prefix.extend(module.name.clone());
 
     module.name = new_prefix.clone();
-
     let new_ctx = ResolutionContext {
         current_prefix: new_prefix.clone(),
         symbol_table: ctx.symbol_table.clone(),
+        imports: module.imports.clone(),
     };
 
     module.structured_types = module
@@ -153,8 +202,9 @@ fn resolve_structured_type(ctx: &ResolutionContext, mut st: StructuredType) -> S
     st.name = new_prefix.clone();
 
     let new_ctx = ResolutionContext {
-        current_prefix: new_prefix,
+        current_prefix: new_prefix.clone(),
         symbol_table: ctx.symbol_table.clone(),
+        imports: ctx.imports.clone(),
     };
 
     st.super_types = st
@@ -207,8 +257,9 @@ fn resolve_impl_block(ctx: &ResolutionContext, mut i: ImplBlock) -> ImplBlock {
     i.name = new_prefix.clone();
 
     let new_ctx = ResolutionContext {
-        current_prefix: new_prefix,
+        current_prefix: new_prefix.clone(),
         symbol_table: ctx.symbol_table.clone(),
+        imports: ctx.imports.clone(),
     };
 
     i.impl_for = resolve_type_ref(&new_ctx, i.impl_for);
@@ -305,61 +356,78 @@ fn traverse_structured_type_edges(st: &StructuredType, edges: &mut Vec<Dependenc
 
 fn add_super_edges(st: &StructuredType, edges: &mut Vec<Dependency>) {
     for sup in &st.super_types {
-        if let TypeRef::Resolved(to) = sup {
-            edges.push(Dependency {
-                from: st.name.clone(),
-                to: to.clone(),
-                kind: DependencyEdgeKind::Inherits,
-            });
+        match sup {
+            TypeRef::Resolved(to) | TypeRef::External(to) => {
+                edges.push(Dependency {
+                    from: st.name.clone(),
+                    to: to.clone(),
+                    kind: DependencyEdgeKind::Inherits,
+                });
+            }
+            _ => {}
         }
     }
 }
 
 fn add_field_edges(st: &StructuredType, edges: &mut Vec<Dependency>) {
     for f in &st.fields {
-        if let TypeRef::Resolved(to) = &f.ty {
-            edges.push(Dependency {
-                from: st.name.clone(),
-                to: to.clone(),
-                kind: DependencyEdgeKind::UsesFieldType,
-            });
+        match &f.ty {
+            TypeRef::Resolved(to) | TypeRef::External(to) => {
+                edges.push(Dependency {
+                    from: st.name.clone(),
+                    to: to.clone(),
+                    kind: DependencyEdgeKind::UsesFieldType,
+                });
+            }
+            _ => {}
         }
     }
 }
 
 fn add_function_edges(ff: &Function, edges: &mut Vec<Dependency>) {
     for p in &ff.signature.parameters {
-        if let TypeRef::Resolved(to) = &p.ty {
+        match &p.ty {
+            TypeRef::Resolved(to) | TypeRef::External(to) => {
+                edges.push(Dependency {
+                    from: ff.name.clone(),
+                    to: to.clone(),
+                    kind: DependencyEdgeKind::UsesParamType,
+                });
+            }
+            _ => {}
+        }
+    }
+    match &ff.signature.return_type {
+        TypeRef::Resolved(to) | TypeRef::External(to) => {
             edges.push(Dependency {
                 from: ff.name.clone(),
                 to: to.clone(),
-                kind: DependencyEdgeKind::UsesParamType,
+                kind: DependencyEdgeKind::UsesReturnType,
             });
         }
-    }
-    if let TypeRef::Resolved(to) = &ff.signature.return_type {
-        edges.push(Dependency {
-            from: ff.name.clone(),
-            to: to.clone(),
-            kind: DependencyEdgeKind::UsesReturnType,
-        });
+        _ => {}
     }
 }
-
 fn add_impl_edges(ib: &ImplBlock, edges: &mut Vec<Dependency>) {
-    if let TypeRef::Resolved(to) = &ib.impl_for {
-        edges.push(Dependency {
-            from: ib.name.clone(),
-            to: to.clone(),
-            kind: DependencyEdgeKind::Implements,
-        });
+    match &ib.impl_for {
+        TypeRef::Resolved(to) | TypeRef::External(to) => {
+            edges.push(Dependency {
+                from: ib.name.clone(),
+                to: to.clone(),
+                kind: DependencyEdgeKind::Implements,
+            });
+        }
+        _ => {}
     }
-    if let Some(TypeRef::Resolved(to)) = &ib.implements_trait {
-        edges.push(Dependency {
-            from: ib.name.clone(),
-            to: to.clone(),
-            kind: DependencyEdgeKind::Implements,
-        });
+    match &ib.implements_trait {
+        Some(TypeRef::Resolved(to)) | Some(TypeRef::External(to)) => {
+            edges.push(Dependency {
+                from: ib.name.clone(),
+                to: to.clone(),
+                kind: DependencyEdgeKind::Implements,
+            });
+        }
+        _ => {}
     }
     for m in &ib.methods {
         edges.push(Dependency {

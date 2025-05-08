@@ -25,6 +25,7 @@ fn walk_cst(node: tree_sitter::Node, source: &str, modules: &mut Vec<Module>) {
         if modules.is_empty() {
             modules.push(Module {
                 name: vec!["root".to_string()],
+                imports: vec![],
                 sub_modules: vec![],
                 structured_types: vec![],
                 free_functions: vec![],
@@ -46,6 +47,7 @@ fn walk_cst(node: tree_sitter::Node, source: &str, modules: &mut Vec<Module>) {
             crate::heuristics::ParsedItem::Component(crate::ir::Component::StructuredType(st)) => modules[0].structured_types.push(st),
             crate::heuristics::ParsedItem::Component(crate::ir::Component::Function(ff)) => modules[0].free_functions.push(ff),
             crate::heuristics::ParsedItem::ImplBlock(ib) => modules[0].impl_blocks.push(ib),
+            crate::heuristics::ParsedItem::Import(i) => modules[0].imports.push(i),
         }
         return;
     }

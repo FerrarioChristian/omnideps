@@ -4,11 +4,15 @@ use tree_sitter::Node;
 pub enum ParsedItem {
     Component(Component),
     ImplBlock(ImplBlock),
+    Import(Import),
 }
 
 // ==================== DISPATCHER CENTRALE ====================
 /// Attempts to identify and parse the given Tree-sitter `Node` into an Intermediate Representation (IR) Component.
 pub fn dispatch_node(node: Node, source: &str) -> Option<ParsedItem> {
+    if let Some(import) = try_parse_import(node, source) {
+        return Some(ParsedItem::Import(import));
+    }
     if let Some(m) = try_parse_module_node(node, source) {
         return Some(ParsedItem::Component(Component::Module(m)));
     }
@@ -39,6 +43,7 @@ fn try_parse_module_node(node: Node, source: &str) -> Option<Module> {
     let name = extract_identifier(node, source).unwrap_or_else(|| "unnamed_module".to_string());
     Some(Module {
         name: vec![name],
+        imports: vec![],
         sub_modules: vec![],
         structured_types: vec![],
         free_functions: vec![],
@@ -143,6 +148,63 @@ fn try_parse_impl_block(node: Node, source: &str) -> Option<ImplBlock> {
         impl_for,
         implements_trait,
         nested_types,
+    })
+}
+
+fn try_parse_import(node: Node, source: &str) -> Option<Import> {
+    if !node.is_named() {
+        return None;
+    }
+    let kind = node.kind();
+    if !matches!(
+        kind,
+        "use_declaration" | "import_declaration" | "import_statement" | "import_from_statement" | "preproc_include"
+    ) {
+        return None;
+    }
+
+    let text = node_text(node, source);
+    let is_wildcard = text.contains('*') || text.contains(".*") || text.contains("::*");
+    
+    // Attempt to find alias
+    let mut alias = None;
+    if let Some(as_pos) = text.find(" as ") {
+        let after_as = text[as_pos + 4..].trim();
+        let alias_part: String = after_as.chars().take_while(|c| c.is_alphanumeric() || *c == '_').collect();
+        if !alias_part.is_empty() {
+            alias = Some(alias_part);
+        }
+    }
+
+    // Try to extract path using tree-sitter fields, fallback to regex-like
+    let path = if let Some(p_node) = node.child_by_field_name("name")
+        .or_else(|| node.child_by_field_name("path")) 
+        .or_else(|| node.child_by_field_name("module_name"))
+    {
+        split_qualified_name(&node_text(p_node, source))
+    } else {
+        // Fallback for preproc_include or generic imports
+        let mut p = vec![];
+        let mut cursor = node.walk();
+        for child in node.children(&mut cursor) {
+            let c_kind = child.kind();
+            if matches!(c_kind, "scoped_identifier" | "identifier" | "dotted_name" | "system_lib_string" | "string_literal") {
+                let txt = node_text(child, source).replace("\"", "").replace("<", "").replace(">", "");
+                p = split_qualified_name(&txt);
+                break;
+            }
+        }
+        p
+    };
+
+    if path.is_empty() {
+        return None;
+    }
+
+    Some(Import {
+        path,
+        alias,
+        is_wildcard,
     })
 }
 
