@@ -1,4 +1,3 @@
-use crate::heuristics::dispatch_node;
 use crate::ir::Module;
 use tree_sitter::{Language, Node, Parser};
 
@@ -20,7 +19,7 @@ fn walk_cst(node: Node, source: &str, modules: &mut Vec<Module>) {
     // Il dispatcher unico viene chiamato su OGNI nodo
     if let Some(component) = crate::heuristics::dispatch_node(node, source) {
         // Qui decidiamo dove mettere il componente (in quale Module)
-        // Per ora semplifichiamo: creiamo un modulo root se non esiste
+        // Per ora semplice: crea un modulo root se non esiste
         if modules.is_empty() {
             modules.push(Module {
                 name: vec!["root".to_string()],
