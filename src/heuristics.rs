@@ -21,7 +21,6 @@ fn try_parse_structured_type(node: Node, source: &str) -> Option<StructuredType>
     let kind = node.kind();
     let text = node_text(node, source);
 
-    // Euristica ibrida: node.kind() + keyword testuale
     let is_structured = matches!(
         kind,
         "struct_item"
@@ -41,17 +40,15 @@ fn try_parse_structured_type(node: Node, source: &str) -> Option<StructuredType>
         return None;
     }
 
-    let name = extract_name(node, source)?;
+    let name = extract_name(node, source).unwrap_or_else(|| "Unnamed".to_string());
     let fields = extract_fields(node, source);
     let methods = extract_methods(node, source);
     let super_types = extract_super_types(node, source);
     let nested_types = extract_nested_types(node, source);
 
-    let kind_enum = determine_structured_kind(kind, &text);
-
     Some(StructuredType {
         name: vec![name],
-        kind: kind_enum,
+        kind: determine_structured_kind(kind, &text),
         fields,
         methods,
         super_types,
@@ -78,7 +75,7 @@ fn try_parse_free_function(node: Node, source: &str) -> Option<FreeFunction> {
         return None;
     }
 
-    let name = extract_name(node, source)?;
+    let name = extract_name(node, source).unwrap_or_else(|| "unnamed".to_string());
     let parameters = extract_parameters(node, source);
     let return_type = extract_return_type(node, source);
 
@@ -92,7 +89,6 @@ fn try_parse_free_function(node: Node, source: &str) -> Option<FreeFunction> {
 fn try_parse_impl_block(node: Node, source: &str) -> Option<ImplBlock> {
     let kind = node.kind();
     let text = node_text(node, source);
-
     if kind != "impl_item" && !text.contains("impl ") {
         return None;
     }
@@ -117,23 +113,10 @@ fn node_text(node: Node, source: &str) -> String {
 }
 
 fn extract_name(node: Node, source: &str) -> Option<String> {
-    // Prova prima con i field name di Tree-sitter
-    if let Some(name_node) = node.child_by_field_name("name") {
-        return Some(
-            name_node
-                .utf8_text(source.as_bytes())
-                .unwrap_or("")
-                .to_string(),
-        );
-    }
-    // Fallback su qualsiasi nodo "identifier" o "type_identifier"
-    let mut cursor = node.walk();
-    for child in node.children(&mut cursor) {
-        if matches!(child.kind(), "identifier" | "type_identifier" | "name") {
-            return Some(child.utf8_text(source.as_bytes()).unwrap_or("").to_string());
-        }
-    }
-    None
+    node.child_by_field_name("name")
+        .or_else(|| node.child_by_field_name("type_identifier"))
+        .or_else(|| node.child_by_field_name("identifier"))
+        .map(|n| n.utf8_text(source.as_bytes()).unwrap_or("").to_string())
 }
 
 fn determine_structured_kind(kind: &str, text: &str) -> StructuredTypeKind {
@@ -154,11 +137,13 @@ fn extract_fields(node: Node, source: &str) -> Vec<Field> {
     for child in node.children(&mut cursor) {
         if matches!(
             child.kind(),
-            "field_declaration" | "field_declaration_list" | "property_declaration"
+            "field_declaration" | "property_declaration" | "field"
         ) {
             if let Some(name) = extract_name(child, source) {
-                let ty = TypeRef::Unknown; // TODO: estrarre tipo reale
-                fields.push(Field { name, ty });
+                fields.push(Field {
+                    name,
+                    ty: TypeRef::Unknown,
+                });
             }
         }
     }
@@ -170,7 +155,6 @@ fn extract_methods(node: Node, source: &str) -> Vec<Method> {
     let mut cursor = node.walk();
     for child in node.children(&mut cursor) {
         if let Some(ff) = try_parse_free_function(child, source) {
-            // Converte FreeFunction in Method (stessa struttura)
             methods.push(Method {
                 name: ff.name,
                 parameters: ff.parameters,
@@ -182,8 +166,7 @@ fn extract_methods(node: Node, source: &str) -> Vec<Method> {
 }
 
 fn extract_super_types(_node: Node, _source: &str) -> Vec<TypeRef> {
-    // TODO: implementazione semplice per ora
-    vec![] // per il momento lasciamo vuoto
+    vec![] // TODO futuro: cerca "extends", "implements", "for" ecc.
 }
 
 fn extract_nested_types(node: Node, source: &str) -> Vec<StructuredType> {
@@ -199,19 +182,15 @@ fn extract_nested_types(node: Node, source: &str) -> Vec<StructuredType> {
 
 fn extract_parameters(node: Node, source: &str) -> Vec<Parameter> {
     let mut params = vec![];
-    // Cerchiamo il nodo parameters / parameter_list
     if let Some(params_node) = node.child_by_field_name("parameters") {
         let mut cursor = params_node.walk();
-        for param in params_node.children(&mut cursor) {
-            if param.kind().contains("parameter") {
-                let name = extract_name(param, source);
-                let ty = TypeRef::Unknown; // TODO: estrarre tipo
-                let is_variadic = node_text(param, source).contains("...")
-                    || node_text(param, source).contains("*args");
+        for p in params_node.children(&mut cursor) {
+            if p.kind().contains("parameter") {
                 params.push(Parameter {
-                    name,
-                    ty,
-                    is_variadic,
+                    name: extract_name(p, source),
+                    ty: TypeRef::Unknown,
+                    is_variadic: node_text(p, source).contains("...")
+                        || node_text(p, source).contains("*args"),
                 });
             }
         }
@@ -220,19 +199,15 @@ fn extract_parameters(node: Node, source: &str) -> Vec<Parameter> {
 }
 
 fn extract_return_type(node: Node, source: &str) -> TypeRef {
-    // Molto semplice per ora
-    if let Some(ret_node) = node.child_by_field_name("return_type") {
-        TypeRef::UserDefined(vec![node_text(ret_node, source)])
-    } else {
-        TypeRef::Unknown
-    }
+    node.child_by_field_name("return_type")
+        .map(|n| TypeRef::UserDefined(vec![node_text(n, source)]))
+        .unwrap_or(TypeRef::Unknown)
 }
 
 fn extract_impl_for(_node: Node, _source: &str) -> TypeRef {
-    // Per "impl Type for ..." o "impl Type"
-    TypeRef::Unknown // TODO: migliorare
+    TypeRef::Unknown // TODO futuro
 }
 
 fn extract_implements_trait(_node: Node, _source: &str) -> Option<TypeRef> {
-    None // TODO: migliorare
+    None
 }

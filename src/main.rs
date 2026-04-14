@@ -1,88 +1,26 @@
-// src/main.rs (versione minima per test)
-use language_agnostic_analyzer::extractor::languages;
+use language_agnostic_analyzer::extractors;
+use language_agnostic_analyzer::ir::Component;
 
 fn main() {
     let source = r#"
-use tree_sitter::Parser
-
-pub trait Entity {
-    fn get_id(&self) -> String;
-}
-
-pub trait LivingBeing: Entity {
-    fn breathe(&self);
-}
-
-pub struct Animal {
-    pub name: String,
-}
-
-impl Entity for Animal {
-    fn get_id(&self) -> String { self.name.clone() }
-}
-
-impl LivingBeing for Animal {
-    fn breathe(&self) { println!("Breathing..."); }
-}
-
-pub struct Mammal {
-    pub base: Animal,
-}
-
-pub struct Cat {
-    pub base: Mammal,
-}
-
-impl Cat {
-    pub fn speak(&self) { println!("Meow"); }
-    
-    pub struct Breed {
-        pub species_type: String,
-    }
-}
-
-pub trait Chargeable: Entity {
-    fn charge(&self);
-}
-
-pub struct Robot {
-    pub id: String,
-}
-
-impl Entity for Robot {
-    fn get_id(&self) -> String { self.id.clone() }
-}
-
-impl Chargeable for Robot {
-    fn charge(&self) { println!("Charging..."); }
-}
-
-// Moduli come Nesting
-pub mod outer {
-    pub mod inner {
-        pub struct DeepInner;
-        
-        impl DeepInner {
-            pub fn hello(&self) {
-                // Local struct in function
-                struct Local;
-            }
-        }
-    }
-}
-
+        struct Point { x: i32, y: i32 }
+        fn add(a: i32, b: i32) -> i32 { a + b }
     "#;
 
-    let modules =
-        language_agnostic_analyzer::extractor::generic_extract(languages::rust(), source).unwrap();
+    let (modules, graph, summary) =
+        extractors::full_analysis(extractors::languages::rust(), source).unwrap();
 
-    println!("Trovati {} moduli", modules.len());
-    for m in modules {
-        println!(
-            "  Modulo '{}' → {} structured types, {} free functions",
-            m.name.join("::"),
-            m.structured_types.len(),
-            m.free_functions.len()
-        );
+    println!("=== SUMMARY ===");
+    println!("Moduli: {}", summary.total_modules);
+    println!("Structured types: {}", summary.total_structured_types);
+    println!("Free functions: {}", summary.total_free_functions);
+
+    println!("\n=== GRAPH NODES ===");
+    for node in &graph.nodes {
+        match node {
+            Component::StructuredType(st) => println!("Structured: {:?}", st.name),
+            Component::FreeFunction(ff) => println!("Function: {}", ff.name),
+            _ => {}
+        }
     }
 }
