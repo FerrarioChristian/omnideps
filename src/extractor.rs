@@ -1,8 +1,8 @@
 use crate::ir::Module;
-use tree_sitter::{Language, Node, Parser};
+use tree_sitter::Language;
 
 pub fn generic_extract(lang: Language, source: &str) -> anyhow::Result<Vec<Module>> {
-    let mut parser = Parser::new();
+    let mut parser = tree_sitter::Parser::new();
     parser.set_language(&lang).unwrap();
 
     let tree = parser
@@ -15,11 +15,8 @@ pub fn generic_extract(lang: Language, source: &str) -> anyhow::Result<Vec<Modul
     Ok(modules)
 }
 
-fn walk_cst(node: Node, source: &str, modules: &mut Vec<Module>) {
-    // Il dispatcher unico viene chiamato su OGNI nodo
-    if let Some(component) = crate::heuristics::dispatch_node(node, source) {
-        // Qui decidiamo dove mettere il componente (in quale Module)
-        // Per ora semplice: crea un modulo root se non esiste
+fn walk_cst(node: tree_sitter::Node, source: &str, modules: &mut Vec<Module>) {
+    if let Some(comp) = crate::heuristics::dispatch_node(node, source) {
         if modules.is_empty() {
             modules.push(Module {
                 name: vec!["root".to_string()],
@@ -30,7 +27,7 @@ fn walk_cst(node: Node, source: &str, modules: &mut Vec<Module>) {
             });
         }
         let root = &mut modules[0];
-        match component {
+        match comp {
             crate::ir::Component::StructuredType(st) => root.structured_types.push(st),
             crate::ir::Component::FreeFunction(ff) => root.free_functions.push(ff),
             crate::ir::Component::ImplBlock(ib) => root.impl_blocks.push(ib),
@@ -38,14 +35,12 @@ fn walk_cst(node: Node, source: &str, modules: &mut Vec<Module>) {
         }
     }
 
-    // Ricorsione su tutti i figli
     let mut cursor = node.walk();
     for child in node.children(&mut cursor) {
         walk_cst(child, source, modules);
     }
 }
 
-// Funzioni di comodo per i vari linguaggi
 pub mod languages {
     use super::*;
     pub fn c() -> Language {
@@ -63,4 +58,19 @@ pub mod languages {
     pub fn rust() -> Language {
         tree_sitter_rust::LANGUAGE.into()
     }
+}
+
+pub fn full_analysis(
+    lang: Language,
+    source: &str,
+) -> anyhow::Result<(
+    Vec<Module>,
+    crate::ir::DependencyGraph,
+    crate::ir::AnalysisSummary,
+)> {
+    let modules = generic_extract(lang, source)?;
+    let resolved = crate::analysis::resolve_type_refs(modules);
+    let graph = crate::analysis::build_dependency_graph(&resolved);
+    let summary = crate::analysis::build_analysis_summary(&resolved);
+    Ok((resolved, graph, summary))
 }
