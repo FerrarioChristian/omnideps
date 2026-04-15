@@ -1,7 +1,7 @@
 pub type Identifier = String;
 pub type QualifiedName = Vec<Identifier>;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum PrimitiveType {
     Int,
     Float,
@@ -11,14 +11,14 @@ pub enum PrimitiveType {
     Other(String),
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum TypeRef {
     Primitive(PrimitiveType),
     UserDefined(QualifiedName),
     Unknown,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum StructuredTypeKind {
     Class,
     Struct,
@@ -26,34 +26,34 @@ pub enum StructuredTypeKind {
     Trait,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Field {
     pub name: Identifier,
     pub ty: TypeRef,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Parameter {
     pub name: Option<Identifier>,
     pub ty: TypeRef,
     pub is_variadic: bool,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Method {
     pub name: Identifier,
     pub parameters: Vec<Parameter>,
     pub return_type: TypeRef,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct FreeFunction {
     pub name: Identifier,
     pub parameters: Vec<Parameter>,
     pub return_type: TypeRef,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ImplBlock {
     pub name: QualifiedName,
     pub methods: Vec<Method>,
@@ -61,7 +61,7 @@ pub struct ImplBlock {
     pub implements_trait: Option<TypeRef>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct StructuredType {
     pub name: QualifiedName,
     pub kind: StructuredTypeKind,
@@ -71,7 +71,7 @@ pub struct StructuredType {
     pub nested_types: Vec<StructuredType>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Module {
     pub name: QualifiedName,
     pub sub_modules: Vec<Module>,
@@ -80,7 +80,7 @@ pub struct Module {
     pub impl_blocks: Vec<ImplBlock>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum Component {
     Module(Module),
     StructuredType(StructuredType),
@@ -88,7 +88,7 @@ pub enum Component {
     ImplBlock(ImplBlock),
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum DependencyEdgeKind {
     Inherits,
     Implements,
@@ -103,14 +103,14 @@ pub enum DependencyEdgeKind {
     ModuleContainment,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Dependency {
     pub from: QualifiedName,
     pub to: QualifiedName,
     pub kind: DependencyEdgeKind,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct DependencyGraph {
     pub nodes: Vec<Component>,
     pub edges: Vec<Dependency>,

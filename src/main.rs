@@ -1,54 +1,110 @@
-use language_agnostic_analyzer::extractor::{full_analysis, languages};
+use anyhow::Result;
+use clap::Parser;
+use language_agnostic_analyzer::{
+    extractor::{self, full_analysis},
+    ir::AnalysisSummary,
+};
+use std::fs;
+use walkdir::WalkDir;
 
-fn main() {
-    let sources = vec![
-        (
-            "Rust",
-            languages::rust(),
-            r#"
-            struct Point { x: i32 }
-            fn add(a: i32, b: i32) -> i32 { a + b }
-            impl Point { fn new() -> Self { Point { x: 0 } } }
-        "#,
-        ),
-        (
-            "Java",
-            languages::java(),
-            r#"
-            class MyClass { int field; void method() {} }
-        "#,
-        ),
-        (
-            "Python",
-            languages::python(),
-            r#"
-            class MyClass:
-                def method(self): pass
-            def free_func(): pass
-        "#,
-        ),
-        (
-            "C",
-            languages::c(),
-            r#"
-            struct MyStruct { int x; };
-            int free_func(int a) { return a; }
-        "#,
-        ),
-        (
-            "C++",
-            languages::cpp(),
-            r#"
-            class MyClass { void method(); };
-        "#,
-        ),
-    ];
+mod cli;
+use cli::Cli;
 
-    for (lang_name, lang, code) in sources {
-        println!("\n=== {} ===", lang_name);
-        let (modules, graph, summary) = full_analysis(lang, code).unwrap();
-        println!("Structured: {}", summary.total_structured_types);
-        println!("Free funcs: {}", summary.total_free_functions);
-        println!("Edges generati: {}", graph.edges.len());
+fn main() -> Result<()> {
+    let cli = Cli::parse();
+
+    if cli.path.is_file() {
+        analyze_single_file(&cli.path, cli.output.as_deref(), cli.csv.as_deref())?;
+    } else if cli.path.is_dir() {
+        analyze_directory(&cli.path, cli.output.as_deref(), cli.csv.as_deref())?;
+    } else {
+        println!("Percorso non valido!");
     }
+    Ok(())
+}
+
+fn analyze_single_file(
+    path: &std::path::Path,
+    json_out: Option<&std::path::Path>,
+    csv_out: Option<&std::path::Path>,
+) -> Result<()> {
+    let lang = detect_language(path)?;
+    let source = fs::read_to_string(path)?;
+    let (modules, graph, summary) = full_analysis(lang, &source)?;
+
+    println!("=== ANALISI {} ===", path.display());
+    print_summary(&summary);
+
+    if let Some(out) = json_out {
+        let json = serde_json::to_string_pretty(&graph)?;
+        fs::write(out, json)?;
+        println!("Grafo salvato in {}", out.display());
+    }
+
+    if let Some(csv) = csv_out {
+        save_summary_csv(&summary, csv)?;
+    }
+    Ok(())
+}
+
+fn analyze_directory(
+    dir: &std::path::Path,
+    json_out: Option<&std::path::Path>,
+    csv_out: Option<&std::path::Path>,
+) -> Result<()> {
+    let mut total_summary = AnalysisSummary::default();
+    let mut all_graphs = vec![];
+
+    for entry in WalkDir::new(dir).into_iter().filter_map(|e| e.ok()) {
+        if entry.file_type().is_file() {
+            if let Ok(lang) = detect_language(entry.path()) {
+                let source = fs::read_to_string(entry.path())?;
+                let (modules, graph, summary) = extractor::full_analysis(lang, &source)?;
+                total_summary.total_modules += summary.total_modules;
+                total_summary.total_structured_types += summary.total_structured_types;
+                // ... aggiungi gli altri campi
+                all_graphs.push(graph);
+            }
+        }
+    }
+
+    println!("=== ANALISI CARTELLA {} ===", dir.display());
+    print_summary(&total_summary);
+
+    // Salva tutto (opzionale)
+    if let Some(out) = json_out {
+        let json = serde_json::to_string_pretty(&all_graphs)?;
+        fs::write(out, json)?;
+    }
+    if let Some(csv) = csv_out {
+        save_summary_csv(&total_summary, csv)?;
+    }
+    Ok(())
+}
+
+fn detect_language(path: &std::path::Path) -> Result<tree_sitter::Language> {
+    match path.extension().and_then(|s| s.to_str()) {
+        Some("rs") => Ok(extractor::languages::rust()),
+        Some("java") => Ok(extractor::languages::java()),
+        Some("py") => Ok(extractor::languages::python()),
+        Some("c") | Some("h") => Ok(extractor::languages::c()),
+        Some("cpp") | Some("cxx") | Some("cc") | Some("hxx") => Ok(extractor::languages::cpp()),
+        _ => anyhow::bail!("Lingua non supportata"),
+    }
+}
+
+fn print_summary(s: &AnalysisSummary) {
+    println!("Moduli: {}", s.total_modules);
+    println!("Structured types: {}", s.total_structured_types);
+    println!("Free functions: {}", s.total_free_functions);
+    println!("Impl blocks: {}", s.total_impl_blocks);
+}
+
+fn save_summary_csv(s: &AnalysisSummary, path: &std::path::Path) -> Result<()> {
+    let csv = format!(
+        "total_modules,total_structured,total_free,total_impl\n{},{},{},{}",
+        s.total_modules, s.total_structured_types, s.total_free_functions, s.total_impl_blocks
+    );
+    fs::write(path, csv)?;
+    Ok(())
 }
