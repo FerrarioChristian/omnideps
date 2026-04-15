@@ -58,7 +58,7 @@ pub fn resolve_type_refs(modules: Vec<Module>) -> Vec<Module> {
         .collect()
 }
 
-// Regole di risoluzione (come formalizzate: assoluto → relativo → enclosing)
+// Regole di risoluzione (come formalizzate: assoluto -> relativo -> enclosing)
 fn resolve_name_in_context(ctx: &ResolutionContext, name: &QualifiedName) -> Option<QualifiedName> {
     // 1. Assoluto
     if ctx.symbol_table.contains_key(name) {
