@@ -208,10 +208,8 @@ fn extract_fields(node: Node, source: &str) -> Vec<Field> {
             "field_declaration" | "property_declaration" | "field"
         ) && let Some(name) = extract_identifier(child, source)
         {
-            fields.push(Field {
-                name,
-                ty: TypeRef::Unknown,
-            });
+            let ty = extract_type_ref(child, source);
+            fields.push(Field { name, ty });
         }
     }
     fields
@@ -249,11 +247,14 @@ fn extract_parameters(node: Node, source: &str) -> Vec<Parameter> {
         let mut cursor = params_node.walk();
         for p in params_node.children(&mut cursor) {
             if p.kind().contains("parameter") {
+                let name = extract_identifier(p, source);
+                let ty = extract_type_ref(p, source);
+                let is_variadic =
+                    node_text(p, source).contains("...") || node_text(p, source).contains("*args");
                 params.push(Parameter {
-                    name: extract_identifier(p, source),
-                    ty: TypeRef::Unknown,
-                    is_variadic: node_text(p, source).contains("...")
-                        || node_text(p, source).contains("*args"),
+                    name,
+                    ty,
+                    is_variadic,
                 });
             }
         }
@@ -262,68 +263,87 @@ fn extract_parameters(node: Node, source: &str) -> Vec<Parameter> {
 }
 
 fn extract_return_type(node: Node, source: &str) -> TypeRef {
-    node.child_by_field_name("return_type")
-        .map(|n| TypeRef::UserDefined(vec![node_text(n, source)]))
-        .unwrap_or(TypeRef::Unknown)
+    extract_type_ref(node, source)
 }
 
 // ==================== SUPER TYPES ====================
 
+// fn extract_super_types(node: Node, source: &str) -> Vec<TypeRef> {
+//     let mut supers = vec![];
+//     let text = node_text(node, source);
+//
+//     // Euristica ibrida: cerca field Tree-sitter + keyword testuali
+//     let super_nodes = node
+//         .child_by_field_name("super_type")
+//         .or_else(|| node.child_by_field_name("extends"))
+//         .or_else(|| node.child_by_field_name("implements"))
+//         .or_else(|| node.child_by_field_name("base_clause"));
+//
+//     if let Some(super_node) = super_nodes {
+//         let mut cursor = super_node.walk();
+//         for child in super_node.children(&mut cursor) {
+//             if let Some(name) = extract_qualified_name(child, source) {
+//                 supers.push(TypeRef::UserDefined(name));
+//             }
+//         }
+//     } else if text.contains("extends") || text.contains("implements") || text.contains("for ") {
+//         // Fallback testuale per linguaggi che non hanno field precisi
+//         let parts: Vec<&str> = text.split(&[':', '.', ' '][..]).collect();
+//         for p in parts {
+//             if p.contains("extends") || p.contains("implements") || p.contains("for") {
+//                 continue;
+//             }
+//             let trimmed = p.trim();
+//             if !trimmed.is_empty()
+//                 && trimmed
+//                     .chars()
+//                     .next()
+//                     .map(|c| c.is_alphabetic())
+//                     .unwrap_or(false)
+//             {
+//                 supers.push(TypeRef::UserDefined(vec![trimmed.to_string()]));
+//             }
+//         }
+//     }
+//     supers
+// }
+//
+// fn extract_impl_for(node: Node, source: &str) -> TypeRef {
+//     // Per Rust: "impl Type for ..." o "impl Type"
+//     let text = node_text(node, source);
+//     if let Some(for_pos) = text.find("for ") {
+//         let after_for = text[for_pos + 4..].trim();
+//         if let Some(name) = extract_name_from_text(after_for) {
+//             return TypeRef::UserDefined(name);
+//         }
+//     }
+//     // Caso "impl Type { ... }"
+//     if let Some(name) = extract_qualified_name(node, source) {
+//         TypeRef::UserDefined(name)
+//     } else {
+//         TypeRef::Unknown
+//     }
+// }
+
 fn extract_super_types(node: Node, source: &str) -> Vec<TypeRef> {
     let mut supers = vec![];
-    let text = node_text(node, source);
-
-    // Euristica ibrida: cerca field Tree-sitter + keyword testuali
-    let super_nodes = node
+    let super_node = node
         .child_by_field_name("super_type")
         .or_else(|| node.child_by_field_name("extends"))
         .or_else(|| node.child_by_field_name("implements"))
         .or_else(|| node.child_by_field_name("base_clause"));
 
-    if let Some(super_node) = super_nodes {
-        let mut cursor = super_node.walk();
-        for child in super_node.children(&mut cursor) {
-            if let Some(name) = extract_qualified_name(child, source) {
-                supers.push(TypeRef::UserDefined(name));
-            }
-        }
-    } else if text.contains("extends") || text.contains("implements") || text.contains("for ") {
-        // Fallback testuale per linguaggi che non hanno field precisi
-        let parts: Vec<&str> = text.split(&[':', '.', ' '][..]).collect();
-        for p in parts {
-            if p.contains("extends") || p.contains("implements") || p.contains("for") {
-                continue;
-            }
-            let trimmed = p.trim();
-            if !trimmed.is_empty()
-                && trimmed
-                    .chars()
-                    .next()
-                    .map(|c| c.is_alphabetic())
-                    .unwrap_or(false)
-            {
-                supers.push(TypeRef::UserDefined(vec![trimmed.to_string()]));
-            }
+    if let Some(n) = super_node {
+        let mut cursor = n.walk();
+        for child in n.children(&mut cursor) {
+            supers.push(extract_type_ref(child, source));
         }
     }
     supers
 }
 
 fn extract_impl_for(node: Node, source: &str) -> TypeRef {
-    // Per Rust: "impl Type for ..." o "impl Type"
-    let text = node_text(node, source);
-    if let Some(for_pos) = text.find("for ") {
-        let after_for = text[for_pos + 4..].trim();
-        if let Some(name) = extract_name_from_text(after_for) {
-            return TypeRef::UserDefined(name);
-        }
-    }
-    // Caso "impl Type { ... }"
-    if let Some(name) = extract_qualified_name(node, source) {
-        TypeRef::UserDefined(name)
-    } else {
-        TypeRef::Unknown
-    }
+    extract_type_ref(node, source)
 }
 
 fn extract_implements_trait(node: Node, source: &str) -> Option<TypeRef> {
@@ -347,4 +367,53 @@ fn extract_name_from_text(text: &str) -> Option<QualifiedName> {
         return None;
     }
     Some(split_qualified_name(trimmed))
+}
+
+// ==================== ESTRAZIONE TIPI REALI  ====================
+
+fn extract_type_ref(node: Node, source: &str) -> TypeRef {
+    // 1. Prova con i field Tree-sitter più comuni (precisi)
+    if let Some(type_node) = node
+        .child_by_field_name("type")
+        .or_else(|| node.child_by_field_name("return_type"))
+        .or_else(|| node.child_by_field_name("field_type"))
+        .or_else(|| node.child_by_field_name("value_type"))
+    {
+        let text = node_text(type_node, source);
+        if !text.is_empty() {
+            return TypeRef::UserDefined(split_qualified_name(&text));
+        }
+    }
+
+    // 2. Fallback: cerca qualsiasi nodo di tipo "type_identifier", "primitive_type", ecc.
+    let mut cursor = node.walk();
+    for child in node.children(&mut cursor) {
+        let kind = child.kind();
+        if matches!(
+            kind,
+            "type_identifier" | "primitive_type" | "identifier" | "type"
+        ) {
+            let text = node_text(child, source);
+            if !text.is_empty() && !text.contains(" ") {
+                return TypeRef::UserDefined(split_qualified_name(&text));
+            }
+        }
+    }
+
+    // 3. Ultimo fallback: cerca testo dopo ":" o "->" o ":"
+    let text = node_text(node, source);
+    if let Some(colon_pos) = text.find(':') {
+        let after = text[colon_pos + 1..].trim();
+        if !after.is_empty() {
+            return TypeRef::UserDefined(split_qualified_name(after));
+        }
+    }
+    if let Some(arrow_pos) = text.find("->") {
+        let after = text[arrow_pos + 2..].trim();
+        if !after.is_empty() {
+            return TypeRef::UserDefined(split_qualified_name(after));
+        }
+    }
+
+    TypeRef::Unknown
 }
