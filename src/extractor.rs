@@ -33,6 +33,7 @@ fn walk_cst(node: tree_sitter::Node, source: &str, modules: &mut Vec<Module>) {
             crate::ir::Component::ImplBlock(ib) => root.impl_blocks.push(ib),
             _ => {}
         }
+        return;
     }
 
     let mut cursor = node.walk();

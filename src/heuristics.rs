@@ -18,36 +18,39 @@ pub fn dispatch_node(node: Node, source: &str) -> Option<Component> {
 // ==================== FUNZIONI GENERICHE DI PARSING ====================
 
 fn try_parse_structured_type(node: Node, source: &str) -> Option<StructuredType> {
+    if !node.is_named() {
+        return None;
+    }
     let kind = node.kind();
     let text = node_text(node, source);
 
-    let is_structured = matches!(
-        kind,
-        "struct_item"
-            | "class_declaration"
-            | "interface_declaration"
-            | "struct_specifier"
-            | "trait_item"
-            | "enum_item"
-            | "union_item"
-    ) || text.contains("struct")
-        || text.contains("class")
-        || text.contains("interface")
-        || text.contains("trait")
-        || text.contains("enum");
+    let is_structured = (kind.contains("struct")
+        || kind.contains("class")
+        || kind.contains("interface")
+        || kind.contains("trait")
+        || kind.contains("enum")
+        || kind.contains("union"))
+        && !kind.contains("bound")
+        && !kind.contains("clause")
+        && !kind.contains("list")
+        && !kind.contains("expression")
+        && !kind.contains("argument")
+        && !kind.contains("call")
+        && !kind.contains("identifier")
+        && !kind.contains("specifier");
 
     if !is_structured {
         return None;
     }
 
-    let name = extract_identifier(node, source).unwrap_or_else(|| "Unnamed".to_string());
+    let name = extract_qualified_name(node, source).unwrap_or_else(|| vec!["unnamed_type".to_string()]);
     let fields = extract_fields(node, source);
     let methods = extract_methods(node, source);
     let super_types = extract_super_types(node, source);
     let nested_types = extract_nested_types(node, source);
 
     Some(StructuredType {
-        name: vec![name],
+        name,
         kind: determine_structured_kind(kind, &text),
         fields,
         methods,
@@ -57,19 +60,16 @@ fn try_parse_structured_type(node: Node, source: &str) -> Option<StructuredType>
 }
 
 fn try_parse_free_function(node: Node, source: &str) -> Option<FreeFunction> {
+    if !node.is_named() {
+        return None;
+    }
     let kind = node.kind();
-    let text = node_text(node, source);
 
-    let is_function = matches!(
-        kind,
-        "function_item"
-            | "fn_item"
-            | "function_declaration"
-            | "def_statement"
-            | "method_definition"
-    ) || text.contains("fn ")
-        || text.contains("def ")
-        || text.contains("func ");
+    let is_function = kind.contains("function")
+        || kind.contains("method")
+        || kind.contains("fn_item")
+        || kind.contains("def")
+        || kind.contains("func");
 
     if !is_function {
         return None;
@@ -87,19 +87,21 @@ fn try_parse_free_function(node: Node, source: &str) -> Option<FreeFunction> {
 }
 
 fn try_parse_impl_block(node: Node, source: &str) -> Option<ImplBlock> {
+    if !node.is_named() {
+        return None;
+    }
     let kind = node.kind();
-    let text = node_text(node, source);
-    if kind != "impl_item" && !text.contains("impl ") {
+    if !kind.contains("impl") {
         return None;
     }
 
-    let name = extract_identifier(node, source).unwrap_or_else(|| "unnamed_impl".to_string());
+    let name = extract_qualified_name(node, source).unwrap_or_else(|| vec!["unnamed_impl".to_string()]);
     let methods = extract_methods(node, source);
     let impl_for = extract_impl_for(node, source);
     let implements_trait = extract_implements_trait(node, source);
 
     Some(ImplBlock {
-        name: vec![name],
+        name,
         methods,
         impl_for,
         implements_trait,
@@ -210,6 +212,11 @@ fn extract_fields(node: Node, source: &str) -> Vec<Field> {
         {
             let ty = extract_type_ref(child, source);
             fields.push(Field { name, ty });
+        } else if child.kind().contains("body")
+            || child.kind().contains("list")
+            || child.kind().contains("block")
+        {
+            fields.extend(extract_fields(child, source));
         }
     }
     fields
@@ -225,6 +232,11 @@ fn extract_methods(node: Node, source: &str) -> Vec<Method> {
                 parameters: ff.parameters,
                 return_type: ff.return_type,
             });
+        } else if child.kind().contains("body")
+            || child.kind().contains("list")
+            || child.kind().contains("block")
+        {
+            methods.extend(extract_methods(child, source));
         }
     }
     methods
@@ -236,6 +248,11 @@ fn extract_nested_types(node: Node, source: &str) -> Vec<StructuredType> {
     for child in node.children(&mut cursor) {
         if let Some(st) = try_parse_structured_type(child, source) {
             nested.push(st);
+        } else if child.kind().contains("body")
+            || child.kind().contains("list")
+            || child.kind().contains("block")
+        {
+            nested.extend(extract_nested_types(child, source));
         }
     }
     nested

@@ -30,7 +30,7 @@ fn analyze_single_file(
 ) -> Result<()> {
     let lang = detect_language(path)?;
     let source = fs::read_to_string(path)?;
-    let (modules, graph, summary) = full_analysis(lang, &source)?;
+    let (_modules, graph, summary) = full_analysis(lang, &source)?;
 
     println!("=== ANALISI {} ===", path.display());
     print_summary(&summary);
@@ -56,15 +56,16 @@ fn analyze_directory(
     let mut all_graphs = vec![];
 
     for entry in WalkDir::new(dir).into_iter().filter_map(|e| e.ok()) {
-        if entry.file_type().is_file() {
-            if let Ok(lang) = detect_language(entry.path()) {
-                let source = fs::read_to_string(entry.path())?;
-                let (modules, graph, summary) = extractor::full_analysis(lang, &source)?;
-                total_summary.total_modules += summary.total_modules;
-                total_summary.total_structured_types += summary.total_structured_types;
-                // ... aggiungi gli altri campi
-                all_graphs.push(graph);
-            }
+        if entry.file_type().is_file()
+            && let Ok(lang) = detect_language(entry.path())
+        {
+            let source = fs::read_to_string(entry.path())?;
+            let (_modules, graph, summary) = extractor::full_analysis(lang, &source)?;
+            total_summary.total_modules += summary.total_modules;
+            total_summary.total_structured_types += summary.total_structured_types;
+            total_summary.total_free_functions += summary.total_free_functions;
+            total_summary.total_impl_blocks += summary.total_impl_blocks;
+            all_graphs.push(graph);
         }
     }
 
