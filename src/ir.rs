@@ -15,8 +15,9 @@ pub enum PrimitiveType {
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum TypeRef {
     Primitive(PrimitiveType),
-    UserDefined(QualifiedName),
-    Unknown,
+    Unresolved(QualifiedName),
+    Resolved(QualifiedName),
+    Failed(QualifiedName),
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -126,5 +127,5 @@ pub struct AnalysisSummary {
     pub total_free_functions: usize,
     pub total_impl_blocks: usize,
     pub resolved_refs: usize,
-    pub unknown_refs: usize,
+    pub failed_refs: usize,
 }

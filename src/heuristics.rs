@@ -308,7 +308,7 @@ fn extract_return_type(node: Node, source: &str) -> TypeRef {
 //         let mut cursor = super_node.walk();
 //         for child in super_node.children(&mut cursor) {
 //             if let Some(name) = extract_qualified_name(child, source) {
-//                 supers.push(TypeRef::UserDefined(name));
+//                 supers.push(TypeRef::Unresolved(name));
 //             }
 //         }
 //     } else if text.contains("extends") || text.contains("implements") || text.contains("for ") {
@@ -326,7 +326,7 @@ fn extract_return_type(node: Node, source: &str) -> TypeRef {
 //                     .map(|c| c.is_alphabetic())
 //                     .unwrap_or(false)
 //             {
-//                 supers.push(TypeRef::UserDefined(vec![trimmed.to_string()]));
+//                 supers.push(TypeRef::Unresolved(vec![trimmed.to_string()]));
 //             }
 //         }
 //     }
@@ -339,14 +339,14 @@ fn extract_return_type(node: Node, source: &str) -> TypeRef {
 //     if let Some(for_pos) = text.find("for ") {
 //         let after_for = text[for_pos + 4..].trim();
 //         if let Some(name) = extract_name_from_text(after_for) {
-//             return TypeRef::UserDefined(name);
+//             return TypeRef::Unresolved(name);
 //         }
 //     }
 //     // Caso "impl Type { ... }"
 //     if let Some(name) = extract_qualified_name(node, source) {
-//         TypeRef::UserDefined(name)
+//         TypeRef::Unresolved(name)
 //     } else {
-//         TypeRef::Unknown
+//         TypeRef::Failed(vec![])
 //     }
 // }
 
@@ -378,7 +378,7 @@ fn extract_implements_trait(node: Node, source: &str) -> Option<TypeRef> {
         if before_for.contains("impl") && !before_for.ends_with("impl") {
             // Es. "impl Trait for Type"
             if let Some(name) = extract_name_from_text(before_for) {
-                return Some(TypeRef::UserDefined(name));
+                return Some(TypeRef::Unresolved(name));
             }
         }
     }
@@ -406,7 +406,7 @@ fn extract_type_ref(node: Node, source: &str) -> TypeRef {
     {
         let text = node_text(type_node, source);
         if !text.is_empty() {
-            return TypeRef::UserDefined(split_qualified_name(&text));
+            return TypeRef::Unresolved(split_qualified_name(&text));
         }
     }
 
@@ -420,7 +420,7 @@ fn extract_type_ref(node: Node, source: &str) -> TypeRef {
         ) {
             let text = node_text(child, source);
             if !text.is_empty() && !text.contains(" ") {
-                return TypeRef::UserDefined(split_qualified_name(&text));
+                return TypeRef::Unresolved(split_qualified_name(&text));
             }
         }
     }
@@ -430,15 +430,15 @@ fn extract_type_ref(node: Node, source: &str) -> TypeRef {
     if let Some(colon_pos) = text.find(':') {
         let after = text[colon_pos + 1..].trim();
         if !after.is_empty() {
-            return TypeRef::UserDefined(split_qualified_name(after));
+            return TypeRef::Unresolved(split_qualified_name(after));
         }
     }
     if let Some(arrow_pos) = text.find("->") {
         let after = text[arrow_pos + 2..].trim();
         if !after.is_empty() {
-            return TypeRef::UserDefined(split_qualified_name(after));
+            return TypeRef::Unresolved(split_qualified_name(after));
         }
     }
 
-    TypeRef::Unknown
+    TypeRef::Failed(vec![])
 }

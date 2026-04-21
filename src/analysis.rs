@@ -88,11 +88,11 @@ fn resolve_name_in_context(ctx: &ResolutionContext, name: &QualifiedName) -> Opt
 
 fn resolve_type_ref(ctx: &ResolutionContext, tr: TypeRef) -> TypeRef {
     match tr {
-        TypeRef::UserDefined(name) => {
+        TypeRef::Unresolved(name) => {
             if let Some(resolved) = resolve_name_in_context(ctx, &name) {
-                TypeRef::UserDefined(resolved)
+                TypeRef::Resolved(resolved)
             } else {
-                TypeRef::Unknown
+                TypeRef::Failed(name)
             }
         }
         other => other,
@@ -223,7 +223,7 @@ pub fn build_dependency_graph(modules: &[Module]) -> DependencyGraph {
 
 fn add_super_edges(st: &StructuredType, edges: &mut Vec<Dependency>) {
     for sup in &st.super_types {
-        if let TypeRef::UserDefined(to) = sup {
+        if let TypeRef::Resolved(to) = sup {
             edges.push(Dependency {
                 from: st.name.clone(),
                 to: to.clone(),
@@ -235,7 +235,7 @@ fn add_super_edges(st: &StructuredType, edges: &mut Vec<Dependency>) {
 
 fn add_field_edges(st: &StructuredType, edges: &mut Vec<Dependency>) {
     for f in &st.fields {
-        if let TypeRef::UserDefined(to) = &f.ty {
+        if let TypeRef::Resolved(to) = &f.ty {
             edges.push(Dependency {
                 from: st.name.clone(),
                 to: to.clone(),
@@ -248,7 +248,7 @@ fn add_field_edges(st: &StructuredType, edges: &mut Vec<Dependency>) {
 fn add_method_edges(st: &StructuredType, edges: &mut Vec<Dependency>) {
     for m in &st.methods {
         for p in &m.parameters {
-            if let TypeRef::UserDefined(to) = &p.ty {
+            if let TypeRef::Resolved(to) = &p.ty {
                 edges.push(Dependency {
                     from: st.name.clone(),
                     to: to.clone(),
@@ -256,7 +256,7 @@ fn add_method_edges(st: &StructuredType, edges: &mut Vec<Dependency>) {
                 });
             }
         }
-        if let TypeRef::UserDefined(to) = &m.return_type {
+        if let TypeRef::Resolved(to) = &m.return_type {
             edges.push(Dependency {
                 from: st.name.clone(),
                 to: to.clone(),
@@ -268,7 +268,7 @@ fn add_method_edges(st: &StructuredType, edges: &mut Vec<Dependency>) {
 
 fn add_free_function_edges(ff: &FreeFunction, edges: &mut Vec<Dependency>) {
     for p in &ff.parameters {
-        if let TypeRef::UserDefined(to) = &p.ty {
+        if let TypeRef::Resolved(to) = &p.ty {
             edges.push(Dependency {
                 from: vec![ff.name.clone()],
                 to: to.clone(),
@@ -276,7 +276,7 @@ fn add_free_function_edges(ff: &FreeFunction, edges: &mut Vec<Dependency>) {
             });
         }
     }
-    if let TypeRef::UserDefined(to) = &ff.return_type {
+    if let TypeRef::Resolved(to) = &ff.return_type {
         edges.push(Dependency {
             from: vec![ff.name.clone()],
             to: to.clone(),
@@ -286,14 +286,14 @@ fn add_free_function_edges(ff: &FreeFunction, edges: &mut Vec<Dependency>) {
 }
 
 fn add_impl_edges(ib: &ImplBlock, edges: &mut Vec<Dependency>) {
-    if let TypeRef::UserDefined(to) = &ib.impl_for {
+    if let TypeRef::Resolved(to) = &ib.impl_for {
         edges.push(Dependency {
             from: ib.name.clone(),
             to: to.clone(),
             kind: DependencyEdgeKind::ImplementsFor,
         });
     }
-    if let Some(TypeRef::UserDefined(to)) = &ib.implements_trait {
+    if let Some(TypeRef::Resolved(to)) = &ib.implements_trait {
         edges.push(Dependency {
             from: ib.name.clone(),
             to: to.clone(),
