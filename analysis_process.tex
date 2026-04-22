@@ -8,9 +8,9 @@ $$\Phi : \mathcal{L} \times \mathcal{S}_{code} \to \mathcal{G}$$
 $$\Phi = G \circ R \circ E$$
 Dove:
 \begin{itemize}
-    \item $E : \mathcal{L} \times \mathcal{S}_{code} \to \vec{\mathcal{M}}$ è la funzione di \textbf{Estrazione}.
-    \item $R : \vec{\mathcal{M}} \to \vec{\mathcal{M}}$ è la funzione di \textbf{Risoluzione} dei riferimenti.
-    \item $G : \vec{\mathcal{M}} \to \mathcal{G}$ è la funzione di \textbf{Costruzione del Grafo}.
+    \item $E : \mathcal{L} \times \mathcal{S}_{code} \to \mathcal{M}$ è la funzione di \textbf{Estrazione}.
+    \item $R : \mathcal{M} \to \mathcal{M}$ è la funzione di \textbf{Risoluzione} dei riferimenti.
+    \item $G : \mathcal{M} \to \mathcal{G}$ è la funzione di \textbf{Costruzione del Grafo}.
 \end{itemize}
 Questa formulazione evidenzia come il sistema sia una pipeline pura dove l'output di ogni fase è l'input della successiva, garantendo la coerenza semantica attraverso il sistema dei tipi condiviso.
 
@@ -49,32 +49,48 @@ Funzioni atomiche che estraggono i tipi base necessari per la costruzione dei co
 \end{itemize}
 
 \section{Fase 2: Risoluzione dei Nomi e dei Tipi ($R$)}
-La risoluzione trasforma un IR "parziale" (con riferimenti non risolti) in un IR semanticamente completo. Questa fase è totalmente \textbf{language-agnostic}.
+La fase di risoluzione è il processo di \textbf{Name Resolution} che trasforma i riferimenti simbolici estratti dal codice in puntatori semantici certi. Questa fase opera interamente sul dominio dell'IR ed è indipendente dal linguaggio sorgente.
 
-\subsection{Tabelle dei Simboli e Contesto}
-Sia $\Sigma = \mathcal{QN} \to \mathcal{C}$ la tabella dei simboli che associa nomi qualificati a componenti. Definiamo il contesto di risoluzione $\Gamma$ come la tripla $\langle \Sigma, \mathcal{QN}_{curr}, \vec{\mathcal{I}}_{imports} \rangle$.
+\subsection{Tabella dei Simboli ($\Sigma$)}
+La \textbf{Tabella dei Simboli} $\Sigma$ è definita come una funzione parziale (o mappa) che associa ogni nome qualificato univoco al componente corrispondente:
+$$\Sigma : \mathcal{QN} \to \mathcal{C}$$
+La funzione $\text{build\_sym\_table}(M)$ scansiona ricorsivamente il modulo radice $M$ e popola $\Sigma$ registrando ogni $\mathcal{S}, FN, \mathcal{B}_{lk}$ e modulo annidato. Questa tabella funge da registro globale (Global Scope) necessario per risolvere riferimenti tra entità definite in file o moduli diversi.
 
-\subsection{Funzioni di Risoluzione}
-\begin{itemize}
-    \item $\text{build\_sym\_table} : \vec{\mathcal{M}} \to \Sigma$ \\
-    Scansiona l'albero dei componenti per popolare la tabella globale dei simboli.
-    \item $\text{resolve}_{\tau} : \Gamma \times \tau \to \tau$ \\
-    Data un riferimento $\tau$, cerca la corrispondenza univoca in $\Sigma$ applicando le regole di scoping definite in $\Gamma$.
-\end{itemize}
+\subsection{Contesto di Risoluzione ($\Gamma$)}
+Per gestire la visibilità locale e gli import, ogni operazione di risoluzione avviene all'interno di un \textbf{Contesto} $\Gamma$:
+$$\Gamma = \langle \Sigma, \mathcal{QN}_{curr}, \mathcal{I}_{imports} \rangle$$
+dove $\mathcal{QN}_{curr}$ è il percorso del modulo attuale e $\mathcal{I}_{imports}$ è l'insieme dei nomi portati nello scope attraverso clausole di importazione.
 
-\subsection{Ricorsione Strutturale}
-La risoluzione è propagata ricorsivamente su tutta la gerarchia:
-$$\text{resolve}_{\mathcal{M}} : \Gamma \times \mathcal{M} \to \mathcal{M}$$
-Per ogni $\mathcal{S} \in \mathcal{M}$, viene invocata $\text{resolve}_{\mathcal{S}}$, che a sua volta invoca $\text{resolve}_{\tau}$ su ogni campo, parametro e super-tipo.
+\subsection{Logica di Risoluzione ($R_{\tau}$)}
+La funzione core $\text{resolve}_{\tau} : \Gamma \times \tau \to \tau$ opera secondo la seguente logica:
+\begin{enumerate}
+    \item Se $\tau = \text{Primitive}$, il riferimento è già risolto per definizione.
+    \item Se $\tau = \text{UserDefined}(qn)$, la funzione tenta di risolvere $qn$ cercando:
+    \begin{itemize}
+        \item Nel percorso locale ($\mathcal{QN}_{curr} + qn$).
+        \item Attraverso gli alias definiti in $\mathcal{I}_{imports}$.
+        \item Nel Global Scope fornito da $\Sigma$.
+    \end{itemize}
+    \item Se la ricerca ha successo, restituisce $\text{UserDefined}(qn_{resolved})$ dove $qn_{resolved}$ è il percorso assoluto in $\Sigma$. Altrimenti, restituisce \texttt{Unknown}.
+\end{enumerate}
 
 \section{Fase 3: Costruzione del Grafo delle Dipendenze ($G$)}
-L'ultima fase mappa l'albero dei componenti risolti in un grafo orientato.
+La fase finale proietta la struttura gerarchica dell'IR in un grafo orientato $\mathcal{G} = \langle V, E \rangle$ che rappresenta le interconnessioni architetturali del sistema.
 
+\subsection{Nodi ($V$)}
+Ogni componente $c \in \mathcal{C}$ presente nel sistema risolto diventa un vertice del grafo. L'identità di un nodo è garantita dal suo nome qualificato assoluto.
+
+\subsection{Archi e Relazioni ($E$)}
+Un arco $e = \langle u, v, k \rangle \in E$ rappresenta una dipendenza dal componente $u$ verso il componente $v$ di tipo $k \in \text{Kind}$. Il sistema estrae archi analizzando i riferimenti risolti all'interno di ogni componente:
 \begin{itemize}
-    \item $\text{build\_graph} : \vec{\mathcal{M}} \to \mathcal{G}$
-    \item $\text{extract\_edges} : \mathcal{C} \to \vec{E}$ \\
-    Per ogni componente, genera archi $e = \langle \text{from}, \text{to}, k \rangle$ basandosi sui riferimenti $\tau$ contenuti (es. il tipo di un campo genera un arco \textit{UsesFieldType}).
+    \item \textbf{Ereditarietà}: Generata da ogni $\tau \in \vec{\tau}_{sup}$ di un tipo strutturato ($k = \text{Inherits}$).
+    \item \textbf{Composizione/Uso}: Generata dal tipo di ogni campo $F$ ($k = \text{UsesFieldType}$).
+    \item \textbf{Interazione Comportamentale}: Generata dai tipi dei parametri $\vec{P}$ e dal tipo di ritorno $\tau_{ret}$ di ogni metodo o funzione ($k = \text{UsesParamType}, \text{UsesReturnType}$).
+    \item \textbf{Contenimento}: Generata dalla gerarchia dei moduli e dei tipi annidati ($k = \text{NestedIn}, \text{Contains}$).
+    \item \textbf{Implementazione}: Generata dai blocchi $\mathcal{B}_{lk}$ verso il target e il trait ($k = \text{ImplementsFor}, \text{ImplementsTrait}$).
 \end{itemize}
+Il grafo così costruito fornisce una visione unificata e agnostica delle dipendenze, permettendo analisi metriche e strutturali cross-linguaggio.
+
 
 \section{Proprietà del Modello}
 La formalizzazione dimostra tre proprietà fondamentali del sistema:

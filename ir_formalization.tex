@@ -69,7 +69,10 @@ Ogni elemento del software è quindi un nodo in un albero di componenti $T \in \
 Il risultato finale dell'analisi è un grafo orientato $\mathcal{G} = (V, E)$. 
 L'insieme dei vertici $V$ è l'insieme di tutti i componenti identificati nel sistema:
 $$V = \{ c \mid c \in \mathcal{C} \}$$
-L'insieme degli archi $E$ rappresenta le relazioni di dipendenza tra componenti, identificate univocamente dai loro nomi qualificati:
-$$E \subseteq \mathcal{QN} \times \mathcal{QN} \times \text{Kind}$$
+L'insieme degli archi $E$ rappresenta le relazioni semantiche e strutturali tra i componenti stessi. Formalmente, un arco è una tripla definita sul prodotto cartesiano dei vertici:
+$$E \subseteq \mathcal{C} \times \mathcal{C} \times \text{Kind}$$
 dove $\text{Kind}$ definisce la semantica della dipendenza (ereditarietà, uso di tipo nei campi, parametri di metodi, implementazione di trait, ecc.).
+
+\textit{Nota implementativa:} Mentre a livello formale un arco collega direttamente due istanze astratte del tipo $\mathcal{C}$, nell'implementazione software (per ragioni di efficienza di memoria, serializzazione e sicurezza dei tipi in Rust) le relazioni sono tracciate utilizzando i nomi qualificati ($\mathcal{QN}$) delle entità come chiavi identificative.
+
 
