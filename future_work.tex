@@ -1,0 +1,34 @@
+\chapter{Sviluppi Futuri}
+
+Il lavoro presentato in questa fase costituisce le fondamenta formali e l'infrastruttura architetturale del sistema di analisi \textit{language-agnostic}. Le fasi di estrazione, risoluzione e costruzione del grafo hanno dimostrato la validità dell'approccio basato su tipi e composizione funzionale. Tuttavia, per raggiungere un grado di maturità tale da poter analizzare codebase complesse e reali in produzione, il sistema richiederà diverse estensioni nei prossimi mesi di sviluppo.
+
+Di seguito vengono delineati i principali filoni di ricerca e implementazione futuri.
+
+\section{Estensione del Supporto ai Costrutti del Linguaggio}
+Attualmente, la Rappresentazione Intermedia (IR) copre i costrutti fondamentali della programmazione orientata agli oggetti e procedurale (Classi, Interfacce, Funzioni, Metodi). L'IR dovrà essere espansa per supportare costrutti più avanzati che impattano in modo significativo sull'architettura:
+\begin{itemize}
+    \item \textbf{Generics e Polimorfismo Parametrico}: Linguaggi come Java, C++ (Template) e Rust fanno un uso massiccio di tipi generici. Il sistema dei tipi $\mathcal{T}$ dovrà essere esteso per catturare i parametri di tipo (es. \texttt{List<T>}) e i vincoli associati (es. \texttt{T: Clone} in Rust o \texttt{T extends Serializable} in Java).
+    \item \textbf{Tipi Somma Alggebrici}: L'introduzione di \textbf{Enums} complessi (con dati associati, tipici di Rust o Swift) e \textbf{Unions} (in C/C++) richiederà la definizione di un nuovo Componente nell'IR, distinto dalle normali Classi o Struct.
+\end{itemize}
+
+\section{Supporto a Paradigmi Architetturali Avanzati}
+Molti linguaggi moderni utilizzano costrutti che alterano la struttura o il comportamento del codice in fase di compilazione o a runtime. Ignorare questi elementi significherebbe perdere dipendenze architetturali cruciali:
+\begin{itemize}
+    \item \textbf{Decorators e Annotazioni}: In Python e Java, i decoratori (\texttt{@Entity}, \texttt{@Autowired}) spesso iniettano dipendenze silenziose (es. verso framework come Spring o Django). Sarà necessario estrarre questi metadati e mapparli come speciali archi di dipendenza.
+    \item \textbf{Mixins e Traits con Implementazioni di Default}: Sebbene i Trait siano abbozzati, la gestione dei Mixins (comuni in linguaggi dinamici o in Dart) richiede una logica di risoluzione più sofisticata per tracciare correttamente l'ereditarietà multipla o l'iniezione di comportamento.
+    \item \textbf{Programmazione Orientata agli Aspetti (AOP)}: Costrutti come gli \textit{Aspects} in Java modificano il flusso di esecuzione ortogonalmente alla gerarchia delle classi. Tracciarli nel Grafo delle Dipendenze rappresenterà una sfida interessante per il mantenimento dell'agnosticismo.
+\end{itemize}
+
+\section{Affinamento delle Euristiche di Estrazione}
+L'approccio attuale si basa su funzioni di dispatch che traducono i nodi del Concrete Syntax Tree (CST) di Tree-sitter. Nei prossimi mesi, le euristiche dovranno essere irrobustite per gestire:
+\begin{itemize}
+    \item \textbf{Costrutti Sintattici Ambigui}: Migliorare il parsing di macro (C/C++ e Rust) che espandendosi generano nuovo codice non visibile nell'AST originale.
+    \item \textbf{Graceful Degradation}: Implementare meccanismi più solidi per estrarre informazioni parziali quando il parser incontra porzioni di codice gravemente malformate o non supportate, garantendo che l'analisi globale non fallisca ma segnali puntualmente il degrado.
+\end{itemize}
+
+\section{Arricchimento del Grafo e Analisi delle Metriche}
+Una volta che l'astrazione sarà sufficientemente ricca, l'ultimo step riguarderà lo sfruttamento del Grafo delle Dipendenze ($\mathcal{G}$):
+\begin{itemize}
+    \item \textbf{Nuove Semantiche di Dipendenza}: Espandere l'insieme $\text{Kind}$ degli archi per includere relazioni temporali o di ownership (es. il passaggio di referenze mutabili in Rust vs il passaggio per valore in C).
+    \item \textbf{Metriche Architetturali}: Sviluppare algoritmi che, navigando il grafo, calcolino metriche classiche (Accoppiamento, Coesione, Cicli di Dipendenza) in modo totalmente indipendente dal linguaggio sorgente analizzato.
+\end{itemize}
