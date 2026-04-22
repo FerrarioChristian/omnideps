@@ -1,6 +1,8 @@
 use crate::ir::Module;
 use tree_sitter::Language;
 
+/// Extracts the basic Intermediate Representation (IR) modules from a source file given its Tree-sitter Language.
+/// It parses the source code into an AST and delegates node matching to the heuristics dispatcher.
 pub fn generic_extract(lang: Language, source: &str) -> anyhow::Result<Vec<Module>> {
     let mut parser = tree_sitter::Parser::new();
     parser.set_language(&lang).unwrap();
@@ -15,6 +17,9 @@ pub fn generic_extract(lang: Language, source: &str) -> anyhow::Result<Vec<Modul
     Ok(modules)
 }
 
+/// Recursively traverses the Concrete Syntax Tree (CST).
+/// When a recognized component is found, it's added to the IR and the recursion stops for that branch
+/// to prevent duplicating internal methods/functions as top-level components.
 fn walk_cst(node: tree_sitter::Node, source: &str, modules: &mut Vec<Module>) {
     if let Some(comp) = crate::heuristics::dispatch_node(node, source) {
         if modules.is_empty() {
@@ -42,6 +47,7 @@ fn walk_cst(node: tree_sitter::Node, source: &str, modules: &mut Vec<Module>) {
     }
 }
 
+/// Wrappers around tree-sitter language loading.
 pub mod languages {
     use super::*;
     pub fn c() -> Language {
@@ -61,6 +67,11 @@ pub mod languages {
     }
 }
 
+/// End-to-end analysis pipeline for a single source file:
+/// 1. Extraction into initial IR modules
+/// 2. Symbol resolution mapping names to types
+/// 3. Dependency graph construction
+/// 4. Statistics aggregation (summary)
 pub fn full_analysis(
     lang: Language,
     source: &str,

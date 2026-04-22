@@ -1,0 +1,86 @@
+\chapter{Formalizzazione del Processo di Analisi Funzionale}
+\section{Introduzione}
+Il sistema di analisi è modellato come una sequenza di trasformazioni tra domini tipati. La pipeline complessiva è definita dalla composizione di tre fasi principali: Estrazione Sintattica, Risoluzione Semantica e Costruzione del Grafo. 
+Siano $\mathcal{L}$ l'insieme dei linguaggi supportati, $\mathcal{S}_{code}$ il dominio del codice sorgente e $\mathcal{D}_{IR}$ il dominio della rappresentazione intermedia definito nel capitolo precedente.
+
+La funzione di analisi completa $\Phi$ è definita come la composizione delle tre fasi fondamentali:
+$$\Phi : \mathcal{L} \times \mathcal{S}_{code} \to \mathcal{G}$$
+$$\Phi = G \circ R \circ E$$
+Dove:
+\begin{itemize}
+    \item $E : \mathcal{L} \times \mathcal{S}_{code} \to \vec{\mathcal{M}}$ è la funzione di \textbf{Estrazione}.
+    \item $R : \vec{\mathcal{M}} \to \vec{\mathcal{M}}$ è la funzione di \textbf{Risoluzione} dei riferimenti.
+    \item $G : \vec{\mathcal{M}} \to \mathcal{G}$ è la funzione di \textbf{Costruzione del Grafo}.
+\end{itemize}
+Questa formulazione evidenzia come il sistema sia una pipeline pura dove l'output di ogni fase è l'input della successiva, garantendo la coerenza semantica attraverso il sistema dei tipi condiviso.
+
+\section{Fase 1: Estrazione Sintattica ($E$)}
+L'estrazione mappa i nodi dell'albero sintattico concreto ($\mathcal{N}$) in istanze del modello IR. Questa fase è l'unica dipendente dal linguaggio $L \in \mathcal{L}$. Poiché i nodi del CST contengono solo metadati strutturali, ogni funzione riceve in input anche il codice sorgente $S \in \mathcal{S}_{code}$ per l'estrazione dei token testuali.
+
+\subsection{Funzioni Core}
+\begin{itemize}
+    \item \textbf{Generic Extract}: $E : \mathcal{L} \times \mathcal{S}_{code} \to \mathcal{M}$ \\
+    Mappa l'intero sorgente in un unico \textbf{Modulo Radice} $\mathcal{M}$ che funge da entry-point del Component Tree.
+    \item \textbf{Node Dispatcher}: $f_{disp} : \mathcal{N} \times \mathcal{S}_{code} \to \mathcal{C}^?$ \\
+    Dato un nodo sintattico, identifica il costrutto e delega l'estrazione al parser specifico, restituendo un Componente opzionale.
+\end{itemize}
+
+\subsection{Parser Strutturali}
+Le funzioni di mapping che istanziano i componenti principali:
+\begin{itemize}
+    \item $f_{\mathcal{S}} : \mathcal{N} \times \mathcal{S}_{code} \to \mathcal{S}^?$ (Tipi Strutturati)
+    \item $f_{FN} : \mathcal{N} \times \mathcal{S}_{code} \to FN^?$ (Funzioni Libere)
+    \item $f_{\mathcal{B}_{lk}} : \mathcal{N} \times \mathcal{S}_{code} \to \mathcal{B}_{lk}^?$ (Blocchi di Implementazione)
+\end{itemize}
+
+\subsection{Helper di Estrazione}
+Funzioni atomiche che estraggono i tipi base necessari per la costruzione dei componenti dell'IR:
+\begin{itemize}
+    \item $\text{ext}_{\mathcal{QN}} : \mathcal{N} \times \mathcal{S}_{code} \to \mathcal{QN}^?$ \\
+    Estrae il nome qualificato (es. \texttt{std::vec::Vec}) analizzando l'identificatore o il percorso sintattico.
+    \item $\text{ext}_{\tau} : \mathcal{N} \times \mathcal{S}_{code} \to \tau$ \\
+    Mappa un nodo tipo in un riferimento $\tau$ (inizialmente \texttt{Unknown} o \texttt{UserDefined}).
+    \item $\text{ext}_{\vec{F}} : \mathcal{N} \times \mathcal{S}_{code} \to \vec{F}$ \\
+    Estrae l'insieme dei campi di un tipo strutturato.
+    \item $\text{ext}_{\vec{P}} : \mathcal{N} \times \mathcal{S}_{code} \to \vec{P}$ \\
+    Estrae la lista dei parametri di una funzione, preservando ordine, tipi e variadicita.
+    \item $\text{ext}_{\vec{\tau}_{sup}} : \mathcal{N} \times \mathcal{S}_{code} \to \vec{\tau}$ \\
+    Estrae i riferimenti alle gerarchie di ereditarietà o implementazione di trait.
+\end{itemize}
+
+\section{Fase 2: Risoluzione dei Nomi e dei Tipi ($R$)}
+La risoluzione trasforma un IR "parziale" (con riferimenti non risolti) in un IR semanticamente completo. Questa fase è totalmente \textbf{language-agnostic}.
+
+\subsection{Tabelle dei Simboli e Contesto}
+Sia $\Sigma = \mathcal{QN} \to \mathcal{C}$ la tabella dei simboli che associa nomi qualificati a componenti. Definiamo il contesto di risoluzione $\Gamma$ come la tripla $\langle \Sigma, \mathcal{QN}_{curr}, \vec{\mathcal{I}}_{imports} \rangle$.
+
+\subsection{Funzioni di Risoluzione}
+\begin{itemize}
+    \item $\text{build\_sym\_table} : \vec{\mathcal{M}} \to \Sigma$ \\
+    Scansiona l'albero dei componenti per popolare la tabella globale dei simboli.
+    \item $\text{resolve}_{\tau} : \Gamma \times \tau \to \tau$ \\
+    Data un riferimento $\tau$, cerca la corrispondenza univoca in $\Sigma$ applicando le regole di scoping definite in $\Gamma$.
+\end{itemize}
+
+\subsection{Ricorsione Strutturale}
+La risoluzione è propagata ricorsivamente su tutta la gerarchia:
+$$\text{resolve}_{\mathcal{M}} : \Gamma \times \mathcal{M} \to \mathcal{M}$$
+Per ogni $\mathcal{S} \in \mathcal{M}$, viene invocata $\text{resolve}_{\mathcal{S}}$, che a sua volta invoca $\text{resolve}_{\tau}$ su ogni campo, parametro e super-tipo.
+
+\section{Fase 3: Costruzione del Grafo delle Dipendenze ($G$)}
+L'ultima fase mappa l'albero dei componenti risolti in un grafo orientato.
+
+\begin{itemize}
+    \item $\text{build\_graph} : \vec{\mathcal{M}} \to \mathcal{G}$
+    \item $\text{extract\_edges} : \mathcal{C} \to \vec{E}$ \\
+    Per ogni componente, genera archi $e = \langle \text{from}, \text{to}, k \rangle$ basandosi sui riferimenti $\tau$ contenuti (es. il tipo di un campo genera un arco \textit{UsesFieldType}).
+\end{itemize}
+
+\section{Proprietà del Modello}
+La formalizzazione dimostra tre proprietà fondamentali del sistema:
+\begin{enumerate}
+    \item \textbf{Type Safety}: Ogni funzione $f: I \to O$ garantisce che l'output appartenga al dominio IR, impedendo stati inconsistenti tra le fasi.
+    \item \textbf{Agnosticismo}: La separazione netta tra la Fase 1 ($L$-dependent) e le Fasi 2 e 3 ($L$-independent) assicura che il core logico non sia influenzato dalla sintassi del linguaggio sorgente.
+    \item \textbf{Terminazione}: Poiché tutte le funzioni operano per ricorsione strutturale su alberi di sintassi finiti, il processo di analisi converge sempre in tempo finito.
+\end{enumerate}
+

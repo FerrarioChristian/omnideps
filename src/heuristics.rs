@@ -2,6 +2,8 @@ use crate::ir::*;
 use tree_sitter::Node;
 
 // ==================== DISPATCHER CENTRALE ====================
+/// Attempts to identify and parse the given Tree-sitter `Node` into an Intermediate Representation (IR) Component.
+/// Returns `Some(Component)` if a match is found (e.g., StructuredType, FreeFunction, ImplBlock), otherwise `None`.
 pub fn dispatch_node(node: Node, source: &str) -> Option<Component> {
     if let Some(st) = try_parse_structured_type(node, source) {
         return Some(Component::StructuredType(st));
@@ -17,6 +19,7 @@ pub fn dispatch_node(node: Node, source: &str) -> Option<Component> {
 
 // ==================== FUNZIONI GENERICHE DI PARSING ====================
 
+/// Heuristically determines if a node is a structured type definition (Struct, Class, Interface, etc.).
 fn try_parse_structured_type(node: Node, source: &str) -> Option<StructuredType> {
     if !node.is_named() {
         return None;
@@ -59,6 +62,7 @@ fn try_parse_structured_type(node: Node, source: &str) -> Option<StructuredType>
     })
 }
 
+/// Heuristically identifies free-standing functions or methods.
 fn try_parse_free_function(node: Node, source: &str) -> Option<FreeFunction> {
     if !node.is_named() {
         return None;
@@ -86,6 +90,7 @@ fn try_parse_free_function(node: Node, source: &str) -> Option<FreeFunction> {
     })
 }
 
+/// Identifies implementation blocks commonly found in Rust.
 fn try_parse_impl_block(node: Node, source: &str) -> Option<ImplBlock> {
     if !node.is_named() {
         return None;
@@ -110,10 +115,12 @@ fn try_parse_impl_block(node: Node, source: &str) -> Option<ImplBlock> {
 
 // ==================== HELPER GENERICI ====================
 
+/// Extracts the raw UTF-8 text from a Tree-sitter node.
 fn node_text(node: Node, source: &str) -> String {
     node.utf8_text(source.as_bytes()).unwrap_or("").to_string()
 }
 
+/// Tries to extract a simple identifier (string) from common child field names.
 fn extract_identifier(node: Node, source: &str) -> Option<String> {
     node.child_by_field_name("name")
         .or_else(|| node.child_by_field_name("type_identifier"))
@@ -124,6 +131,7 @@ fn extract_identifier(node: Node, source: &str) -> Option<String> {
         })
 }
 
+/// Extracts a qualified name (e.g. A::B::C) by traversing identifiers.
 fn extract_qualified_name(node: Node, source: &str) -> Option<QualifiedName> {
     // Prova con field Tree-sitter (più preciso)
     if let Some(n) = node

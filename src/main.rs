@@ -10,6 +10,8 @@ use walkdir::WalkDir;
 mod cli;
 use cli::Cli;
 
+/// Entry point of the analyzer.
+/// Parses arguments and routes to either single file analysis or recursive directory analysis.
 fn main() -> Result<()> {
     let cli = Cli::parse();
 
@@ -23,6 +25,8 @@ fn main() -> Result<()> {
     Ok(())
 }
 
+/// Runs the full analysis pipeline on a single file, printing the summary
+/// and optionally saving the graph to JSON and the summary to CSV.
 fn analyze_single_file(
     path: &std::path::Path,
     json_out: Option<&std::path::Path>,
@@ -47,6 +51,8 @@ fn analyze_single_file(
     Ok(())
 }
 
+/// Recursively processes all files in a directory.
+/// Combines the graphs from all recognized source files and aggregates their summaries.
 fn analyze_directory(
     dir: &std::path::Path,
     json_out: Option<&std::path::Path>,
@@ -83,6 +89,7 @@ fn analyze_directory(
     Ok(())
 }
 
+/// Helper function to match file extensions to tree-sitter language parsers.
 fn detect_language(path: &std::path::Path) -> Result<tree_sitter::Language> {
     match path.extension().and_then(|s| s.to_str()) {
         Some("rs") => Ok(extractor::languages::rust()),
@@ -94,6 +101,7 @@ fn detect_language(path: &std::path::Path) -> Result<tree_sitter::Language> {
     }
 }
 
+/// Prints a basic aggregation of the extracted components to standard output.
 fn print_summary(s: &AnalysisSummary) {
     println!("Moduli: {}", s.total_modules);
     println!("Structured types: {}", s.total_structured_types);
@@ -101,6 +109,7 @@ fn print_summary(s: &AnalysisSummary) {
     println!("Impl blocks: {}", s.total_impl_blocks);
 }
 
+/// Appends a CSV header and row detailing the total component counts.
 fn save_summary_csv(s: &AnalysisSummary, path: &std::path::Path) -> Result<()> {
     let csv = format!(
         "total_modules,total_structured,total_free,total_impl\n{},{},{},{}",

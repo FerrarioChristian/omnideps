@@ -2,12 +2,14 @@ use crate::ir::*;
 use std::collections::HashMap;
 
 // ==================== CONTEXT PER RISOLUZIONE NOMI ====================
+/// Contains the current prefix (namespace) and a flat symbol table for fast lookups.
 #[derive(Debug)]
 pub struct ResolutionContext {
     pub current_prefix: QualifiedName,
     pub symbol_table: HashMap<QualifiedName, Component>,
 }
 
+/// Builds a flat symbol table from a list of root modules, indexing every nested component.
 pub fn build_symbol_table(modules: &[Module]) -> HashMap<QualifiedName, Component> {
     let mut table = HashMap::new();
     fn populate(
@@ -46,6 +48,7 @@ pub fn build_symbol_table(modules: &[Module]) -> HashMap<QualifiedName, Componen
     table
 }
 
+/// Resolves type references across all modules by matching them against the global symbol table.
 pub fn resolve_type_refs(modules: Vec<Module>) -> Vec<Module> {
     let symbol_table = build_symbol_table(&modules);
     let ctx = ResolutionContext {
@@ -197,6 +200,7 @@ fn resolve_method(ctx: &ResolutionContext, mut m: Method) -> Method {
 }
 
 // ==================== BUILD DEPENDENCY GRAPH ====================
+/// Constructs a dependency graph linking components based on inheritance, types used in fields, parameters, etc.
 pub fn build_dependency_graph(modules: &[Module]) -> DependencyGraph {
     let nodes = flatten_modules(modules);
     let mut edges = vec![];
@@ -321,6 +325,7 @@ fn flatten_modules(modules: &[Module]) -> Vec<Component> {
 }
 
 // ==================== BENCHMARK ====================
+/// Aggregates basic statistics about the extracted components across all provided modules.
 pub fn build_analysis_summary(modules: &[Module]) -> AnalysisSummary {
     let mut s = AnalysisSummary::default();
     s.total_modules = modules.len();

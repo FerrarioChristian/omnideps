@@ -9,6 +9,7 @@ pub enum PrimitiveType {
     String,
     Void,
     Other(String),
+    // Aggiungere altri tipi primitivi comuni se necessario
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -78,6 +79,7 @@ pub struct Module {
     pub structured_types: Vec<StructuredType>,
     pub free_functions: Vec<FreeFunction>,
     pub impl_blocks: Vec<ImplBlock>,
+    // Convertire le tre tipologie di componenti in un'unica lista di Componenti, Vec<Box<Component>>
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
