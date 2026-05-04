@@ -9,13 +9,15 @@ pub enum PrimitiveType {
     String,
     Void,
     Other(String),
+    // Aggiungere altri tipi primitivi comuni se necessario
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum TypeRef {
     Primitive(PrimitiveType),
-    UserDefined(QualifiedName),
-    Unknown,
+    Unresolved(QualifiedName),
+    Resolved(QualifiedName),
+    Failed(QualifiedName),
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -78,6 +80,7 @@ pub struct Module {
     pub structured_types: Vec<StructuredType>,
     pub free_functions: Vec<FreeFunction>,
     pub impl_blocks: Vec<ImplBlock>,
+    // Convertire le tre tipologie di componenti in un'unica lista di Componenti, Vec<Box<Component>>
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -124,5 +127,5 @@ pub struct AnalysisSummary {
     pub total_free_functions: usize,
     pub total_impl_blocks: usize,
     pub resolved_refs: usize,
-    pub unknown_refs: usize,
+    pub failed_refs: usize,
 }

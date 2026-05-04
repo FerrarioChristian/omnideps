@@ -1,6 +1,10 @@
 use clap::Parser;
 use std::path::PathBuf;
 
+/// Defines the command-line interface for the `language-agnostic-analyzer`.
+///
+/// Uses `clap` to parse arguments for input files/directories,
+/// and optional paths for outputting JSON dependency graphs and CSV summaries.
 #[derive(Parser)]
 #[command(
     author,

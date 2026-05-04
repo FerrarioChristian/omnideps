@@ -1,0 +1,83 @@
+\chapter{Modello di Rappresentazione Intermedia (IR)}
+\section{Introduzione}
+Il processo di analisi proposto si configura come una pipeline di trasformazioni funzionali. Dato un codice sorgente $S$ appartenente a un linguaggio $L \in \{C, C++, Java, Python, Rust\}$, il sistema genera un Component Tree astratto attraverso una funzione di estrazione $E: CST_L \to IR$. L'obiettivo dell'IR è fornire un dominio $\mathcal{D}_{IR}$ che sia un'\href{https://en.wikipedia.org/wiki/Conservative_extension}{estensione conservativa} dei costrutti sintattici di alto livello, garantendo la Type Safety nella successiva fase di risoluzione delle dipendenze $R: IR \to \mathcal{G}$, dove $\mathcal{G}$ è il grafo delle dipendenze.
+
+Formalmente, definiamo il \textbf{Dominio della Rappresentazione Intermedia} $\mathcal{D}_{IR}$ come lo spazio di tutti i possibili \textit{Component Trees} validi. Ogni istanza $T \in \mathcal{D}_{IR}$ corrisponde alla radice di una gerarchia di componenti (rappresentata dal tipo Modulo $\mathcal{M}$, definito in seguito) che aggrega ricorsivamente l'intera struttura del software analizzato.
+
+\section{Il Sistema dei Tipi $\mathcal{T}$}
+Per garantire l'agnosticismo rispetto al linguaggio, definiamo il sistema dei tipi come un'algebra di tipi somma e prodotti.
+
+\subsection{Identificatori e Percorsi ($\mathcal{QN}$)}
+Sia $\mathcal{I}$ l'insieme delle stringhe valide come identificatori. Definiamo il tipo \textbf{Qualified Name} ($\mathcal{QN}$) come l'insieme delle sequenze finite non vuote di identificatori:
+$$\mathcal{QN} = \{ \langle i_1, i_2, \dots, i_n \rangle \mid i_j \in \mathcal{I}, n \geq 1 \}$$
+Questo tipo permette di mappare in modo univoco namespaces, package di Java, moduli di Rust e scope risolti in C++.
+
+\subsection{Riferimenti a Tipi ($\tau$)}
+Un riferimento a un tipo $\tau$ nell'IR modella il ciclo di vita della scoperta e della risoluzione dei simboli. Per garantire la \textit{Type Safety} tra le fasi di estrazione e la generazione del grafo, definiamo $\tau$ come un tipo somma a quattro stati:
+$$\tau ::= \text{Prim}(\mathcal{T}_{p}) \mid \text{Unresolved}(\mathcal{QN}_{raw}) \mid \text{Resolved}(\mathcal{QN}_{abs}) \mid \text{Failed}$$
+Dove:
+\begin{itemize}
+    \item \textbf{Prim}: Rappresenta i tipi primitivi fondamentali ($\mathcal{T}_{p} = \{ \text{Int, Float, Bool, String, Void, Other} \}$). Essendo definiti a livello di linguaggio, non necessitano di risoluzione.
+    \item \textbf{Unresolved}: Rappresenta un identificatore estratto dal parser (es. \texttt{List}) di cui non si conosce ancora il percorso assoluto. È lo stato tipico prodotto dalla Fase 1 di Estrazione.
+    \item \textbf{Resolved}: Rappresenta un tipo definito dall'utente per cui la fase di Risoluzione ha trovato una corrispondenza univoca nella Tabella dei Simboli. Contiene il nome qualificato assoluto (es. \texttt{java::util::List}).
+    \item \textbf{Failed}: Indica che la fase di risoluzione ha tentato di associare l'identificatore ma non ha trovato corrispondenze (es. dipendenze da librerie esterne non incluse nell'analisi).
+\end{itemize}
+Questa rigorosa separazione permette al type system di imporre che la generazione del grafo avvenga esclusivamente a partire da riferimenti \texttt{Resolved}.
+
+\section{Modellazione dei Costrutti Strutturali}
+I Tipi Strutturati rappresentano il nucleo dell'analisi architetturale. Essi vengono modellati come tipi prodotto le cui componenti definiscono lo stato e il comportamento dell'entità.
+
+\subsection{Membri e Firme}
+Definiamo il tipo \textbf{Field} ($F$), che rappresenta un attributo o campo dati, definito come il prodotto tra un identificatore e un riferimento a un tipo:
+    $$F = \mathcal{I} \times \tau$$
+Definiamo il tipo \textbf{Parameter} ($P$) e il tipo \textbf{Method} ($M$) per gestire il polimorfismo e l'overloading:
+$$P = \mathcal{I}^? \times \tau \times \mathbb{B}$$ dove l'identificatore $\mathcal{I}^?$ è opzionale, in questo modo è possibile supportare funzioni lamdba e parametri anonimi, $\tau$ è il tipo e $\mathbb{B}$ indica la proprietà variadica del parametro.\\ \\
+Una funzione o metodo è dunque:
+$$M = \mathcal{I} \times \vec{P} \times \tau_{ret}$$
+dove $\mathcal{I}$ è il nome, $\vec{P}$ è il vettore dei parametri e $\tau_{ret}$ è il tipo di ritorno.
+
+Allo stesso modo, definiamo una \textbf{Free Function} ($FN$) come una funzione non legata ad alcun tipo strutturato, formalizzata anch'essa come la tupla $\langle \mathcal{I}, \vec{P}, \tau_{ret} \rangle$.
+
+L'overloading è gestito naturalmente dalla cardinalità dell'insieme delle funzioni all'interno di un tipo strutturato o di un modulo: un'entità può contenere più metodi o funzioni con lo stesso $\mathcal{I}$ ma diversa firma $\vec{P}$.
+
+\subsection{Tipi Strutturati ($\mathcal{S}$)}
+Sia $\mathcal{K} = \{ \text{Class, Struct, Interface, Trait} \}$ l'insieme delle categorie strutturali. Un tipo strutturato è definito dalla tupla:
+$$\mathcal{S} = \langle \text{id} \in \mathcal{QN}, k \in \mathcal{K}, \vec{F}, \vec{M}, \vec{\tau}_{sup}, \vec{\mathcal{S}}_{nest} \rangle$$
+dove:
+\begin{itemize}
+    \item \textbf{id}: il nome qualificato univoco che identifica l'entità all'interno del sistema.
+    \item \textbf{k}: la categoria strutturale (definita in $\mathcal{K}$) che preserva la semantica originale del costrutto.
+    \item $\vec{F}$: l'insieme dei campi (\textit{fields}) che compongono lo stato dell'entità.
+    \item $\vec{M}$: l'insieme dei metodi che definiscono il comportamento dell'entità.
+    \item $\vec{\tau}_{sup}$: l'insieme dei riferimenti ai super-tipi, modellando le relazioni di ereditarietà o di implementazione di interfacce/trait.
+    \item $\vec{\mathcal{S}}_{nest}$: l'insieme dei tipi definiti internamente all'entità, permettendo una modellazione ricorsiva dei tipi annidati (\textit{nested types}).
+\end{itemize}
+
+\subsection{Blocchi di Implementazione ($\mathcal{B}_{lk}$)}
+Per supportare linguaggi come Rust e C++ (separazione tra dichiarazione e definizione), introduciamo il tipo \textbf{ImplBlock}:
+$$\mathcal{B}_{lk} = \langle \text{target} \in \tau, \text{trait}^? \in \tau, \vec{M} \rangle$$
+dove $\text{target}$ è il tipo a cui si applica l'implementazione, $\text{trait}^?$ è un riferimento opzionale al trait o interfaccia che si sta implementando, e $\vec{M}$ è il vettore dei metodi implementati. \\
+Questa astrazione è cruciale per la risoluzione delle dipendenze: una dipendenza verso un metodo contenuto in $\mathcal{B}_{lk}$ deve essere risolta mappando $\vec{M}$ sul tipo $\tau_{target}$ e, se presente, validando il contratto definito da $\tau_{trait}$.
+
+\section{Rappresentazione del Sistema Analizzato}
+L'intero sistema software, una volta analizzato, è rappresentato come un'istanza del tipo \textbf{Modulo} ($\mathcal{M}$), che funge da radice del \textit{Component Tree}.
+Ogni elemento $T \in \mathcal{M}$ rappresenta una foresta gerarchica di componenti, che aggrega ricorsivamente l'intera struttura del software (moduli annidati, tipi strutturati, funzioni e blocchi di implementazione). Questa struttura costituisce il dominio della nostra rappresentazione intermedia.
+Definiamo un \textbf{Componente} ($\mathcal{C}$) come l'unione disgiunta (sum type) di tutti i costrutti analizzabili del sistema. Ogni componente rappresenta l'unità logica che può comparire come vertice nel grafo delle dipendenze:
+$$\mathcal{C} ::= \text{Mod}(\mathcal{M}) \mid \text{Struct}(\mathcal{S}) \mid \text{Func}(FN) \mid \text{Impl}(\mathcal{B}_{lk})$$
+
+\subsection{Modulo ($\mathcal{M}$)}
+L'intera struttura del programma è catturata dal tipo \textbf{Modulo} ($\mathcal{M}$), definito ricorsivamente per riflettere la gerarchia del file system o dei namespace:
+$$\mathcal{M} = \langle \mathcal{QN}, \vec{\mathcal{M}_{nest}}, \vec{\mathcal{S}}, \vec{FN}, \vec{\mathcal{B}}_{lk} \rangle$$
+Ogni elemento del software è quindi un nodo in un albero di componenti $T \in \mathcal{D}_{IR}$.
+
+\section{Grafo delle Dipendenze $\mathcal{G}$}
+Il risultato finale dell'analisi è un grafo orientato $\mathcal{G} = (V, E)$. 
+L'insieme dei vertici $V$ è l'insieme di tutti i componenti identificati nel sistema:
+$$V = \{ c \mid c \in \mathcal{C} \}$$
+L'insieme degli archi $E$ rappresenta le relazioni semantiche e strutturali tra i componenti stessi. Formalmente, un arco è una tripla definita sul prodotto cartesiano dei vertici:
+$$E \subseteq \mathcal{C} \times \mathcal{C} \times \text{Kind}$$
+dove $\text{Kind}$ definisce la semantica della dipendenza (ereditarietà, uso di tipo nei campi, parametri di metodi, implementazione di trait, ecc.).
+
+\textit{Nota implementativa:} Mentre a livello formale un arco collega direttamente due istanze astratte del tipo $\mathcal{C}$, nell'implementazione software (per ragioni di efficienza di memoria, serializzazione e sicurezza dei tipi in Rust) le relazioni sono tracciate utilizzando i nomi qualificati ($\mathcal{QN}$) delle entità come chiavi identificative.
+
+

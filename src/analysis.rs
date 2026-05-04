@@ -2,12 +2,14 @@ use crate::ir::*;
 use std::collections::HashMap;
 
 // ==================== CONTEXT PER RISOLUZIONE NOMI ====================
+/// Contains the current prefix (namespace) and a flat symbol table for fast lookups.
 #[derive(Debug)]
 pub struct ResolutionContext {
     pub current_prefix: QualifiedName,
     pub symbol_table: HashMap<QualifiedName, Component>,
 }
 
+/// Builds a flat symbol table from a list of root modules, indexing every nested component.
 pub fn build_symbol_table(modules: &[Module]) -> HashMap<QualifiedName, Component> {
     let mut table = HashMap::new();
     fn populate(
@@ -46,6 +48,7 @@ pub fn build_symbol_table(modules: &[Module]) -> HashMap<QualifiedName, Componen
     table
 }
 
+/// Resolves type references across all modules by matching them against the global symbol table.
 pub fn resolve_type_refs(modules: Vec<Module>) -> Vec<Module> {
     let symbol_table = build_symbol_table(&modules);
     let ctx = ResolutionContext {
@@ -58,7 +61,7 @@ pub fn resolve_type_refs(modules: Vec<Module>) -> Vec<Module> {
         .collect()
 }
 
-// Regole di risoluzione (come formalizzate: assoluto → relativo → enclosing)
+// Regole di risoluzione (come formalizzate: assoluto -> relativo -> enclosing)
 fn resolve_name_in_context(ctx: &ResolutionContext, name: &QualifiedName) -> Option<QualifiedName> {
     // 1. Assoluto
     if ctx.symbol_table.contains_key(name) {
@@ -85,11 +88,11 @@ fn resolve_name_in_context(ctx: &ResolutionContext, name: &QualifiedName) -> Opt
 
 fn resolve_type_ref(ctx: &ResolutionContext, tr: TypeRef) -> TypeRef {
     match tr {
-        TypeRef::UserDefined(name) => {
+        TypeRef::Unresolved(name) => {
             if let Some(resolved) = resolve_name_in_context(ctx, &name) {
-                TypeRef::UserDefined(resolved)
+                TypeRef::Resolved(resolved)
             } else {
-                TypeRef::Unknown
+                TypeRef::Failed(name)
             }
         }
         other => other,
@@ -197,6 +200,7 @@ fn resolve_method(ctx: &ResolutionContext, mut m: Method) -> Method {
 }
 
 // ==================== BUILD DEPENDENCY GRAPH ====================
+/// Constructs a dependency graph linking components based on inheritance, types used in fields, parameters, etc.
 pub fn build_dependency_graph(modules: &[Module]) -> DependencyGraph {
     let nodes = flatten_modules(modules);
     let mut edges = vec![];
@@ -219,7 +223,7 @@ pub fn build_dependency_graph(modules: &[Module]) -> DependencyGraph {
 
 fn add_super_edges(st: &StructuredType, edges: &mut Vec<Dependency>) {
     for sup in &st.super_types {
-        if let TypeRef::UserDefined(to) = sup {
+        if let TypeRef::Resolved(to) = sup {
             edges.push(Dependency {
                 from: st.name.clone(),
                 to: to.clone(),
@@ -231,7 +235,7 @@ fn add_super_edges(st: &StructuredType, edges: &mut Vec<Dependency>) {
 
 fn add_field_edges(st: &StructuredType, edges: &mut Vec<Dependency>) {
     for f in &st.fields {
-        if let TypeRef::UserDefined(to) = &f.ty {
+        if let TypeRef::Resolved(to) = &f.ty {
             edges.push(Dependency {
                 from: st.name.clone(),
                 to: to.clone(),
@@ -244,7 +248,7 @@ fn add_field_edges(st: &StructuredType, edges: &mut Vec<Dependency>) {
 fn add_method_edges(st: &StructuredType, edges: &mut Vec<Dependency>) {
     for m in &st.methods {
         for p in &m.parameters {
-            if let TypeRef::UserDefined(to) = &p.ty {
+            if let TypeRef::Resolved(to) = &p.ty {
                 edges.push(Dependency {
                     from: st.name.clone(),
                     to: to.clone(),
@@ -252,7 +256,7 @@ fn add_method_edges(st: &StructuredType, edges: &mut Vec<Dependency>) {
                 });
             }
         }
-        if let TypeRef::UserDefined(to) = &m.return_type {
+        if let TypeRef::Resolved(to) = &m.return_type {
             edges.push(Dependency {
                 from: st.name.clone(),
                 to: to.clone(),
@@ -264,7 +268,7 @@ fn add_method_edges(st: &StructuredType, edges: &mut Vec<Dependency>) {
 
 fn add_free_function_edges(ff: &FreeFunction, edges: &mut Vec<Dependency>) {
     for p in &ff.parameters {
-        if let TypeRef::UserDefined(to) = &p.ty {
+        if let TypeRef::Resolved(to) = &p.ty {
             edges.push(Dependency {
                 from: vec![ff.name.clone()],
                 to: to.clone(),
@@ -272,7 +276,7 @@ fn add_free_function_edges(ff: &FreeFunction, edges: &mut Vec<Dependency>) {
             });
         }
     }
-    if let TypeRef::UserDefined(to) = &ff.return_type {
+    if let TypeRef::Resolved(to) = &ff.return_type {
         edges.push(Dependency {
             from: vec![ff.name.clone()],
             to: to.clone(),
@@ -282,14 +286,14 @@ fn add_free_function_edges(ff: &FreeFunction, edges: &mut Vec<Dependency>) {
 }
 
 fn add_impl_edges(ib: &ImplBlock, edges: &mut Vec<Dependency>) {
-    if let TypeRef::UserDefined(to) = &ib.impl_for {
+    if let TypeRef::Resolved(to) = &ib.impl_for {
         edges.push(Dependency {
             from: ib.name.clone(),
             to: to.clone(),
             kind: DependencyEdgeKind::ImplementsFor,
         });
     }
-    if let Some(TypeRef::UserDefined(to)) = &ib.implements_trait {
+    if let Some(TypeRef::Resolved(to)) = &ib.implements_trait {
         edges.push(Dependency {
             from: ib.name.clone(),
             to: to.clone(),
@@ -321,6 +325,7 @@ fn flatten_modules(modules: &[Module]) -> Vec<Component> {
 }
 
 // ==================== BENCHMARK ====================
+/// Aggregates basic statistics about the extracted components across all provided modules.
 pub fn build_analysis_summary(modules: &[Module]) -> AnalysisSummary {
     let mut s = AnalysisSummary::default();
     s.total_modules = modules.len();

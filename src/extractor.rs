@@ -1,6 +1,8 @@
 use crate::ir::Module;
 use tree_sitter::Language;
 
+/// Extracts the basic Intermediate Representation (IR) modules from a source file given its Tree-sitter Language.
+/// It parses the source code into an AST and delegates node matching to the heuristics dispatcher.
 pub fn generic_extract(lang: Language, source: &str) -> anyhow::Result<Vec<Module>> {
     let mut parser = tree_sitter::Parser::new();
     parser.set_language(&lang).unwrap();
@@ -15,6 +17,9 @@ pub fn generic_extract(lang: Language, source: &str) -> anyhow::Result<Vec<Modul
     Ok(modules)
 }
 
+/// Recursively traverses the Concrete Syntax Tree (CST).
+/// When a recognized component is found, it's added to the IR and the recursion stops for that branch
+/// to prevent duplicating internal methods/functions as top-level components.
 fn walk_cst(node: tree_sitter::Node, source: &str, modules: &mut Vec<Module>) {
     if let Some(comp) = crate::heuristics::dispatch_node(node, source) {
         if modules.is_empty() {
@@ -26,13 +31,23 @@ fn walk_cst(node: tree_sitter::Node, source: &str, modules: &mut Vec<Module>) {
                 impl_blocks: vec![],
             });
         }
-        let root = &mut modules[0];
+        
         match comp {
-            crate::ir::Component::StructuredType(st) => root.structured_types.push(st),
-            crate::ir::Component::FreeFunction(ff) => root.free_functions.push(ff),
-            crate::ir::Component::ImplBlock(ib) => root.impl_blocks.push(ib),
-            _ => {}
+            crate::ir::Component::Module(m) => {
+                // Attraversa i figli popolando il nuovo modulo prima di aggiungerlo
+                let mut cursor = node.walk();
+                let mut new_modules = vec![m];
+                for child in node.children(&mut cursor) {
+                    walk_cst(child, source, &mut new_modules);
+                }
+                // Il nuovo modulo ora è popolato (si trova in new_modules[0])
+                modules[0].sub_modules.push(new_modules.remove(0));
+            }
+            crate::ir::Component::StructuredType(st) => modules[0].structured_types.push(st),
+            crate::ir::Component::FreeFunction(ff) => modules[0].free_functions.push(ff),
+            crate::ir::Component::ImplBlock(ib) => modules[0].impl_blocks.push(ib),
         }
+        return;
     }
 
     let mut cursor = node.walk();
@@ -41,6 +56,7 @@ fn walk_cst(node: tree_sitter::Node, source: &str, modules: &mut Vec<Module>) {
     }
 }
 
+/// Wrappers around tree-sitter language loading.
 pub mod languages {
     use super::*;
     pub fn c() -> Language {
@@ -60,6 +76,11 @@ pub mod languages {
     }
 }
 
+/// End-to-end analysis pipeline for a single source file:
+/// 1. Extraction into initial IR modules
+/// 2. Symbol resolution mapping names to types
+/// 3. Dependency graph construction
+/// 4. Statistics aggregation (summary)
 pub fn full_analysis(
     lang: Language,
     source: &str,
