@@ -20,7 +20,7 @@ Di seguito sono definiti i simboli principali che costituiscono l'alfabeto della
 \begin{itemize}
     \item $\mathcal{I}$ (\textbf{Identifier}): L'insieme di tutte le stringhe alfanumeriche valide utilizzate per nominare variabili, funzioni o classi.
     \item $\mathcal{QN}$ (\textbf{Qualified Name}): Una sequenza gerarchica di identificatori ($\langle i_1, \dots, i_n \rangle$) che rappresenta il percorso assoluto e univoco di un'entità (es. il namespace o il modulo).
-    \item $\tau$ (\textbf{Type Reference}): Un riferimento astratto a un tipo. Può rappresentare un tipo primitivo, un tipo definito dall'utente (attraverso un $\mathcal{QN}$), o un tipo temporaneamente "sconosciuto" (\texttt{Unknown}) in attesa di risoluzione.
+    \item $\tau$ (\textbf{Type Reference}): Un riferimento astratto a un tipo. Rappresentato da un tipo somma a quattro stati che ne modella il ciclo di vita durante l'analisi: \texttt{Prim} (primitivo di base), \texttt{Unresolved} (nome grezzo appena estratto), \texttt{Resolved} (percorso assoluto accertato), o \texttt{Failed} (tentativo di risoluzione non andato a buon fine).
 \end{itemize}
 
 \subsection{Membri Strutturali}

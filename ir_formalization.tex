@@ -12,12 +12,17 @@ Sia $\mathcal{I}$ l'insieme delle stringhe valide come identificatori. Definiamo
 $$\mathcal{QN} = \{ \langle i_1, i_2, \dots, i_n \rangle \mid i_j \in \mathcal{I}, n \geq 1 \}$$
 Questo tipo permette di mappare in modo univoco namespaces, package di Java, moduli di Rust e scope risolti in C++.
 
-\subsection{Riferimenti a Tipi ($\mathcal{T}_{ref}$)}
-Un riferimento a un tipo $\tau$ nell'IR è un tipo somma che modella l'incertezza intrinseca dell'estrazione statica prima della risoluzione:
-$$\tau ::= \text{Primitive}(\mathcal{T}_{p}) \mid \text{UserDefined}(\mathcal{QN}) \mid \text{Unknown}$$
-dove $\mathcal{T}_{p}$ è l'insieme dei tipi primitivi fondamentali:
-$$\mathcal{T}_{p} = \{ \text{Int, Float, Bool, String, Void, Other}(s \in \mathcal{I}) \}$$
-L'incertezza della prima estrazione statica è data dal fatto che al primo passaggio il sistema non ha ancora analizzato tutto il codice, quindi non ha ancora incontrato tutti i simboli dei tipi. Questo verrà risolto tramite la Name Resolution nel secondo passaggio dell'algoritmo.
+\subsection{Riferimenti a Tipi ($\tau$)}
+Un riferimento a un tipo $\tau$ nell'IR modella il ciclo di vita della scoperta e della risoluzione dei simboli. Per garantire la \textit{Type Safety} tra le fasi di estrazione e la generazione del grafo, definiamo $\tau$ come un tipo somma a quattro stati:
+$$\tau ::= \text{Prim}(\mathcal{T}_{p}) \mid \text{Unresolved}(\mathcal{QN}_{raw}) \mid \text{Resolved}(\mathcal{QN}_{abs}) \mid \text{Failed}$$
+Dove:
+\begin{itemize}
+    \item \textbf{Prim}: Rappresenta i tipi primitivi fondamentali ($\mathcal{T}_{p} = \{ \text{Int, Float, Bool, String, Void, Other} \}$). Essendo definiti a livello di linguaggio, non necessitano di risoluzione.
+    \item \textbf{Unresolved}: Rappresenta un identificatore estratto dal parser (es. \texttt{List}) di cui non si conosce ancora il percorso assoluto. È lo stato tipico prodotto dalla Fase 1 di Estrazione.
+    \item \textbf{Resolved}: Rappresenta un tipo definito dall'utente per cui la fase di Risoluzione ha trovato una corrispondenza univoca nella Tabella dei Simboli. Contiene il nome qualificato assoluto (es. \texttt{java::util::List}).
+    \item \textbf{Failed}: Indica che la fase di risoluzione ha tentato di associare l'identificatore ma non ha trovato corrispondenze (es. dipendenze da librerie esterne non incluse nell'analisi).
+\end{itemize}
+Questa rigorosa separazione permette al type system di imporre che la generazione del grafo avvenga esclusivamente a partire da riferimenti \texttt{Resolved}.
 
 \section{Modellazione dei Costrutti Strutturali}
 I Tipi Strutturati rappresentano il nucleo dell'analisi architetturale. Essi vengono modellati come tipi prodotto le cui componenti definiscono lo stato e il comportamento dell'entità.

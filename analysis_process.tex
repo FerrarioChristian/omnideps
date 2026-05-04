@@ -19,32 +19,32 @@ L'estrazione mappa i nodi dell'albero sintattico concreto ($\mathcal{N}$) in ist
 
 \subsection{Funzioni Core}
 \begin{itemize}
-    \item \textbf{Generic Extract}: $E : \mathcal{L} \times \mathcal{S}_{code} \to \mathcal{M}$ \\
+    \item \textbf{Generic Extract} ($\text{generic\_extract} : \mathcal{L} \times \mathcal{S}_{code} \to \mathcal{M}$): \\
     Mappa l'intero sorgente in un unico \textbf{Modulo Radice} $\mathcal{M}$ che funge da entry-point del Component Tree.
-    \item \textbf{Node Dispatcher}: $f_{disp} : \mathcal{N} \times \mathcal{S}_{code} \to \mathcal{C}^?$ \\
+    \item \textbf{Node Dispatcher} ($\text{dispatch\_node} : \mathcal{N} \times \mathcal{S}_{code} \to \mathcal{C}^?$): \\
     Dato un nodo sintattico, identifica il costrutto e delega l'estrazione al parser specifico, restituendo un Componente opzionale.
 \end{itemize}
 
 \subsection{Parser Strutturali}
 Le funzioni di mapping che istanziano i componenti principali:
 \begin{itemize}
-    \item $f_{\mathcal{S}} : \mathcal{N} \times \mathcal{S}_{code} \to \mathcal{S}^?$ (Tipi Strutturati)
-    \item $f_{FN} : \mathcal{N} \times \mathcal{S}_{code} \to FN^?$ (Funzioni Libere)
-    \item $f_{\mathcal{B}_{lk}} : \mathcal{N} \times \mathcal{S}_{code} \to \mathcal{B}_{lk}^?$ (Blocchi di Implementazione)
+    \item $\text{try\_parse\_structured\_type} : \mathcal{N} \times \mathcal{S}_{code} \to \mathcal{S}^?$ (Tipi Strutturati)
+    \item $\text{try\_parse\_free\_function} : \mathcal{N} \times \mathcal{S}_{code} \to FN^?$ (Funzioni Libere)
+    \item $\text{try\_parse\_impl\_block} : \mathcal{N} \times \mathcal{S}_{code} \to \mathcal{B}_{lk}^?$ (Blocchi di Implementazione)
 \end{itemize}
 
 \subsection{Helper di Estrazione}
 Funzioni atomiche che estraggono i tipi base necessari per la costruzione dei componenti dell'IR:
 \begin{itemize}
-    \item $\text{ext}_{\mathcal{QN}} : \mathcal{N} \times \mathcal{S}_{code} \to \mathcal{QN}^?$ \\
+    \item $\text{extract\_qualified\_name} : \mathcal{N} \times \mathcal{S}_{code} \to \mathcal{QN}^?$ \\
     Estrae il nome qualificato (es. \texttt{std::vec::Vec}) analizzando l'identificatore o il percorso sintattico.
-    \item $\text{ext}_{\tau} : \mathcal{N} \times \mathcal{S}_{code} \to \tau$ \\
-    Mappa un nodo tipo in un riferimento $\tau$ (inizialmente \texttt{Unknown} o \texttt{UserDefined}).
-    \item $\text{ext}_{\vec{F}} : \mathcal{N} \times \mathcal{S}_{code} \to \vec{F}$ \\
+    \item $\text{extract\_type\_ref} : \mathcal{N} \times \mathcal{S}_{code} \to \tau$ \\
+    Mappa un nodo rappresentante un tipo in un riferimento $\tau$ (generando stati \texttt{Unresolved} o \texttt{Failed}).
+    \item $\text{extract\_fields} : \mathcal{N} \times \mathcal{S}_{code} \to \vec{F}$ \\
     Estrae l'insieme dei campi di un tipo strutturato.
-    \item $\text{ext}_{\vec{P}} : \mathcal{N} \times \mathcal{S}_{code} \to \vec{P}$ \\
-    Estrae la lista dei parametri di una funzione, preservando ordine, tipi e variadicita.
-    \item $\text{ext}_{\vec{\tau}_{sup}} : \mathcal{N} \times \mathcal{S}_{code} \to \vec{\tau}$ \\
+    \item $\text{extract\_parameters} : \mathcal{N} \times \mathcal{S}_{code} \to \vec{P}$ \\
+    Estrae la lista dei parametri di una funzione, preservando ordine, tipi e variadicità.
+    \item $\text{extract\_super\_types} : \mathcal{N} \times \mathcal{S}_{code} \to \vec{\tau}$ \\
     Estrae i riferimenti alle gerarchie di ereditarietà o implementazione di trait.
 \end{itemize}
 
@@ -56,29 +56,37 @@ La \textbf{Tabella dei Simboli} $\Sigma$ è definita come una funzione parziale 
 $$\Sigma : \mathcal{QN} \to \mathcal{C}$$
 La funzione $\text{build\_sym\_table}(M)$ scansiona ricorsivamente il modulo radice $M$ e popola $\Sigma$ registrando ogni $\mathcal{S}, FN, \mathcal{B}_{lk}$ e modulo annidato. Questa tabella funge da registro globale (Global Scope) necessario per risolvere riferimenti tra entità definite in file o moduli diversi.
 
-\subsection{Contesto di Risoluzione ($\Gamma$)}
-Per gestire la visibilità locale e gli import, ogni operazione di risoluzione avviene all'interno di un \textbf{Contesto} $\Gamma$:
+%La \textbf{Tabella dei Simboli} $\Sigma$ è definita come una funzione parziale (o mappa) che associa un identificatore univoco al componente corrispondente:
+%$$\Sigma : \mathcal{QN}_{id} \to \mathcal{C}$$
+%Per i moduli e i tipi strutturati, $\mathcal{QN}_{id}$ coincide con il normale nome qualificato ($\mathcal{QN}$). Tuttavia, per supportare l'\textbf{Overloading} delle funzioni (più funzioni con lo stesso nome ma firme diverse), l'identificatore univoco per $M$ e $FN$ è generato attraverso un processo di \textit{Name Mangling}, che concatena il nome qualificato con la codifica dei tipi dei parametri $\vec{P}$:
+%$$\mathcal{QN}_{id}(f) = \mathcal{QN} \oplus \text{encode}(\vec{P})$$
+%La funzione $\text{build\_sym\_table}(M)$ scansiona ricorsivamente il modulo radice $M$ e popola $\Sigma$. Questa tabella funge da registro globale (Global Scope) necessario per risolvere riferimenti tra entità definite in file o moduli diversi senza rischio di collisioni.
+
+
+\subsection{Contesto di Risoluzione ($\Gamma$) e Punti di Salto}
+Per gestire la visibilità locale e le dipendenze, ogni operazione di risoluzione avviene all'interno di un \textbf{Contesto} $\Gamma$:
 $$\Gamma = \langle \Sigma, \mathcal{QN}_{curr}, \mathcal{I}_{imports} \rangle$$
-dove $\mathcal{QN}_{curr}$ è il percorso del modulo attuale e $\mathcal{I}_{imports}$ è l'insieme dei nomi portati nello scope attraverso clausole di importazione.
+dove $\mathcal{QN}_{curr}$ è il percorso del modulo attuale e $\mathcal{I}_{imports}$ è l'insieme delle clausole di importazione. In questo contesto, costrutti come gli import o le relazioni di ereditarietà agiscono come \textbf{punti di salto}. Durante la ricerca del punto di partenza per la risoluzione di una catena di identificatori, il sistema può utilizzare tutti i componenti resi visibili tramite questi punti di salto. Tale meccanismo è implementato attraverso una \textit{visita ricorsiva controllata}, che esplora il grafo delle visibilità rispettando le regole semantiche del linguaggio: ad esempio, gli import potrebbero non essere transitivi, mentre l'ereditarietà generalmente lo è, seppur soggetta a filtri di visibilità (\texttt{public}, \texttt{private}, \texttt{protected}).
 
 \subsection{Logica di Risoluzione ($R_{\tau}$)}
-La funzione core $\text{resolve}_{\tau} : \Gamma \times \tau \to \tau$ opera secondo la seguente logica:
+La funzione core $\text{resolve}_{\tau} : \Gamma \times \tau \to \tau$ opera la transizione di stato della reference secondo la seguente logica:
 \begin{enumerate}
-    \item Se $\tau = \text{Primitive}$, il riferimento è già risolto per definizione.
-    \item Se $\tau = \text{UserDefined}(qn)$, la funzione tenta di risolvere $qn$ cercando:
+    \item Se $\tau = \text{Prim}(p)$, la funzione restituisce l'input inalterato poiché i primitivi non necessitano di risoluzione.
+    \item Se $\tau = \text{Unresolved}(qn_{raw})$, la funzione tenta di risolvere il nome grezzo cercando la corrispondenza univoca:
     \begin{itemize}
-        \item Nel percorso locale ($\mathcal{QN}_{curr} + qn$).
-        \item Attraverso gli alias definiti in $\mathcal{I}_{imports}$.
+        \item Nel percorso locale ($\mathcal{QN}_{curr} + qn_{raw}$).
+        \item Attraverso la visita ricorsiva controllata dei \textit{punti di salto} (es. alias definiti in $\mathcal{I}_{imports}$ o super-tipi ereditati).
         \item Nel Global Scope fornito da $\Sigma$.
     \end{itemize}
-    \item Se la ricerca ha successo, restituisce $\text{UserDefined}(qn_{resolved})$ dove $qn_{resolved}$ è il percorso assoluto in $\Sigma$. Altrimenti, restituisce \texttt{Unknown}.
+    \item Se la ricerca ha successo, la funzione restituisce $\text{Resolved}(qn_{abs})$, dove $qn_{abs}$ è il percorso assoluto registrato in $\Sigma$. 
+    \item Se la ricerca fallisce, la funzione restituisce $\text{Failed}$.
 \end{enumerate}
 
 \section{Fase 3: Costruzione del Grafo delle Dipendenze ($G$)}
 La fase finale proietta la struttura gerarchica dell'IR in un grafo orientato $\mathcal{G} = \langle V, E \rangle$ che rappresenta le interconnessioni architetturali del sistema.
 
 \subsection{Nodi ($V$)}
-Ogni componente $c \in \mathcal{C}$ presente nel sistema risolto diventa un vertice del grafo. L'identità di un nodo è garantita dal suo nome qualificato assoluto.
+Ogni componente $c \in \mathcal{C}$ presente nel sistema risolto diventa un vertice del grafo. L'identità matematica e l'unicità di un nodo sono garantite dal suo $\mathcal{QN}_{id}$ (che, come definito per $\Sigma$, include la firma per le funzioni in overloading), impedendo il collasso di entità omonime ma distinte.
 
 \subsection{Archi e Relazioni ($E$)}
 Un arco $e = \langle u, v, k \rangle \in E$ rappresenta una dipendenza dal componente $u$ verso il componente $v$ di tipo $k \in \text{Kind}$. Il sistema estrae archi analizzando i riferimenti risolti all'interno di ogni componente:
@@ -95,8 +103,8 @@ Il grafo così costruito fornisce una visione unificata e agnostica delle dipend
 \section{Proprietà del Modello}
 La formalizzazione dimostra tre proprietà fondamentali del sistema:
 \begin{enumerate}
-    \item \textbf{Type Safety}: Ogni funzione $f: I \to O$ garantisce che l'output appartenga al dominio IR, impedendo stati inconsistenti tra le fasi.
-    \item \textbf{Agnosticismo}: La separazione netta tra la Fase 1 ($L$-dependent) e le Fasi 2 e 3 ($L$-independent) assicura che il core logico non sia influenzato dalla sintassi del linguaggio sorgente.
-    \item \textbf{Terminazione}: Poiché tutte le funzioni operano per ricorsione strutturale su alberi di sintassi finiti, il processo di analisi converge sempre in tempo finito.
+    \item \textbf{Type Safety}: Ogni funzione $f: I \to O$ opera rigorosamente sui tipi definiti, assicurando che la composizione delle funzioni attraverso le diverse fasi dell'analisi sia sempre ben tipizzata, impedendo così la generazione di stati inconsistenti.
+    \item \textbf{Agnosticismo}: La separazione netta tra la Fase 1 ($L$-dependent) e le Fasi 2 e 3 ($L$-independent) assicura che il core logico non sia influenzato dalla sintassi del linguaggio sorgente, ma dipenda esclusivamente da proprietà semantiche trasversali (come, ad esempio, le regole di visibilità o la transitività degli import in linguaggi come C/C++).
+    \item \textbf{Terminazione}: Poiché la navigazione degli alberi di sintassi avviene per ricorsione strutturale, e posto che le operazioni interne alle singole funzioni siano dimostrabilmente finite su tutti i possibili input, l'intero processo di analisi convergerà sempre in tempo finito.
 \end{enumerate}
 
