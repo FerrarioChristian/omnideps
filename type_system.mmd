@@ -1,0 +1,77 @@
+classDiagram
+    class DependencyGraph {
+        +nodes: Vec~Component~
+        +edges: Vec~Dependency~
+    }
+
+    class Component {
+        <<enumeration>>
+        Module
+        StructuredType
+        FreeFunction
+        ImplBlock
+    }
+
+    class Module {
+        +name: QualifiedName
+        +sub_modules: Vec~Module~
+        +structured_types: Vec~StructuredType~
+        +free_functions: Vec~FreeFunction~
+        +impl_blocks: Vec~ImplBlock~
+    }
+
+    class StructuredType {
+        +name: QualifiedName
+        +kind: StructuredTypeKind
+        +fields: Vec~Field~
+        +methods: Vec~Method~
+        +super_types: Vec~TypeRef~
+        +nested_types: Vec~StructuredType~
+    }
+
+    class ImplBlock {
+        +name: QualifiedName
+        +methods: Vec~Method~
+        +impl_for: TypeRef
+        +implements_trait: Option~TypeRef~
+    }
+
+    class Method {
+        +name: Identifier
+        +parameters: Vec~Parameter~
+        +return_type: TypeRef
+    }
+
+    class Field {
+        +name: Identifier
+        +ty: TypeRef
+    }
+
+    class TypeRef {
+        <<enumeration>>
+        Primitive(PrimitiveType)
+        UserDefined(QualifiedName)
+        Unknown
+    }
+
+    DependencyGraph *-- Component : contains
+    DependencyGraph *-- Dependency : contains
+    Component <|-- Module
+    Component <|-- StructuredType
+    Component <|-- FreeFunction
+    Component <|-- ImplBlock
+
+    Module *-- Module : sub_modules
+    Module *-- StructuredType
+    Module *-- FreeFunction
+    Module *-- ImplBlock
+
+    StructuredType *-- Field
+    StructuredType *-- Method
+    StructuredType *-- StructuredType : nested_types
+    
+    Field --> TypeRef
+    Method --> TypeRef : return_type
+    Method *-- Parameter
+    Parameter --> TypeRef
+    ImplBlock --> TypeRef : impl_for
