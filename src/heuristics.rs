@@ -5,6 +5,9 @@ use tree_sitter::Node;
 /// Attempts to identify and parse the given Tree-sitter `Node` into an Intermediate Representation (IR) Component.
 /// Returns `Some(Component)` if a match is found (e.g., StructuredType, FreeFunction, ImplBlock), otherwise `None`.
 pub fn dispatch_node(node: Node, source: &str) -> Option<Component> {
+    if let Some(m) = try_parse_module_node(node, source) {
+        return Some(Component::Module(m));
+    }
     if let Some(st) = try_parse_structured_type(node, source) {
         return Some(Component::StructuredType(st));
     }
@@ -18,6 +21,26 @@ pub fn dispatch_node(node: Node, source: &str) -> Option<Component> {
 }
 
 // ==================== FUNZIONI GENERICHE DI PARSING ====================
+
+/// Heuristically determines if a node is a module or namespace definition.
+fn try_parse_module_node(node: Node, source: &str) -> Option<Module> {
+    if !node.is_named() {
+        return None;
+    }
+    let kind = node.kind();
+    if !kind.contains("mod_item") && !kind.contains("module") && !kind.contains("namespace") {
+        return None;
+    }
+    
+    let name = extract_identifier(node, source).unwrap_or_else(|| "unnamed_module".to_string());
+    Some(Module {
+        name: vec![name],
+        sub_modules: vec![],
+        structured_types: vec![],
+        free_functions: vec![],
+        impl_blocks: vec![],
+    })
+}
 
 /// Heuristically determines if a node is a structured type definition (Struct, Class, Interface, etc.).
 fn try_parse_structured_type(node: Node, source: &str) -> Option<StructuredType> {
@@ -40,7 +63,8 @@ fn try_parse_structured_type(node: Node, source: &str) -> Option<StructuredType>
         && !kind.contains("argument")
         && !kind.contains("call")
         && !kind.contains("identifier")
-        && !kind.contains("specifier");
+        && !kind.contains("specifier")
+        && !kind.contains("mod");
 
     if !is_structured {
         return None;
