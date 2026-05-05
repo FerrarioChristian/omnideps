@@ -1,21 +1,25 @@
 use crate::ir::*;
 use tree_sitter::Node;
 
+pub enum ParsedItem {
+    Component(Component),
+    ImplBlock(ImplBlock),
+}
+
 // ==================== DISPATCHER CENTRALE ====================
 /// Attempts to identify and parse the given Tree-sitter `Node` into an Intermediate Representation (IR) Component.
-/// Returns `Some(Component)` if a match is found (e.g., StructuredType, FreeFunction, ImplBlock), otherwise `None`.
-pub fn dispatch_node(node: Node, source: &str) -> Option<Component> {
+pub fn dispatch_node(node: Node, source: &str) -> Option<ParsedItem> {
     if let Some(m) = try_parse_module_node(node, source) {
-        return Some(Component::Module(m));
+        return Some(ParsedItem::Component(Component::Module(m)));
     }
     if let Some(st) = try_parse_structured_type(node, source) {
-        return Some(Component::StructuredType(st));
+        return Some(ParsedItem::Component(Component::StructuredType(st)));
     }
-    if let Some(ff) = try_parse_free_function(node, source) {
-        return Some(Component::FreeFunction(ff));
+    if let Some(ff) = try_parse_function(node, source) {
+        return Some(ParsedItem::Component(Component::Function(ff)));
     }
     if let Some(implb) = try_parse_impl_block(node, source) {
-        return Some(Component::ImplBlock(implb));
+        return Some(ParsedItem::ImplBlock(implb));
     }
     None
 }
@@ -87,7 +91,7 @@ fn try_parse_structured_type(node: Node, source: &str) -> Option<StructuredType>
 }
 
 /// Heuristically identifies free-standing functions or methods.
-fn try_parse_free_function(node: Node, source: &str) -> Option<FreeFunction> {
+fn try_parse_function(node: Node, source: &str) -> Option<Function> {
     if !node.is_named() {
         return None;
     }
@@ -107,10 +111,12 @@ fn try_parse_free_function(node: Node, source: &str) -> Option<FreeFunction> {
     let parameters = extract_parameters(node, source);
     let return_type = extract_return_type(node, source);
 
-    Some(FreeFunction {
+    Some(Function {
         name,
-        parameters,
-        return_type,
+        signature: crate::ir::Signature {
+            parameters,
+            return_type,
+        },
     })
 }
 
@@ -254,15 +260,14 @@ fn extract_fields(node: Node, source: &str) -> Vec<Field> {
     fields
 }
 
-fn extract_methods(node: Node, source: &str) -> Vec<Method> {
+fn extract_methods(node: Node, source: &str) -> Vec<Function> {
     let mut methods = vec![];
     let mut cursor = node.walk();
     for child in node.children(&mut cursor) {
-        if let Some(ff) = try_parse_free_function(child, source) {
-            methods.push(Method {
+        if let Some(ff) = try_parse_function(child, source) {
+            methods.push(Function {
                 name: ff.name,
-                parameters: ff.parameters,
-                return_type: ff.return_type,
+                signature: ff.signature,
             });
         } else if child.kind().contains("body")
             || child.kind().contains("list")

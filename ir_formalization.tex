@@ -30,44 +30,50 @@ I Tipi Strutturati rappresentano il nucleo dell'analisi architetturale. Essi ven
 \subsection{Membri e Firme}
 Definiamo il tipo \textbf{Field} ($F$), che rappresenta un attributo o campo dati, definito come il prodotto tra un identificatore e un riferimento a un tipo:
     $$F = \mathcal{I} \times \tau$$
-Definiamo il tipo \textbf{Parameter} ($P$) e il tipo \textbf{Method} ($M$) per gestire il polimorfismo e l'overloading:
-$$P = \mathcal{I}^? \times \tau \times \mathbb{B}$$ dove l'identificatore $\mathcal{I}^?$ è opzionale, in questo modo è possibile supportare funzioni lamdba e parametri anonimi, $\tau$ è il tipo e $\mathbb{B}$ indica la proprietà variadica del parametro.\\ \\
-Una funzione o metodo è dunque:
-$$M = \mathcal{I} \times \vec{P} \times \tau_{ret}$$
-dove $\mathcal{I}$ è il nome, $\vec{P}$ è il vettore dei parametri e $\tau_{ret}$ è il tipo di ritorno.
+Definiamo il tipo \textbf{Parameter} ($P$) per gestire i parametri passati alle funzioni:
+$$P = \mathcal{I}^? \times \tau \times \mathbb{B}$$ dove l'identificatore $\mathcal{I}^?$ è opzionale (per supportare funzioni lambda e parametri anonimi), $\tau$ è il tipo e $\mathbb{B}$ indica la proprietà variadica del parametro.
 
-Allo stesso modo, definiamo una \textbf{Free Function} ($FN$) come una funzione non legata ad alcun tipo strutturato, formalizzata anch'essa come la tupla $\langle \mathcal{I}, \vec{P}, \tau_{ret} \rangle$.
+Per astrarre il concetto di "firma" di una funzione dal componente che la implementa, introduciamo il tipo \textbf{Signature} ($\sigma$):
+$$\sigma = \vec{P} \times \tau_{ret}$$
+dove $\vec{P}$ è il vettore dei parametri e $\tau_{ret}$ è il tipo di ritorno.
 
-L'overloading è gestito naturalmente dalla cardinalità dell'insieme delle funzioni all'interno di un tipo strutturato o di un modulo: un'entità può contenere più metodi o funzioni con lo stesso $\mathcal{I}$ ma diversa firma $\vec{P}$.
+Su questa base, definiamo il tipo universale \textbf{Function} ($\mathcal{F}$) come contenitore che lega un identificatore a una specifica firma:
+$$\mathcal{F} = \langle \mathcal{I}, \sigma \rangle$$
+
+Il ruolo architetturale di una $\mathcal{F}$ (se funge da Metodo o da Free Function) non è codificato nel suo tipo, ma è determinato esclusivamente dal contesto strutturale in cui viene inserita (all'interno di un tipo strutturato o di un modulo).
+
+L'overloading è gestito naturalmente dalla cardinalità dell'insieme delle funzioni all'interno di un tipo strutturato o di un modulo: un'entità può contenere più funzioni con lo stesso $\mathcal{I}$ ma diversa firma $\sigma$.
+
 
 \subsection{Tipi Strutturati ($\mathcal{S}$)}
-Sia $\mathcal{K} = \{ \text{Class, Struct, Interface, Trait} \}$ l'insieme delle categorie strutturali. Un tipo strutturato è definito dalla tupla:
-$$\mathcal{S} = \langle \text{id} \in \mathcal{QN}, k \in \mathcal{K}, \vec{F}, \vec{M}, \vec{\tau}_{sup}, \vec{\mathcal{S}}_{nest} \rangle$$
-dove:
+Sia $\mathcal{K} = \{ \text{Class, Struct, Interface, Trait} \}$ il dominio delle tipologie di tipi struttrati. Un tipo strutturato è definito dalla tupla:
+$$\mathcal{S} = \langle \text{id} \in \mathcal{QN}, k \in \mathcal{K}, \vec{F}, \vec{\mathcal{F}}, \vec{\tau}_{sup}, \vec{\mathcal{S}}_{nest} \rangle$$
+dove: 
 \begin{itemize}
     \item \textbf{id}: il nome qualificato univoco che identifica l'entità all'interno del sistema.
     \item \textbf{k}: la categoria strutturale (definita in $\mathcal{K}$) che preserva la semantica originale del costrutto.
     \item $\vec{F}$: l'insieme dei campi (\textit{fields}) che compongono lo stato dell'entità.
-    \item $\vec{M}$: l'insieme dei metodi che definiscono il comportamento dell'entità.
+    \item $\vec{\mathcal{F}}$: l'insieme delle funzioni (che assumono ruolo di metodi) che definiscono il comportamento dell'entità.
     \item $\vec{\tau}_{sup}$: l'insieme dei riferimenti ai super-tipi, modellando le relazioni di ereditarietà o di implementazione di interfacce/trait.
     \item $\vec{\mathcal{S}}_{nest}$: l'insieme dei tipi definiti internamente all'entità, permettendo una modellazione ricorsiva dei tipi annidati (\textit{nested types}).
 \end{itemize}
 
 \subsection{Blocchi di Implementazione ($\mathcal{B}_{lk}$)}
-Per supportare linguaggi come Rust e C++ (separazione tra dichiarazione e definizione), introduciamo il tipo \textbf{ImplBlock}:
+Per supportare linguaggi come Rust e C++ (separazione tra dichiarazione e definizione), in fase di estrazione introduciamo il costrutto temporaneo \textbf{ImplBlock}:
 $$\mathcal{B}_{lk} = \langle \text{target} \in \tau, \text{trait}^? \in \tau, \vec{M} \rangle$$
-dove $\text{target}$ è il tipo a cui si applica l'implementazione, $\text{trait}^?$ è un riferimento opzionale al trait o interfaccia che si sta implementando, e $\vec{M}$ è il vettore dei metodi implementati. \\
-Questa astrazione è cruciale per la risoluzione delle dipendenze: una dipendenza verso un metodo contenuto in $\mathcal{B}_{lk}$ deve essere risolta mappando $\vec{M}$ sul tipo $\tau_{target}$ e, se presente, validando il contratto definito da $\tau_{trait}$.
+dove $\text{target}$ è il tipo a cui si applica l'implementazione, $\text{trait}^?$ è un riferimento opzionale al trait o interfaccia che si sta implementando, e $\vec{M}$ è il vettore dei metodi.
+Come vedremo nella fase di Risoluzione, i blocchi di implementazione fungono da "zucchero sintattico": i loro metodi e trait vengono \textit{appiattiti} all'interno del tipo strutturato di riferimento, scomparendo di fatto dal modello architetturale finale.
 
-\section{Rappresentazione del Sistema Analizzato}
-L'intero sistema software, una volta analizzato, è rappresentato come un'istanza del tipo \textbf{Modulo} ($\mathcal{M}$), che funge da radice del \textit{Component Tree}.
-Ogni elemento $T \in \mathcal{M}$ rappresenta una foresta gerarchica di componenti, che aggrega ricorsivamente l'intera struttura del software (moduli annidati, tipi strutturati, funzioni e blocchi di implementazione). Questa struttura costituisce il dominio della nostra rappresentazione intermedia.
-Definiamo un \textbf{Componente} ($\mathcal{C}$) come l'unione disgiunta (sum type) di tutti i costrutti analizzabili del sistema. Ogni componente rappresenta l'unità logica che può comparire come vertice nel grafo delle dipendenze:
-$$\mathcal{C} ::= \text{Mod}(\mathcal{M}) \mid \text{Struct}(\mathcal{S}) \mid \text{Func}(FN) \mid \text{Impl}(\mathcal{B}_{lk})$$
+\section{Architettura dei Componenti}
+L'intero sistema software, una volta analizzato, è rappresentato come un'istanza del tipo \textbf{Modulo} ($\mathcal{M}$), che funge da radice del \textit{Component Tree}. Ogni elemento $T \in \mathcal{M}$ rappresenta una foresta gerarchica di componenti, che aggrega ricorsivamente l'intera struttura del software (moduli annidati, tipi strutturati e funzioni). Questa struttura costituisce il dominio della nostra rappresentazione intermedia.
+
+\subsection{Componente ($\mathcal{C}$)}
+Definiamo un \textbf{Componente} ($\mathcal{C}$) come l'unione disgiunta (sum type) dei costrutti strutturali definitivi del sistema. Ogni componente rappresenta l'unità logica che può comparire come vertice nel grafo delle dipendenze:
+$$\mathcal{C} ::= \text{Mod}(\mathcal{M}) \mid \text{StructuredType}(\mathcal{S}) \mid \text{Function}(\mathcal{F})$$
 
 \subsection{Modulo ($\mathcal{M}$)}
 L'intera struttura del programma è catturata dal tipo \textbf{Modulo} ($\mathcal{M}$), definito ricorsivamente per riflettere la gerarchia del file system o dei namespace:
-$$\mathcal{M} = \langle \mathcal{QN}, \vec{\mathcal{M}_{nest}}, \vec{\mathcal{S}}, \vec{FN}, \vec{\mathcal{B}}_{lk} \rangle$$
+$$\mathcal{M} = \langle \mathcal{QN}, \vec{\mathcal{M}_{nest}}, \vec{\mathcal{S}}, \vec{\mathcal{F}}, \vec{\mathcal{B}}_{lk} \rangle$$
 Ogni elemento del software è quindi un nodo in un albero di componenti $T \in \mathcal{D}_{IR}$.
 
 \section{Grafo delle Dipendenze $\mathcal{G}$}
@@ -78,6 +84,4 @@ L'insieme degli archi $E$ rappresenta le relazioni semantiche e strutturali tra 
 $$E \subseteq \mathcal{C} \times \mathcal{C} \times \text{Kind}$$
 dove $\text{Kind}$ definisce la semantica della dipendenza (ereditarietà, uso di tipo nei campi, parametri di metodi, implementazione di trait, ecc.).
 
-\textit{Nota implementativa:} Mentre a livello formale un arco collega direttamente due istanze astratte del tipo $\mathcal{C}$, nell'implementazione software (per ragioni di efficienza di memoria, serializzazione e sicurezza dei tipi in Rust) le relazioni sono tracciate utilizzando i nomi qualificati ($\mathcal{QN}$) delle entità come chiavi identificative.
-
-
+\includegraphics[width=\textwidth]{images/mermaid-diagram-guest-low.pnga

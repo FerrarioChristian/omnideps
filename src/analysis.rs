@@ -28,12 +28,7 @@ pub fn build_symbol_table(modules: &[Module]) -> HashMap<QualifiedName, Componen
         for f in &m.free_functions {
             let mut name = prefix.clone();
             name.push(f.name.clone());
-            table.insert(name, Component::FreeFunction(f.clone()));
-        }
-        for i in &m.impl_blocks {
-            let mut name = prefix.clone();
-            name.extend(i.name.clone());
-            table.insert(name, Component::ImplBlock(i.clone()));
+            table.insert(name, Component::Function(f.clone()));
         }
         for sub in &m.sub_modules {
             populate(sub, table, prefix);
@@ -117,13 +112,31 @@ fn resolve_module_in_context(ctx: &ResolutionContext, mut module: Module) -> Mod
     module.free_functions = module
         .free_functions
         .into_iter()
-        .map(|f| resolve_free_function(&new_ctx, f))
+        .map(|f| resolve_function(&new_ctx, f))
         .collect();
-    module.impl_blocks = module
+    
+    let resolved_impls: Vec<ImplBlock> = module
         .impl_blocks
         .into_iter()
         .map(|i| resolve_impl_block(&new_ctx, i))
         .collect();
+
+    for ib in resolved_impls {
+        if let TypeRef::Resolved(target_name) = &ib.impl_for {
+            if let Some(target_st) = module.structured_types.iter_mut().find(|st| {
+                let mut st_absolute = new_ctx.current_prefix.clone();
+                st_absolute.extend(st.name.clone());
+                &st_absolute == target_name
+            }) {
+                target_st.methods.extend(ib.methods);
+                if let Some(trait_ref) = ib.implements_trait {
+                    target_st.super_types.push(trait_ref);
+                }
+            }
+        }
+    }
+    module.impl_blocks = vec![]; // Flattened
+
     module.sub_modules = module
         .sub_modules
         .into_iter()
@@ -150,7 +163,7 @@ fn resolve_structured_type(ctx: &ResolutionContext, mut st: StructuredType) -> S
     st.methods = st
         .methods
         .into_iter()
-        .map(|m| resolve_method(ctx, m))
+        .map(|m| resolve_function(ctx, m))
         .collect();
     st.nested_types = st
         .nested_types
@@ -160,9 +173,9 @@ fn resolve_structured_type(ctx: &ResolutionContext, mut st: StructuredType) -> S
     st
 }
 
-fn resolve_free_function(ctx: &ResolutionContext, mut f: FreeFunction) -> FreeFunction {
-    f.parameters = f
-        .parameters
+fn resolve_function(ctx: &ResolutionContext, mut f: Function) -> Function {
+    f.signature.parameters = f
+        .signature.parameters
         .into_iter()
         .map(|p| Parameter {
             name: p.name,
@@ -170,7 +183,7 @@ fn resolve_free_function(ctx: &ResolutionContext, mut f: FreeFunction) -> FreeFu
             is_variadic: p.is_variadic,
         })
         .collect();
-    f.return_type = resolve_type_ref(ctx, f.return_type);
+    f.signature.return_type = resolve_type_ref(ctx, f.signature.return_type);
     f
 }
 
@@ -180,23 +193,9 @@ fn resolve_impl_block(ctx: &ResolutionContext, mut i: ImplBlock) -> ImplBlock {
     i.methods = i
         .methods
         .into_iter()
-        .map(|m| resolve_method(ctx, m))
+        .map(|m| resolve_function(ctx, m))
         .collect();
     i
-}
-
-fn resolve_method(ctx: &ResolutionContext, mut m: Method) -> Method {
-    m.parameters = m
-        .parameters
-        .into_iter()
-        .map(|p| Parameter {
-            name: p.name,
-            ty: resolve_type_ref(ctx, p.ty),
-            is_variadic: p.is_variadic,
-        })
-        .collect();
-    m.return_type = resolve_type_ref(ctx, m.return_type);
-    m
 }
 
 // ==================== BUILD DEPENDENCY GRAPH ====================
@@ -212,8 +211,7 @@ pub fn build_dependency_graph(modules: &[Module]) -> DependencyGraph {
                 add_field_edges(st, &mut edges);
                 add_method_edges(st, &mut edges);
             }
-            Component::FreeFunction(ff) => add_free_function_edges(ff, &mut edges),
-            Component::ImplBlock(ib) => add_impl_edges(ib, &mut edges),
+            Component::Function(ff) => add_function_edges(ff, &mut edges),
             _ => {}
         }
     }
@@ -247,57 +245,40 @@ fn add_field_edges(st: &StructuredType, edges: &mut Vec<Dependency>) {
 
 fn add_method_edges(st: &StructuredType, edges: &mut Vec<Dependency>) {
     for m in &st.methods {
-        for p in &m.parameters {
+        for p in &m.signature.parameters {
             if let TypeRef::Resolved(to) = &p.ty {
                 edges.push(Dependency {
                     from: st.name.clone(),
                     to: to.clone(),
-                    kind: DependencyEdgeKind::UsesMethodParam,
+                    kind: DependencyEdgeKind::UsesParamType,
                 });
             }
         }
-        if let TypeRef::Resolved(to) = &m.return_type {
+        if let TypeRef::Resolved(to) = &m.signature.return_type {
             edges.push(Dependency {
                 from: st.name.clone(),
                 to: to.clone(),
-                kind: DependencyEdgeKind::UsesMethodReturn,
+                kind: DependencyEdgeKind::UsesReturnType,
             });
         }
     }
 }
 
-fn add_free_function_edges(ff: &FreeFunction, edges: &mut Vec<Dependency>) {
-    for p in &ff.parameters {
+fn add_function_edges(ff: &Function, edges: &mut Vec<Dependency>) {
+    for p in &ff.signature.parameters {
         if let TypeRef::Resolved(to) = &p.ty {
             edges.push(Dependency {
                 from: vec![ff.name.clone()],
                 to: to.clone(),
-                kind: DependencyEdgeKind::UsesFreeFunctionParam,
+                kind: DependencyEdgeKind::UsesParamType,
             });
         }
     }
-    if let TypeRef::Resolved(to) = &ff.return_type {
+    if let TypeRef::Resolved(to) = &ff.signature.return_type {
         edges.push(Dependency {
             from: vec![ff.name.clone()],
             to: to.clone(),
-            kind: DependencyEdgeKind::UsesFreeFunctionReturn,
-        });
-    }
-}
-
-fn add_impl_edges(ib: &ImplBlock, edges: &mut Vec<Dependency>) {
-    if let TypeRef::Resolved(to) = &ib.impl_for {
-        edges.push(Dependency {
-            from: ib.name.clone(),
-            to: to.clone(),
-            kind: DependencyEdgeKind::ImplementsFor,
-        });
-    }
-    if let Some(TypeRef::Resolved(to)) = &ib.implements_trait {
-        edges.push(Dependency {
-            from: ib.name.clone(),
-            to: to.clone(),
-            kind: DependencyEdgeKind::ImplementsTrait,
+            kind: DependencyEdgeKind::UsesReturnType,
         });
     }
 }
@@ -316,9 +297,8 @@ fn flatten_modules(modules: &[Module]) -> Vec<Component> {
             m.free_functions
                 .iter()
                 .cloned()
-                .map(Component::FreeFunction),
+                .map(Component::Function),
         );
-        flat.extend(m.impl_blocks.iter().cloned().map(Component::ImplBlock));
         flat.extend(flatten_modules(&m.sub_modules));
     }
     flat

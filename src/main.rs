@@ -97,7 +97,7 @@ fn detect_language(path: &std::path::Path) -> Result<tree_sitter::Language> {
         Some("py") => Ok(extractor::languages::python()),
         Some("c") | Some("h") => Ok(extractor::languages::c()),
         Some("cpp") | Some("cxx") | Some("cc") | Some("hxx") => Ok(extractor::languages::cpp()),
-        _ => anyhow::bail!("Lingua non supportata"),
+        _ => anyhow::bail!("Language not supported for file: {}", path.display()),
     }
 }
 

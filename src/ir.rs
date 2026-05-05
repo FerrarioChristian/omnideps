@@ -42,23 +42,21 @@ pub struct Parameter {
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
-pub struct Method {
-    pub name: Identifier,
+pub struct Signature {
     pub parameters: Vec<Parameter>,
     pub return_type: TypeRef,
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
-pub struct FreeFunction {
+pub struct Function {
     pub name: Identifier,
-    pub parameters: Vec<Parameter>,
-    pub return_type: TypeRef,
+    pub signature: Signature,
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ImplBlock {
     pub name: QualifiedName,
-    pub methods: Vec<Method>,
+    pub methods: Vec<Function>,
     pub impl_for: TypeRef,
     pub implements_trait: Option<TypeRef>,
 }
@@ -68,7 +66,7 @@ pub struct StructuredType {
     pub name: QualifiedName,
     pub kind: StructuredTypeKind,
     pub fields: Vec<Field>,
-    pub methods: Vec<Method>,
+    pub methods: Vec<Function>,
     pub super_types: Vec<TypeRef>,
     pub nested_types: Vec<StructuredType>,
 }
@@ -78,7 +76,7 @@ pub struct Module {
     pub name: QualifiedName,
     pub sub_modules: Vec<Module>,
     pub structured_types: Vec<StructuredType>,
-    pub free_functions: Vec<FreeFunction>,
+    pub free_functions: Vec<Function>,
     pub impl_blocks: Vec<ImplBlock>,
     // Convertire le tre tipologie di componenti in un'unica lista di Componenti, Vec<Box<Component>>
 }
@@ -87,8 +85,7 @@ pub struct Module {
 pub enum Component {
     Module(Module),
     StructuredType(StructuredType),
-    FreeFunction(FreeFunction),
-    ImplBlock(ImplBlock),
+    Function(Function),
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -96,12 +93,8 @@ pub enum DependencyEdgeKind {
     Inherits,
     Implements,
     UsesFieldType,
-    UsesMethodParam,
-    UsesMethodReturn,
-    UsesFreeFunctionParam,
-    UsesFreeFunctionReturn,
-    ImplementsFor,
-    ImplementsTrait,
+    UsesParamType,
+    UsesReturnType,
     NestedIn,
     ModuleContainment,
 }
