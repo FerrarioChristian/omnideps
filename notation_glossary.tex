@@ -1,56 +1,118 @@
 \chapter{Notazione Matematica e Glossario}
 
-Per garantire il rigore formale e la chiarezza dell'esposizione, i capitoli successivi utilizzano una notazione matematica derivata dalla teoria dei tipi e dalla semantica funzionale. Questo capitolo funge da riferimento rapido per la simbologia e i concetti formali introdotti nella formalizzazione del sistema.
+Per garantire il rigore formale e la chiarezza dell'esposizione, i
+capitoli successivi utilizzano una notazione matematica derivata
+dalla teoria dei tipi e dalla semantica funzionale. Questo capitolo
+funge da riferimento rapido per la simbologia e i concetti formali
+introdotti nella formalizzazione del sistema.
 
 \section{Convenzioni Notazionali}
-Il modello utilizza le seguenti convenzioni standard per descrivere le strutture dati e le funzioni del sistema:
+Il modello utilizza le seguenti convenzioni standard per descrivere
+le strutture dati e le funzioni del sistema:
 
 \begin{itemize}
-    \item \textbf{Tuple (Prodotto Cartesiano)} $\langle x_1, x_2, \dots, x_n \rangle$: Rappresentano tipi composti (corrispondenti alle \texttt{struct}  nel codice sorgente). Ogni elemento della tupla definisce una proprietà essenziale dell'entità.
-    \item \textbf{Unione Disgiunta (Tipo Somma)} $A \mid B \mid C$: Indica che un valore può appartenere a uno e un solo tipo tra quelli elencati (corrispondente agli \texttt{enum} nel codice). È utilizzato per modellare il polimorfismo o l'incertezza.
-    \item \textbf{Vettori e Sequenze} $\vec{X}$: Indica una sequenza finita e ordinata di elementi di tipo $X$ (corrispondente alle liste, array o \texttt{Vec} in memoria).
-    \item \textbf{Opzionalità} $X^?$: Indica un valore che può essere presente (di tipo $X$) oppure assente (corrispondente a \texttt{Option<T>}).
-    \item \textbf{Firme Funzionali} $f : A \to B$: Denota una funzione $f$ che accetta un input dal dominio $A$ e restituisce un output nel codominio $B$. Se l'input è composto da più argomenti, si utilizza il prodotto cartesiano (es. $A \times B \to C$).
+  \item \textbf{Tuple (Prodotto Cartesiano)} $\langle x_1, x_2,
+    \dots, x_n \rangle$: Rappresentano tipi composti (corrispondenti
+    alle \texttt{struct}  nel codice sorgente). Ogni elemento della
+    tupla definisce una proprietà essenziale dell'entità.
+  \item \textbf{Unione Disgiunta (Tipo Somma)} $A \mid B \mid C$:
+    Indica che un valore può appartenere a uno e un solo tipo tra
+    quelli elencati (corrispondente agli \texttt{enum} nel codice). È
+    utilizzato per modellare il polimorfismo o l'incertezza.
+  \item \textbf{Vettori e Sequenze} $\vec{X}$: Indica una sequenza
+    finita e ordinata di elementi di tipo $X$ (corrispondente alle
+    liste, array o \texttt{Vec} in memoria).
+  \item \textbf{Opzionalità} $X^?$: Indica un valore che può essere
+    presente (di tipo $X$) oppure assente (corrispondente a \texttt{Option<T>}).
+  \item \textbf{Firme Funzionali} $f : A \to B$: Denota una funzione
+    $f$ che accetta un input dal dominio $A$ e restituisce un output
+    nel codominio $B$. Se l'input è composto da più argomenti, si
+    utilizza il prodotto cartesiano (es. $A \times B \to C$).
 \end{itemize}
 
 \section{Glossario dei Tipi e dei Domini}
-Di seguito sono definiti i simboli principali che costituiscono l'alfabeto della nostra Rappresentazione Intermedia (IR) e della pipeline di analisi.
+Di seguito sono definiti i simboli principali che costituiscono
+l'alfabeto della nostra Rappresentazione Intermedia (IR) e della
+pipeline di analisi.
 
 \subsection{Tipi Base e Identificatori}
 \begin{itemize}
-    \item $\mathcal{I}$ (\textbf{Identifier}): L'insieme di tutte le stringhe alfanumeriche valide utilizzate per nominare variabili, funzioni o classi.
-    \item $\mathcal{QN}$ (\textbf{Qualified Name}): Una sequenza gerarchica di identificatori ($\langle i_1, \dots, i_n \rangle$) che rappresenta il percorso assoluto e univoco di un'entità (es. il namespace o il modulo).
-    \item $\tau$ (\textbf{Type Reference}): Un riferimento astratto a un tipo. Rappresentato da un tipo somma a quattro stati che ne modella il ciclo di vita durante l'analisi: \texttt{Prim} (primitivo di base), \texttt{Unresolved} (nome grezzo appena estratto), \texttt{Resolved} (percorso assoluto accertato), o \texttt{Failed} (tentativo di risoluzione non andato a buon fine).
+  \item $\mathcal{I}$ (\textbf{Identifier}): L'insieme di tutte le
+    stringhe alfanumeriche valide utilizzate per nominare variabili,
+    funzioni o classi.
+  \item $\mathcal{QN}$ (\textbf{Qualified Name}): Una sequenza
+    gerarchica di identificatori ($\langle i_1, \dots, i_n \rangle$)
+    che rappresenta il percorso assoluto e univoco di un'entità (es.
+    il namespace o il modulo).
+  \item $\tau$ (\textbf{Type Reference}): Un riferimento astratto a
+    un tipo. Rappresentato da un tipo somma a quattro stati che ne
+    modella il ciclo di vita durante l'analisi: \texttt{Prim}
+    (primitivo di base), \texttt{Unresolved} (nome grezzo appena
+    estratto), \texttt{Resolved} (percorso assoluto accertato), o
+    \texttt{Failed} (tentativo di risoluzione non andato a buon fine).
 \end{itemize}
 
 \subsection{Membri Strutturali e Firme}
 \begin{itemize}
-    \item $F$ (\textbf{Field}): Un campo dati appartenente a una struttura, definito dalla coppia identificatore e tipo ($\langle \mathcal{I}, \tau \rangle$).
-    \item $P$ (\textbf{Parameter}): Un parametro in ingresso a una funzione, comprendente nome opzionale, tipo e indicatore di variadicità.
-    \item $\sigma$ (\textbf{Signature}): La firma architetturale di una funzione, composta dalla tupla $\langle \vec{P}, \tau_{ret} \rangle$. Astrae i tipi di input e output isolandoli dal componente implementativo.
-    \item $\mathcal{F}$ (\textbf{Function}): Un componente funzionale universale definito dalla coppia $\langle \mathcal{I}, \sigma \rangle$. Il suo ruolo architetturale (metodo o funzione libera) è determinato unicamente dal costrutto in cui è annidato.
+  \item $F$ (\textbf{Field}): Un campo dati appartenente a una
+    struttura, definito dalla coppia identificatore e tipo ($\langle
+    \mathcal{I}, \tau \rangle$).
+  \item $P$ (\textbf{Parameter}): Un parametro in ingresso a una
+    funzione, comprendente nome opzionale, tipo e indicatore di variadicità.
+  \item $\sigma$ (\textbf{Signature}): La firma architetturale di una
+    funzione, composta dalla tupla $\langle \vec{P}, \tau_{ret}
+    \rangle$. Astrae i tipi di input e output isolandoli dal
+    componente implementativo.
+  \item $\mathcal{F}$ (\textbf{Function}): Un componente funzionale
+    universale definito dalla coppia $\langle \mathcal{I}, \sigma
+    \rangle$. Il suo ruolo architetturale (metodo o funzione libera)
+    è determinato unicamente dal costrutto in cui è annidato.
 \end{itemize}
 
 \subsection{Entità Architetturali}
 \begin{itemize}
-    \item $\mathcal{S}$ (\textbf{Structured Type}): L'astrazione di classi, struct, interfacce e trait. Aggrega campi, funzioni, gerarchie di ereditarietà e tipi annidati.
-    \item $\mathcal{B}_{lk}$ (\textbf{Implementation Block}): Costrutto sintattico di estrazione temporaneo tipico di linguaggi come Rust o C++. Associa un insieme di funzioni a un tipo target. Viene appiattito all'interno di $\mathcal{S}$ durante la Fase di Risoluzione, scomparendo dal modello finale.
-    \item $\mathcal{C}$ (\textbf{Component}): Il tipo somma universale che abbraccia le entità analizzabili definitive del sistema (Moduli, Tipi Strutturati, Funzioni).
-    \item $\mathcal{M}$ (\textbf{Module}): L'unità gerarchica fondamentale. Il modulo radice funge da dominio della Rappresentazione Intermedia ($\mathcal{D}_{IR}$) e aggrega ricorsivamente tutto il codice sorgente analizzato.
+  \item $\mathcal{S}$ (\textbf{Structured Type}): L'astrazione di
+    classi, struct, interfacce e trait. Aggrega campi, funzioni,
+    gerarchie di ereditarietà e tipi annidati.
+  \item $\mathcal{B}_{lk}$ (\textbf{Implementation Block}): Costrutto
+    sintattico di estrazione temporaneo tipico di linguaggi come Rust
+    o C++. Associa un insieme di funzioni a un tipo target. Viene
+    appiattito all'interno di $\mathcal{S}$ durante la Fase di
+    Risoluzione, scomparendo dal modello finale.
+  \item $\mathcal{C}$ (\textbf{Component}): Il tipo somma universale
+    che abbraccia le entità analizzabili definitive del sistema
+    (Moduli, Tipi Strutturati, Funzioni).
+  \item $\mathcal{M}$ (\textbf{Module}): L'unità gerarchica
+    fondamentale. Il modulo radice funge da dominio della
+    Rappresentazione Intermedia ($\mathcal{D}_{IR}$) e aggrega
+    ricorsivamente tutto il codice sorgente analizzato.
 \end{itemize}
 
 \subsection{Modello di Risoluzione e Grafo}
 \begin{itemize}
-    \item $\Sigma$ (\textbf{Symbol Table}): La funzione di mappa globale che associa i nomi qualificati ($\mathcal{QN}$) alle effettive istanze dei componenti ($\mathcal{C}$).
-    \item $\Gamma$ (\textbf{Resolution Context}): Il contesto locale (comprendente scope attuale e importazioni) utilizzato per risolvere riferimenti ambigui durante la fase di risoluzione.
-    \item $\mathcal{G}$ (\textbf{Dependency Graph}): Il grafo orientato finale $\langle V, E \rangle$. I vertici $V$ sono i componenti estratti dal codice e gli archi $E$ sono le relazioni semantiche di dipendenza (ereditarietà, composizione, uso).
+  \item $\Sigma$ (\textbf{Symbol Table}): La funzione di mappa
+    globale che associa i nomi qualificati ($\mathcal{QN}$) alle
+    effettive istanze dei componenti ($\mathcal{C}$).
+  \item $\Gamma$ (\textbf{Resolution Context}): Il contesto locale
+    (comprendente scope attuale e importazioni) utilizzato per
+    risolvere riferimenti ambigui durante la fase di risoluzione.
+  \item $\mathcal{G}$ (\textbf{Dependency Graph}): Il grafo orientato
+    finale $\langle V, E \rangle$. I vertici $V$ sono i componenti
+    estratti dal codice e gli archi $E$ sono le relazioni semantiche
+    di dipendenza (ereditarietà, composizione, uso).
 \end{itemize}
 
 \subsection{Fasi dell'Analisi}
 \begin{itemize}
-    \item $\Phi$ (\textbf{Full Analysis}): La funzione matematica complessiva che rappresenta l'intero programma, calcolata come la composizione delle tre fasi sottostanti ($\Phi = G \circ R \circ E$).
-    \item $E$ (\textbf{Extraction}): La prima fase dipendente dal linguaggio che trasforma i nodi dell'albero sintattico nel Modulo Radice $\mathcal{M}$.
-    \item $R$ (\textbf{Resolution}): La fase agnostica che naviga la gerarchia $\mathcal{M}$ risolvendo e validando tutti i riferimenti $\tau$ grazie al contesto $\Gamma$.
-    \item $G$ (\textbf{Graphing}): L'ultima fase che converte il modello a oggetti risolto nel grafo delle dipendenze $\mathcal{G}$.
+  \item $\Phi$ (\textbf{Full Analysis}): La funzione matematica
+    complessiva che rappresenta l'intero programma, calcolata come la
+    composizione delle tre fasi sottostanti ($\Phi = G \circ R \circ E$).
+  \item $E$ (\textbf{Extraction}): La prima fase dipendente dal
+    linguaggio che trasforma i nodi dell'albero sintattico nel Modulo
+    Radice $\mathcal{M}$.
+  \item $R$ (\textbf{Resolution}): La fase agnostica che naviga la
+    gerarchia $\mathcal{M}$ risolvendo e validando tutti i
+    riferimenti $\tau$ grazie al contesto $\Gamma$.
+  \item $G$ (\textbf{Graphing}): L'ultima fase che converte il
+    modello a oggetti risolto nel grafo delle dipendenze $\mathcal{G}$.
 \end{itemize}
-

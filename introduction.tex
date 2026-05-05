@@ -1,29 +1,78 @@
 \chapter{Introduzione}
 
 \section{Contesto e Motivazione}
-L'analisi automatica del codice sorgente è un'attività fondamentale nell'ingegneria del software moderna, essenziale per la comprensione dell'architettura, il refactoring, e la misurazione della qualità del codice. Tuttavia, la maggior parte degli strumenti di analisi statica è fortemente legata a un singolo linguaggio di programmazione. Costruire analizzatori per linguaggi multipli spesso comporta la riscrittura da zero delle logiche di parsing e di estrazione delle dipendenze, con un notevole dispendio di risorse e una difficile manutenibilità.
+L'analisi automatica del codice sorgente è un'attività fondamentale
+nell'ingegneria del software moderna, essenziale per la comprensione
+dell'architettura, il refactoring, e la misurazione della qualità del
+codice. Tuttavia, la maggior parte degli strumenti di analisi statica
+è fortemente legata a un singolo linguaggio di programmazione.
+Costruire analizzatori per linguaggi multipli spesso comporta la
+riscrittura da zero delle logiche di parsing e di estrazione delle
+dipendenze, con un notevole dispendio di risorse e una difficile manutenibilità.
 
-Negli ultimi anni, l'adozione di parser generici basati su grammatiche formali unificate, come Tree-sitter, ha semplificato la fase iniziale del processo. Tree-sitter è in grado di generare un Concrete Syntax Tree (CST) per quasi ogni linguaggio moderno. Tuttavia, il CST è una struttura dati a basso livello, che modella la sintassi esatta del testo (incluse parentesi, parole chiave e spaziature) ma manca di una semantica forte. Un nodo che rappresenta la definizione di una classe in Java ha una struttura profondamente diversa da un nodo equivalente in C++ o Rust, rendendo complessa l'analisi architetturale unificata.
+Negli ultimi anni, l'adozione di parser generici basati su
+grammatiche formali unificate, come Tree-sitter, ha semplificato la
+fase iniziale del processo. Tree-sitter è in grado di generare un
+Concrete Syntax Tree (CST) per quasi ogni linguaggio moderno.
+Tuttavia, il CST è una struttura dati a basso livello, che modella la
+sintassi esatta del testo (incluse parentesi, parole chiave e
+spaziature) ma manca di una semantica forte. Un nodo che rappresenta
+la definizione di una classe in Java ha una struttura profondamente
+diversa da un nodo equivalente in C++ o Rust, rendendo complessa
+l'analisi architetturale unificata.
 
 \section{Obiettivi del Progetto}
-L'obiettivo principale di questo lavoro di tesi è progettare, formalizzare e implementare un processo di analisi delle dipendenze architetturali che operi in modo intrinsecamente \textit{language-agnostic}. 
+L'obiettivo principale di questo lavoro di tesi è progettare,
+formalizzare e implementare un processo di analisi delle dipendenze
+architetturali che operi in modo intrinsecamente \textit{language-agnostic}.
 
-Il sistema mira a elaborare il codice sorgente di linguaggi eterogenei (con focus su C, C++, Java, Python e Rust) e a generare un Grafo delle Dipendenze unificato. I nodi di questo grafo non rappresentano semplici porzioni di testo, ma entità logiche strutturate (Classi, Struct, Interfacce, Metodi), mentre gli archi rappresentano le relazioni semantiche tra di esse (Ereditarietà, Composizione, Interazione Comportamentale).
+Il sistema mira a elaborare il codice sorgente di linguaggi
+eterogenei (con focus su C, C++, Java, Python e Rust) e a generare un
+Grafo delle Dipendenze unificato. I nodi di questo grafo non
+rappresentano semplici porzioni di testo, ma entità logiche
+strutturate (Classi, Struct, Interfacce, Metodi), mentre gli archi
+rappresentano le relazioni semantiche tra di esse (Ereditarietà,
+Composizione, Interazione Comportamentale).
 
-Per raggiungere questo scopo, non assumiamo il compito di effettuare controlli di validità logica (es. visibilità delle variabili o mutabilità), basandoci sull'assunzione che il codice sorgente in input sia compilante o semanticamente valido per il proprio ecosistema.
+Per raggiungere questo scopo, non assumiamo il compito di effettuare
+controlli di validità logica (es. visibilità delle variabili o
+mutabilità), basandoci sull'assunzione che il codice sorgente in
+input sia compilante o semanticamente valido per il proprio ecosistema.
 
 \section{Approccio Metodologico}
-Per garantire che il sistema sia estensibile, corretto e indipendente dalle peculiarità sintattiche dei singoli linguaggi, il progetto adotta un approccio basato sui tipi e sulla composizione funzionale.
+Per garantire che il sistema sia estensibile, corretto e indipendente
+dalle peculiarità sintattiche dei singoli linguaggi, il progetto
+adotta un approccio basato sui tipi e sulla composizione funzionale.
 
 \subsection{Sistema dei Tipi e Rappresentazione Intermedia}
-Il nucleo del sistema è la definizione di una Rappresentazione Intermedia (IR) fortemente tipizzata. L'IR agisce come un "linguaggio universale" interno. Ogni costrutto estratto dal codice (una funzione, una classe, un parametro) viene convertito in un tipo di dato strutturato. Questo permette di "dimenticare" come un'entità fosse scritta nel file originale, concentrandosi esclusivamente sulle sue proprietà architetturali.
+Il nucleo del sistema è la definizione di una Rappresentazione
+Intermedia (IR) fortemente tipizzata. L'IR agisce come un "linguaggio
+universale" interno. Ogni costrutto estratto dal codice (una
+funzione, una classe, un parametro) viene convertito in un tipo di
+dato strutturato. Questo permette di "dimenticare" come un'entità
+fosse scritta nel file originale, concentrandosi esclusivamente sulle
+sue proprietà architetturali.
 
 \subsection{Pipeline come Composizione di Funzioni}
-L'intero processo di analisi è modellato come una sequenza di trasformazioni, o una pipeline di funzioni tipate. Invece di avere una singola procedura monolitica, il sistema è diviso in tre fasi distinte:
+L'intero processo di analisi è modellato come una sequenza di
+trasformazioni, o una pipeline di funzioni tipate. Invece di avere
+una singola procedura monolitica, il sistema è diviso in tre fasi distinte:
 \begin{enumerate}
-    \item \textbf{Estrazione}: Mappa i nodi del CST generati da Tree-sitter nei tipi della nostra IR. È l'unica fase che "conosce" le regole sintattiche dei singoli linguaggi, utilizzando un approccio euristico per riconoscere pattern comuni.
-    \item \textbf{Risoluzione}: Un passaggio logico che prende i nomi estratti (es. l'uso di un tipo in un parametro) e li collega in modo inequivocabile all'entità a cui si riferiscono, risolvendo le ambiguità attraverso le regole di scope.
-    \item \textbf{Costruzione del Grafo}: Trasforma la struttura ad albero risolta nel grafo finale delle dipendenze.
+  \item \textbf{Estrazione}: Mappa i nodi del CST generati da
+    Tree-sitter nei tipi della nostra IR. È l'unica fase che
+    "conosce" le regole sintattiche dei singoli linguaggi,
+    utilizzando un approccio euristico per riconoscere pattern comuni.
+  \item \textbf{Risoluzione}: Un passaggio logico che prende i nomi
+    estratti (es. l'uso di un tipo in un parametro) e li collega in
+    modo inequivocabile all'entità a cui si riferiscono, risolvendo
+    le ambiguità attraverso le regole di scope.
+  \item \textbf{Costruzione del Grafo}: Trasforma la struttura ad
+    albero risolta nel grafo finale delle dipendenze.
 \end{enumerate}
 
-Modellare il sistema in questo modo ci permette di ragionare sulla sua correttezza strutturale: ogni fase riceve un input ben formato e garantisce la produzione di un output altrettanto valido (\textit{Type Safety}), assicurando la coerenza semantica complessiva della pipeline senza richiedere l'uso di terminologie matematiche complesse per la sua validazione.
+Modellare il sistema in questo modo ci permette di ragionare sulla
+sua correttezza strutturale: ogni fase riceve un input ben formato e
+garantisce la produzione di un output altrettanto valido
+(\textit{Type Safety}), assicurando la coerenza semantica complessiva
+della pipeline senza richiedere l'uso di terminologie matematiche
+complesse per la sua validazione.
