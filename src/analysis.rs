@@ -129,6 +129,7 @@ fn resolve_module_in_context(ctx: &ResolutionContext, mut module: Module) -> Mod
                 &st_absolute == target_name
             }) {
                 target_st.methods.extend(ib.methods);
+                target_st.nested_types.extend(ib.nested_types);
                 if let Some(trait_ref) = ib.implements_trait {
                     target_st.super_types.push(trait_ref);
                 }
@@ -194,6 +195,11 @@ fn resolve_impl_block(ctx: &ResolutionContext, mut i: ImplBlock) -> ImplBlock {
         .methods
         .into_iter()
         .map(|m| resolve_function(ctx, m))
+        .collect();
+    i.nested_types = i
+        .nested_types
+        .into_iter()
+        .map(|n| resolve_structured_type(ctx, n))
         .collect();
     i
 }

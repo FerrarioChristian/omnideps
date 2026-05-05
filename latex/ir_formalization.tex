@@ -128,12 +128,12 @@ Per supportare linguaggi come Rust e C++ (separazione tra
 dichiarazione e definizione), in fase di estrazione introduciamo il
 costrutto temporaneo \textbf{ImplBlock}:
 $$\mathcal{B}_{lk} = \langle \text{target} \in \tau, \text{trait}^?
-\in \tau, \vec{M} \rangle$$
+\in \tau, \vec{\mathcal{F}}, \vec{\mathcal{S}}_{nest} \rangle$$
 dove $\text{target}$ è il tipo a cui si applica l'implementazione,
 $\text{trait}^?$ è un riferimento opzionale al trait o interfaccia
-che si sta implementando, e $\vec{M}$ è il vettore dei metodi.
+che si sta implementando, $\vec{\mathcal{F}}$ è il vettore delle funzioni (metodi) e $\vec{\mathcal{S}}_{nest}$ è il vettore di eventuali tipi strutturati annidati.
 Come vedremo nella fase di Risoluzione, i blocchi di implementazione
-fungono da "zucchero sintattico": i loro metodi e trait vengono
+fungono da "zucchero sintattico": i loro metodi, i tipi annidati e i trait vengono
 \textit{appiattiti} all'interno del tipo strutturato di riferimento,
 scomparendo di fatto dal modello architetturale finale.
 

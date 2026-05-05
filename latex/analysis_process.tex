@@ -165,8 +165,10 @@ separare dichiarazione e definizione, esso viene rimosso dal modello
 architetturale finale per preservare l'agnosticismo:
 \begin{enumerate}
   \item Per ogni blocco $\mathcal{B}_{lk}$ associato a un tipo target
-    $\mathcal{S}$, i metodi $\vec{M}$ contenuti nel blocco vengono
-    spostati all'interno della lista dei metodi del tipo target.
+    $\mathcal{S}$, le funzioni $\vec{\mathcal{F}}$ contenute nel blocco vengono
+    spostate all'interno della lista delle funzioni del tipo target.
+  \item I tipi strutturati annidati $\vec{\mathcal{S}}_{nest}$ contenuti nel blocco
+    vengono spostati all'interno della lista dei tipi annidati del tipo target.
   \item Se il blocco implementa un trait ($\text{trait}^?$), il
     riferimento a tale trait viene aggiunto all'insieme dei
     super-tipi ($\vec{\tau}_{sup}$) del tipo $\mathcal{S}$.

@@ -59,6 +59,7 @@ pub struct ImplBlock {
     pub methods: Vec<Function>,
     pub impl_for: TypeRef,
     pub implements_trait: Option<TypeRef>,
+    pub nested_types: Vec<StructuredType>,
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]

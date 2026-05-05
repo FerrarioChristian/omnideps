@@ -134,12 +134,14 @@ fn try_parse_impl_block(node: Node, source: &str) -> Option<ImplBlock> {
     let methods = extract_methods(node, source);
     let impl_for = extract_impl_for(node, source);
     let implements_trait = extract_implements_trait(node, source);
+    let nested_types = extract_nested_types(node, source);
 
     Some(ImplBlock {
         name,
         methods,
         impl_for,
         implements_trait,
+        nested_types,
     })
 }
 
@@ -288,6 +290,7 @@ fn extract_nested_types(node: Node, source: &str) -> Vec<StructuredType> {
         } else if child.kind().contains("body")
             || child.kind().contains("list")
             || child.kind().contains("block")
+            || child.kind().contains("declaration")
         {
             nested.extend(extract_nested_types(child, source));
         }
