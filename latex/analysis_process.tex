@@ -48,8 +48,11 @@ in input anche il codice sorgente $S \in \mathcal{S}_{code}$.
 \end{itemize}
 
 \subsection{Parser Strutturali}
-Le funzioni di mapping che istanziano i componenti principali:
+Le funzioni di mapping che istanziano i componenti principali o
+estraggono i tipi base necessari per la costruzione dell'IR.
 \begin{itemize}
+  \item $\text{try\_parse\import} : \mathcal{N} \times
+    \mathcal{S}_{code} \to \mathcal{I}_{import}^?$ (Import)
   \item $\text{try\_parse\_structured\_type} : \mathcal{N} \times
     \mathcal{S}_{code} \to \mathcal{S}^?$ (Tipi Strutturati)
   \item $\text{try\_parse\_function} : \mathcal{N} \times
@@ -153,8 +156,13 @@ La funzione core $\text{resolve}_{\tau} : \Gamma \times \tau \to
     \end{itemize}
   \item Se la ricerca ha successo, la funzione restituisce:
     \begin{itemize}
-      \item $\text{Resolved}(qn_{abs})$ se il percorso assoluto $qn_{abs}$ è registrato e presente nel Global Scope $\Sigma$.
-      \item $\text{External}(qn_{abs})$ se il percorso è stato risolto tramite un import $\mathcal{I}_{imports}$, ma non appartiene al Global Scope analizzato. Questo permette di mappare confini verso librerie esterne e dipendenze di terze parti senza generare falsi fallimenti.
+      \item $\text{Resolved}(qn_{abs})$ se il percorso assoluto
+        $qn_{abs}$ è registrato e presente nel Global Scope $\Sigma$.
+      \item $\text{External}(qn_{abs})$ se il percorso è stato
+        risolto tramite un import $\mathcal{I}_{imports}$, ma non
+        appartiene al Global Scope analizzato. Questo permette di
+        mappare confini verso librerie esterne e dipendenze di terze
+        parti senza generare falsi fallimenti.
     \end{itemize}
   \item Se la ricerca fallisce, la funzione restituisce $\text{Failed}$.
 \end{enumerate}
@@ -169,7 +177,8 @@ architetturale finale per preservare l'agnosticismo:
   \item Per ogni blocco $\mathcal{B}_{lk}$ associato a un tipo target
     $\mathcal{S}$, le funzioni $\vec{\mathcal{F}}$ contenute nel blocco vengono
     spostate all'interno della lista delle funzioni del tipo target.
-  \item I tipi strutturati annidati $\vec{\mathcal{S}}_{nest}$ contenuti nel blocco
+  \item I tipi strutturati annidati $\vec{\mathcal{S}}_{nest}$
+    contenuti nel blocco
     vengono spostati all'interno della lista dei tipi annidati del tipo target.
   \item Se il blocco implementa un trait ($\text{trait}^?$), il
     riferimento a tale trait viene aggiunto all'insieme dei
@@ -207,11 +216,15 @@ risolti all'interno di ogni componente:
     che l'implementazione di trait/interfacce ($k = \text{Inherits}$).
   \item \textbf{Composizione/Uso}: Generata dal tipo di ogni campo
     $F$ ($k = \text{UsesFieldType}$).
-  \item \textbf{Interazione Comportamentale}: Generata dai tipi
+  \item \textbf{Interazione Architetturale}: Generata dai tipi
     all'interno della firma $\sigma$ di ogni funzione (sia essa
     metodo o funzione libera), ovvero dai parametri $\vec{P}$ e dal
     tipo di ritorno $\tau_{ret}$ ($k = \text{UsesParamType},
     \text{UsesReturnType}$).
+  \item \textbf{Interazione Comportamentale}: Generata dall'analisi del corpo
+    di ogni funzione, includendo le chiamate dirette a funzioni o metodi statici
+    ($\vec{\tau}_{calls}$, $k = \text{Calls}$) e l'istanziazione di tipi
+    strutturati ($\vec{\tau}_{inst}$, $k = \text{Instantiates}$).
   \item \textbf{Contenimento}: Generata dalla gerarchia dei moduli e
     dei tipi annidati ($k = \text{NestedIn}, \text{Contains}$).
 \end{itemize}

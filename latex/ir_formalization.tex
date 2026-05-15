@@ -88,8 +88,9 @@ dove $\vec{P}$ è il vettore dei parametri e $\tau_{ret}$ è il tipo di ritorno.
 
 Su questa base, definiamo il tipo universale \textbf{Function}
 ($\mathcal{F}$) come contenitore che lega un nome qualificato a una
-specifica firma:
-$$\mathcal{F} = \langle \text{id} \in \mathcal{QN}, \sigma \rangle$$
+specifica firma e alle sue dipendenze comportamentali (il corpo della funzione):
+$$\mathcal{F} = \langle \text{id} \in \mathcal{QN}, \sigma, \vec{\tau}_{calls}, \vec{\tau}_{inst} \rangle$$
+dove $\vec{\tau}_{calls}$ rappresenta l'insieme dei riferimenti ai tipi (classi, moduli o altre funzioni libere) le cui funzioni vengono esplicitamente invocate nel corpo, mentre $\vec{\tau}_{inst}$ rappresenta i tipi strutturati esplicitamente istanziati (es. tramite operatori come \texttt{new}).
 
 Il ruolo architetturale di una $\mathcal{F}$ (se funge da Metodo o da
 Free Function) non è codificato nel suo tipo, ma è determinato
