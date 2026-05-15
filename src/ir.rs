@@ -53,6 +53,10 @@ pub struct Signature {
 pub struct Function {
     pub name: QualifiedName,
     pub signature: Signature,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub calls: Vec<TypeRef>,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub instantiates: Vec<TypeRef>,
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -119,6 +123,8 @@ pub enum DependencyEdgeKind {
     UsesReturnType,
     NestedIn,
     ModuleContainment,
+    Calls,
+    Instantiates,
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]

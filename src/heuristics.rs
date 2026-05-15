@@ -73,6 +73,7 @@ fn try_parse_structured_type(node: Node, source: &str) -> Option<StructuredType>
         && !kind.contains("call")
         && !kind.contains("identifier")
         && !kind.contains("reference")
+        && !kind.contains("body")
         && !kind.contains("mod")
         && !kind.contains("variant");
 
@@ -117,16 +118,68 @@ fn try_parse_function(node: Node, source: &str) -> Option<Function> {
     let parameters = extract_parameters(node, source);
     let return_type = extract_return_type(node, source);
 
+    let mut calls = vec![];
+    let mut instantiates = vec![];
+    if let Some(body) = node.child_by_field_name("body") {
+        traverse_for_body_deps(body, source, &mut calls, &mut instantiates);
+    }
+
     Some(Function {
         name: vec![name],
-        signature: Signature {
+        signature: crate::ir::Signature {
             parameters,
             return_type,
         },
+        calls,
+        instantiates,
     })
-}
+    }
 
-/// Identifies implementation blocks commonly found in Rust.
+    fn traverse_for_body_deps(node: Node, source: &str, calls: &mut Vec<TypeRef>, instantiates: &mut Vec<TypeRef>) {
+    let kind = node.kind();
+
+    // --- Instantiations ---
+    if matches!(kind, "object_creation_expression" | "new_expression") {
+        if let Some(t_node) = node.child_by_field_name("type") {
+            instantiates.push(extract_type_ref(t_node, source));
+        }
+    } else if kind == "struct_expression" {
+        if let Some(name_node) = node.child_by_field_name("name") {
+            instantiates.push(extract_type_ref(name_node, source));
+        }
+    }
+
+    // --- Calls ---
+    if matches!(kind, "call_expression" | "call") {
+        if let Some(f) = node.child_by_field_name("function") {
+            let f_kind = f.kind();
+            if matches!(f_kind, "qualified_identifier" | "scoped_identifier") {
+                if let Some(scope) = f.child_by_field_name("scope").or_else(|| f.child_by_field_name("path")) {
+                    calls.push(extract_type_ref(scope, source));
+                }
+            } else if matches!(f_kind, "field_expression" | "attribute") {
+                if let Some(obj) = f.child_by_field_name("argument").or_else(|| f.child_by_field_name("object")).or_else(|| f.child_by_field_name("value")) {
+                    calls.push(extract_type_ref(obj, source));
+                }
+            } else if matches!(f_kind, "identifier" | "type_identifier") {
+                calls.push(extract_type_ref(f, source));
+            }
+        }
+    } else if kind == "method_invocation" { // Java
+        if let Some(obj) = node.child_by_field_name("object") {
+            calls.push(extract_type_ref(obj, source));
+        } else if let Some(name) = node.child_by_field_name("name") {
+            calls.push(extract_type_ref(name, source));
+        }
+    }
+
+    let mut cursor = node.walk();
+    for child in node.children(&mut cursor) {
+        traverse_for_body_deps(child, source, calls, instantiates);
+    }
+    }
+
+    /// Identifies implementation blocks commonly found in Rust.
 fn try_parse_impl_block(node: Node, source: &str) -> Option<ImplBlock> {
     if !node.is_named() {
         return None;
@@ -347,6 +400,8 @@ fn extract_methods(node: Node, source: &str) -> Vec<Function> {
             methods.push(Function {
                 name: ff.name,
                 signature: ff.signature,
+                calls: ff.calls,
+                instantiates: ff.instantiates,
             });
         } else if child.kind().contains("body")
             || child.kind().contains("list")
@@ -542,6 +597,18 @@ fn extract_name_from_text(text: &str) -> Option<QualifiedName> {
 // ==================== ESTRAZIONE TIPI REALI  ====================
 
 fn extract_type_ref(node: Node, source: &str) -> TypeRef {
+    // 0. Handle direct field_access, scoped_identifier, qualified_identifier or identifiers
+    let kind = node.kind();
+    if matches!(
+        kind,
+        "field_access" | "scoped_identifier" | "qualified_identifier" | "identifier" | "type_identifier" | "attribute"
+    ) {
+        let text = node_text(node, source);
+        if !text.is_empty() {
+            return TypeRef::Unresolved(split_qualified_name(&text));
+        }
+    }
+
     // 1. Prova con i field Tree-sitter più comuni (precisi)
     if let Some(type_node) = node
         .child_by_field_name("type")

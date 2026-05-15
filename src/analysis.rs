@@ -21,15 +21,45 @@ pub fn build_symbol_table(modules: &[Module]) -> HashMap<QualifiedName, Componen
         prefix.push(m.name.last().cloned().unwrap_or_default());
         table.insert(prefix.clone(), Component::Module(m.clone()));
 
-        for st in &m.structured_types {
+        fn populate_st(
+            st: &StructuredType,
+            table: &mut HashMap<QualifiedName, Component>,
+            prefix: &mut QualifiedName,
+        ) {
             let mut name = prefix.clone();
             name.extend(st.name.clone());
-            table.insert(name, Component::StructuredType(st.clone()));
+            table.insert(name.clone(), Component::StructuredType(st.clone()));
+
+            for nested in &st.nested_types {
+                populate_st(nested, table, &mut name);
+            }
+        }
+
+        for st in &m.structured_types {
+            populate_st(st, table, prefix);
         }
         for f in &m.free_functions {
             let mut name = prefix.clone();
             name.extend(f.name.clone());
             table.insert(name, Component::Function(f.clone()));
+        }
+        for ib in &m.impl_blocks {
+            // Un ImplBlock è zucchero sintattico e verrà appiattito nella struct target.
+            // Poiché la Symbol Table viene costruita prima del flattening,
+            // indicizziamo i tipi annidati dell'impl block simulando che si trovino
+            // già sotto il percorso assoluto della struct target.
+            if let TypeRef::Unresolved(target) = &ib.impl_for {
+                let mut base_name = prefix.clone();
+                base_name.extend(target.clone());
+                for nested in &ib.nested_types {
+                    populate_st(nested, table, &mut base_name);
+                }
+            } else if let TypeRef::Resolved(target) = &ib.impl_for {
+                let mut base_name = target.clone();
+                for nested in &ib.nested_types {
+                    populate_st(nested, table, &mut base_name);
+                }
+            }
         }
         for sub in &m.sub_modules {
             populate(sub, table, prefix);
@@ -64,7 +94,10 @@ enum ResolutionResult {
 }
 
 // Regole di risoluzione (come formalizzate: assoluto -> relativo -> enclosing)
-fn resolve_name_in_context(ctx: &ResolutionContext, name: &QualifiedName) -> Option<ResolutionResult> {
+fn resolve_name_in_context(
+    ctx: &ResolutionContext,
+    name: &QualifiedName,
+) -> Option<ResolutionResult> {
     // 0. Imports (Punti di salto)
     if let Some(first_part) = name.first() {
         for imp in &ctx.imports {
@@ -174,9 +207,11 @@ fn resolve_module_in_context(ctx: &ResolutionContext, mut module: Module) -> Mod
 
     for ib in resolved_impls {
         if let TypeRef::Resolved(target_name) = &ib.impl_for {
-            if let Some(target_st) = module.structured_types.iter_mut().find(|st| {
-                &st.name == target_name
-            }) {
+            if let Some(target_st) = module
+                .structured_types
+                .iter_mut()
+                .find(|st| &st.name == target_name)
+            {
                 target_st.methods.extend(ib.methods.clone());
                 target_st.nested_types.extend(ib.nested_types.clone());
                 if let Some(trait_ref) = ib.implements_trait.clone() {
@@ -239,7 +274,8 @@ fn resolve_function(ctx: &ResolutionContext, mut f: Function) -> Function {
     f.name = new_prefix;
 
     f.signature.parameters = f
-        .signature.parameters
+        .signature
+        .parameters
         .into_iter()
         .map(|p| Parameter {
             name: p.name,
@@ -248,6 +284,18 @@ fn resolve_function(ctx: &ResolutionContext, mut f: Function) -> Function {
         })
         .collect();
     f.signature.return_type = resolve_type_ref(ctx, f.signature.return_type);
+
+    f.calls = f
+        .calls
+        .into_iter()
+        .map(|tr| resolve_type_ref(ctx, tr))
+        .collect();
+    f.instantiates = f
+        .instantiates
+        .into_iter()
+        .map(|tr| resolve_type_ref(ctx, tr))
+        .collect();
+
     f
 }
 
@@ -282,7 +330,7 @@ fn resolve_impl_block(ctx: &ResolutionContext, mut i: ImplBlock) -> ImplBlock {
 pub fn build_dependency_graph(modules: &[Module]) -> DependencyGraph {
     let nodes = flatten_modules(modules);
     let mut edges = vec![];
-    
+
     for m in modules {
         traverse_module_for_edges(m, None, &mut edges);
     }
@@ -290,7 +338,11 @@ pub fn build_dependency_graph(modules: &[Module]) -> DependencyGraph {
     DependencyGraph { nodes, edges }
 }
 
-fn traverse_module_for_edges(m: &Module, parent_id: Option<&QualifiedName>, edges: &mut Vec<Dependency>) {
+fn traverse_module_for_edges(
+    m: &Module,
+    parent_id: Option<&QualifiedName>,
+    edges: &mut Vec<Dependency>,
+) {
     if let Some(parent) = parent_id {
         edges.push(Dependency {
             from: parent.clone(),
@@ -298,7 +350,7 @@ fn traverse_module_for_edges(m: &Module, parent_id: Option<&QualifiedName>, edge
             kind: DependencyEdgeKind::ModuleContainment,
         });
     }
-    
+
     for st in &m.structured_types {
         edges.push(Dependency {
             from: m.name.clone(),
@@ -307,7 +359,7 @@ fn traverse_module_for_edges(m: &Module, parent_id: Option<&QualifiedName>, edge
         });
         traverse_structured_type_edges(st, edges);
     }
-    
+
     for ff in &m.free_functions {
         edges.push(Dependency {
             from: m.name.clone(),
@@ -316,7 +368,7 @@ fn traverse_module_for_edges(m: &Module, parent_id: Option<&QualifiedName>, edge
         });
         add_function_edges(ff, edges);
     }
-    
+
     for ib in &m.impl_blocks {
         edges.push(Dependency {
             from: m.name.clone(),
@@ -325,7 +377,7 @@ fn traverse_module_for_edges(m: &Module, parent_id: Option<&QualifiedName>, edge
         });
         add_impl_edges(ib, edges);
     }
-    
+
     for sub in &m.sub_modules {
         traverse_module_for_edges(sub, Some(&m.name), edges);
     }
@@ -334,7 +386,7 @@ fn traverse_module_for_edges(m: &Module, parent_id: Option<&QualifiedName>, edge
 fn traverse_structured_type_edges(st: &StructuredType, edges: &mut Vec<Dependency>) {
     add_super_edges(st, edges);
     add_field_edges(st, edges);
-    
+
     for m in &st.methods {
         edges.push(Dependency {
             from: st.name.clone(),
@@ -343,7 +395,7 @@ fn traverse_structured_type_edges(st: &StructuredType, edges: &mut Vec<Dependenc
         });
         add_function_edges(m, edges);
     }
-    
+
     for nested in &st.nested_types {
         edges.push(Dependency {
             from: st.name.clone(),
@@ -406,6 +458,30 @@ fn add_function_edges(ff: &Function, edges: &mut Vec<Dependency>) {
             });
         }
         _ => {}
+    }
+    for call in &ff.calls {
+        match call {
+            TypeRef::Resolved(to) | TypeRef::External(to) => {
+                edges.push(Dependency {
+                    from: ff.name.clone(),
+                    to: to.clone(),
+                    kind: DependencyEdgeKind::Calls,
+                });
+            }
+            _ => {}
+        }
+    }
+    for inst in &ff.instantiates {
+        match inst {
+            TypeRef::Resolved(to) | TypeRef::External(to) => {
+                edges.push(Dependency {
+                    from: ff.name.clone(),
+                    to: to.clone(),
+                    kind: DependencyEdgeKind::Instantiates,
+                });
+            }
+            _ => {}
+        }
     }
 }
 fn add_impl_edges(ib: &ImplBlock, edges: &mut Vec<Dependency>) {

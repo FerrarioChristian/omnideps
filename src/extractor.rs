@@ -45,7 +45,15 @@ fn walk_cst(node: tree_sitter::Node, source: &str, modules: &mut Vec<Module>) {
                 modules[0].sub_modules.push(new_modules.remove(0));
             }
             crate::heuristics::ParsedItem::Component(crate::ir::Component::StructuredType(st)) => modules[0].structured_types.push(st),
-            crate::heuristics::ParsedItem::Component(crate::ir::Component::Function(ff)) => modules[0].free_functions.push(ff),
+            crate::heuristics::ParsedItem::Component(crate::ir::Component::Function(ff)) => {
+                modules[0].free_functions.push(ff);
+                let mut cursor = node.walk();
+                for child in node.children(&mut cursor) {
+                    if child.kind().contains("body") || child.kind().contains("block") {
+                        walk_cst(child, source, modules);
+                    }
+                }
+            }
             crate::heuristics::ParsedItem::ImplBlock(ib) => modules[0].impl_blocks.push(ib),
             crate::heuristics::ParsedItem::Import(i) => modules[0].imports.push(i),
         }
