@@ -36,6 +36,9 @@ fn useless_function() {
     impl Entity for LocalEntity {
         fn get_id(&self) -> String { self.id.clone() }
     }
+    
+    let entity = LocalEntity { id: "123".to_string() };
+    entity.get_id();
 }
 
 pub struct Animal {

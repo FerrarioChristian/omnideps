@@ -49,6 +49,13 @@ class Robot implements Entity, Chargeable {
     public String getId() { return "Robot-1"; }
     @Override
     public void charge() { }
+    
+    public void startServer() {
+        Cat myCat = new Cat("Tom");
+        myCat.breathe(); // dynamic (ignored or failed)
+        Cat.Breed myBreed = new Cat.Breed("Siamese");
+        Outer.Inner.DeepInner.hello();
+    }
 }
 
 // Nesting profondo
