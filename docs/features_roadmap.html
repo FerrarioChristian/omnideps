@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Language-Agnostic Analyzer: Features & Roadmap</title>
+    <style>
+        body { font-family: system-ui, -apple-system, sans-serif; line-height: 1.6; padding: 2rem; color: #333; background-color: #fcfcfc; }
+        h1, h2, h3 { color: #2c3e50; border-bottom: 2px solid #eee; padding-bottom: 0.5rem; }
+        table { width: 100%; border-collapse: collapse; margin-bottom: 2rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1); background-color: white; }
+        th, td { border: 1px solid #e1e4e8; padding: 12px; text-align: left; vertical-align: top; }
+        th { background-color: #f8f9fa; font-weight: 600; }
+        
+        /* Fixed widths for specific columns */
+        tr > th:nth-child(1) { width: 180px; }
+        tr > th:nth-child(2), tr > td:nth-child(2) { width: 1%; white-space: nowrap; text-align: center; vertical-align: middle; }
+        
+        .status-yes, .status-partial, .status-no { 
+            font-size: 0.75rem; 
+            padding: 2px 8px; 
+            border-radius: 12px; 
+            display: inline-block;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.02em;
+        }
+        .status-yes { color: #1e7e34; background-color: #d4edda; border: 1px solid #c3e6cb; }
+        .status-partial { color: #856404; background-color: #fff3cd; border: 1px solid #ffeeba; }
+        .status-no { color: #721c24; background-color: #f8d7da; border: 1px solid #f5c6cb; }
+        
+        code { background-color: #f1f3f5; padding: 2px 4px; border-radius: 4px; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 0.9em; }
+        pre { background-color: #2b2b2b; color: #f8f8f2; padding: 1rem; border-radius: 4px; overflow-x: auto; font-size: 0.9em; margin: 0.5rem 0; }
+        .notes { font-size: 0.85em; color: #555; margin-top: 0.5rem; }
+        .implementation-idea { margin-top: 0.5rem; padding: 8px; background-color: #f0f7ff; border-left: 4px solid #0066cc; font-size: 0.9em; }
+        .ir-node { color: #0056b3; font-weight: 500; }
+        .function-ref { color: #c7254e; font-family: monospace; font-size: 0.9em; }
+    </style>
+</head>
+<body>
+    <h1>Language-Agnostic Analyzer: Features & Roadmap</h1>
+    <p>Questo documento funge da piano di lavoro, report di stato e vetrina delle potenzialità del nostro analizzatore architetturale multi-linguaggio. Traccia i costrutti del linguaggio supportati, come vengono modellati nell'Intermediate Representation (IR), e quali euristiche se ne occupano.</p>
+
+    <h2>1. Dipendenze di tipo (Type-Level)</h2>
+    <table>
+        <tr>
+            <th>Feature</th>
+            <th>Stato</th>
+            <th>Esempi & Differenze Linguistiche</th>
+            <th>Modellazione (IR & Grafo)</th>
+            <th>Implementazione (Heuristics)</th>
+        </tr>
+        <tr>
+            <td>Class / Struct / Interface / Trait</td>
+            <td><span class="status-yes">Sì</span></td>
+            <td>
+                <pre>class User { } // Java, C++, Py
+struct Data { } // C, Rust
+trait Walk { } // Rust
+interface Fly { } // Java</pre>
+                <div class="notes">Riconoscimento unificato. Estrazione perfetta in Rust. In C++ estrae le classi. In Java estrae Classi e Interfacce. In Python le dichiarazioni non hanno keyword rigide come struct, ma `class` viene estratto. In C le struct vengono riconosciute correttamente includendo il parsing ricorsivo. Tipi locali (all'interno dei body delle funzioni) vengono annidati correttamente.</div>
+            </td>
+            <td>Nodo: <span class="ir-node">StructuredType</span><br>Grafico: Vertice primario</td>
+            <td><span class="function-ref">try_parse_structured_type</span><br>Riconosce i nodi CST (class_declaration, struct_specifier, ecc.).</td>
+        </tr>
+        <tr>
+            <td>Variabili Tipate (Fields)</td>
+            <td><span class="status-yes">Sì</span></td>
+            <td>
+                <pre>private String name; // Java
+            pub age: u8, // Rust
+            char *id; // C</pre>
+                <div class="notes">Riscontrato in Rust e Java. In C le struct annidate o i puntatori `struct Type` generano failed refs a causa degli spazi nel nome.</div>
+            </td>
+            <td>Campo: <span class="ir-node">Field</span> dentro <span class="ir-node">StructuredType</span><br>Arco: <code>UsesFieldType</code></td>
+            <td><span class="function-ref">extract_fields</span></td>
+        </tr>
+        <tr>
+            <td>Firme di Funzioni (Parametri & Ritorno)</td>
+            <td><span class="status-yes">Sì</span></td>
+            <td>
+                <pre>int sum(int a, float b) // C++
+fn run(user: User) -> bool // Rust</pre>
+                <div class="notes">Funziona in Rust, Java, e Python. Python non forza type hints; se mancano o se il ritorno non è specificato, fallisce elegantemente a Void o Failed. In C++ i metodi vengono estratti correttamente navigando il nodo <code>function_declarator</code>. In C le funzioni all'interno delle struct tramite puntatore sono correttamente categorizzate come campi.</div>
+            </td>
+            <td>Entità: <span class="ir-node">Function</span> con <span class="ir-node">Signature</span><br>Archi: <code>UsesParamType</code>, <code>UsesReturnType</code></td>
+            <td><span class="function-ref">extract_parameters</span>, <span class="function-ref">extract_return_type</span></td>
+        </tr>
+        <tr>
+            <td>Generics / Template</td>
+            <td><span class="status-no">No</span></td>
+            <td>
+                <pre>Map&lt;K, V&gt; map; // Java
+vector&lt;int&gt; vec; // C++</pre>
+            </td>
+            <td>
+                Attualmente estratti come tipo base grezzo (<code>Map</code> o <code>vector</code>).
+                <div class="implementation-idea"><strong>Idea di implementazione:</strong> Aggiungere <code>pub type_arguments: Vec&lt;TypeRef&gt;</code> al <code>TypeRef</code> nell'IR. In `extract_type_ref`, intercettare nodi come `type_arguments` o `template_argument_list`, estrarne i figli e generare archi <code>UsesGenericType</code> verso `K` e `V`.</div>
+            </td>
+            <td>-</td>
+        </tr>
+        <tr>
+            <td>Type Alias</td>
+            <td><span class="status-no">No</span></td>
+            <td>
+                <pre>type UserId = string; // TS
+typedef int length_t; // C</pre>
+            </td>
+            <td>
+                Attualmente ignorato.
+                <div class="implementation-idea"><strong>Idea di implementazione:</strong> Creare una variante <code>TypeAlias</code> in <code>ParsedItem</code>. In fase di costruzione della Symbol Table (&Sigma;), mappare l'alias al suo <code>TypeRef</code> originale in un registro <code>aliases</code> di modulo. Il risolutore appiattirebbe l'alias risolvendo direttamente il tipo sottostante.</div>
+            </td>
+            <td>-</td>
+        </tr>
+        <tr>
+            <td>Union Types</td>
+            <td><span class="status-no">No</span></td>
+            <td>
+                <pre>User | Admin // TS
+Union[str, int] // Python</pre>
+            </td>
+            <td>
+                Fallisce o prende solo il primo termine.
+                <div class="implementation-idea"><strong>Idea di implementazione:</strong> Introdurre <code>TypeRef::Union(Vec&lt;TypeRef&gt;)</code>. Nell'estrattore di tipi, se il nodo è <code>union_type</code>, parsare tutti i child. Il creatore del grafo genererà archi multipli per la singola referenza.</div>
+            </td>
+            <td>-</td>
+        </tr>
+        <tr>
+            <td>Type Constraints</td>
+            <td><span class="status-no">No</span></td>
+            <td>
+                <pre>&lt;T extends Serializable&gt;</pre>
+            </td>
+            <td>
+                <div class="implementation-idea"><strong>Idea di implementazione:</strong> Molto complesso in un'architettura agnostica. Si potrebbe modellare introducendo un "nodo fantasma" nel modulo per rappresentare <code>T</code>, per poi fargli ereditare (`Inherits`) da <code>Serializable</code>. I parametri generici punterebbero quindi a questo nodo fittizio.</div>
+            </td>
+            <td>-</td>
+        </tr>
+        <tr>
+            <td>Return Type Impliciti / Inferenziali</td>
+            <td><span class="status-no">N/A</span></td>
+            <td>
+                <pre>func f() { return User{} }</pre>
+            </td>
+            <td>
+                <div class="implementation-idea"><strong>Perché Non Sì:</strong> L'inferenza locale richiede di tracciare l'albero delle espressioni fino ai nodi foglia, simulando l'esecuzione statica. Questo distrugge l'astrazione agnostica e va lasciato ai compiler veri e propri. L'approccio corretto è segnarlo come <code>Failed</code> o <code>Void</code> e ignorarlo a livello architetturale.</div>
+            </td>
+            <td>-</td>
+        </tr>
+    </table>
+
+    <h2>2. Dipendenze da Chiamata (Call Graph)</h2>
+    <table>
+        <tr>
+            <th>Feature</th>
+            <th>Stato</th>
+            <th>Esempi & Differenze Linguistiche</th>
+            <th>Modellazione (IR & Grafo)</th>
+            <th>Implementazione (Heuristics)</th>
+        </tr>
+        <tr>
+            <td>Function / Method Calls</td>
+            <td><span class="status-partial">Parz</span></td>
+            <td>
+                <pre>foo(); // OK
+User.create(); // OK
+myVar.run(); // Ignorato (Failed)</pre>
+                <div class="notes">L'estrattore intercetta i nomi dai body (Best-Effort). L'agnosticismo del risolutore scarta saggiamente le chiamate su variabili locali che non esistono come classi nel Global Scope.</div>
+            </td>
+            <td>Vettore: <code>calls</code> in <code>Function</code><br>Arco: <code>Calls</code></td>
+            <td><span class="function-ref">traverse_for_body_deps</span><br>Navigazione di <code>call_expression</code> e affini.</td>
+        </tr>
+        <tr>
+            <td>Factory / Static Methods</td>
+            <td><span class="status-yes">Sì</span></td>
+            <td>
+                <pre>User::create(); // C++, Rust
+DatabaseFactory.build(); // Java</pre>
+            </td>
+            <td>Vettore: <code>calls</code> in <code>Function</code><br>Arco: <code>Calls</code> (risolto nel Global Scope o come External Import).</td>
+            <td><span class="function-ref">traverse_for_body_deps</span></td>
+        </tr>
+        <tr>
+            <td>Constructor Calls</td>
+            <td><span class="status-yes">Sì</span></td>
+            <td>
+                <pre>new User(); // Java, C++
+User {} // Rust
+User() // Python</pre>
+            </td>
+            <td>Vettore: <code>instantiates</code> in <code>Function</code><br>Arco: <code>Instantiates</code></td>
+            <td><span class="function-ref">traverse_for_body_deps</span><br>Ricerca di <code>object_creation_expression</code> o <code>struct_expression</code>.</td>
+        </tr>
+        <tr>
+            <td>Operator Overloading</td>
+            <td><span class="status-no">No</span></td>
+            <td>
+                <pre>a + b // C++</pre>
+            </td>
+            <td>
+                <div class="implementation-idea"><strong>Idea di implementazione:</strong> Pre-processing durante l'estrazione. Marcare un metodo come "operatore" se il suo nome inizia per <code>operator</code>. Nel parser dei body, i nodi <code>binary_expression</code> (es. `+`) verrebbero estratti non come keyword, ma tradotti in ipotetiche dipendenze di tipo <code>CallsOperator</code>. Trattandosi di tipizzazione dinamica delle variabili, il rischio di <code>Failed</code> è altissimo.</div>
+            </td>
+            <td>-</td>
+        </tr>
+    </table>
+
+    <h2>3. Dipendenze da Accesso (Usage-Level)</h2>
+    <table>
+        <tr>
+            <th>Feature</th>
+            <th>Stato</th>
+            <th>Esempi & Differenze Linguistiche</th>
+            <th>Modellazione (IR & Grafo)</th>
+            <th>Implementazione (Heuristics)</th>
+        </tr>
+        <tr>
+            <td>Accesso a Proprietà/Campi</td>
+            <td><span class="status-no">No</span></td>
+            <td>
+                <pre>user.name = "Mario";</pre>
+            </td>
+            <td>
+                <div class="implementation-idea"><strong>Idea di implementazione:</strong> Estremamente difficile. Non potendo inferire che `user` è di tipo `User`, la risoluzione fallirebbe sempre. Un'euristica "azzardata" potrebbe cercare il nome del campo ("name") in tutto il progetto globale e tracciare un arco incerto verso l'entità proprietaria, ma la precisione architetturale calerebbe drasticamente.</div>
+            </td>
+            <td>-</td>
+        </tr>
+        <tr>
+            <td>Accesso Statico</td>
+            <td><span class="status-partial">Parz</span></td>
+            <td>
+                <pre>Math.PI;
+System.out;</pre>
+            </td>
+            <td>
+                <div class="implementation-idea"><strong>Idea di implementazione:</strong> Estendere <code>traverse_for_body_deps</code> per catturare i nodi di tipo <code>member_access</code> o <code>scoped_identifier</code> *anche* fuori dalle espressioni di chiamata. Il prefisso (es. `Math`) andrebbe salvato in un nuovo array <code>accesses</code> in <code>Function</code>, e risolto dal builder in un arco <code>AccessesStatic</code>.</div>
+            </td>
+            <td>-</td>
+        </tr>
+        <tr>
+            <td>Enum Usage</td>
+            <td><span class="status-no">No</span></td>
+            <td><pre>Status.ACTIVE</pre></td>
+            <td>
+                <div class="implementation-idea"><strong>Idea di implementazione:</strong> Condivide esattamente la stessa logica e astrazione dell'Accesso Statico. Raccogliere i <code>member_access</code> permetterebbe di creare archi <code>UsesEnum</code> verso `Status`.</div>
+            </td>
+            <td>-</td>
+        </tr>
+    </table>
+
+    <h2>4. Dependency Injection e Wiring</h2>
+    <table>
+        <tr>
+            <th>Feature</th>
+            <th>Stato</th>
+            <th>Esempi & Differenze Linguistiche</th>
+            <th>Modellazione (IR & Grafo)</th>
+            <th>Implementazione (Heuristics)</th>
+        </tr>
+        <tr>
+            <td>Annotazioni e Decorator</td>
+            <td><span class="status-no">No</span></td>
+            <td>
+                <pre>@Autowired
+@Inject</pre>
+            </td>
+            <td>
+                <div class="implementation-idea"><strong>Idea di implementazione:</strong> Aggiungere <code>pub annotations: Vec&lt;TypeRef&gt;</code> a <code>StructuredType</code> e <code>Function</code>. In `heuristics.rs`, parser per <code>annotation</code> (Java) o <code>decorator</code> (Python). Il risolutore mapperebbe queste reference creando archi di tipo <code>AnnotatedWith</code>.</div>
+            </td>
+            <td>-</td>
+        </tr>
+        <tr>
+            <td>Constructor Injection</td>
+            <td><span class="status-partial">Parz</span></td>
+            <td>
+                <pre>new Service(repo);</pre>
+            </td>
+            <td>Il tipo del parametro è riconosciuto strutturalmente (<code>UsesParamType</code>). Il "wiring" dinamico di framework è volutamente ignorato per mantenere l'astrazione estatica.</td>
+            <td>-</td>
+        </tr>
+        <tr>
+            <td>Reflection / Dynamic Lookup</td>
+            <td><span class="status-no">N/A</span></td>
+            <td><pre>Class.forName("User")</pre></td>
+            <td>
+                <div class="implementation-idea"><strong>Perché Non Sì:</strong> La valutazione di stringhe a runtime rende invisibili le dipendenze al parser statico. È un limite teorico dell'analisi statica pura.</div>
+            </td>
+            <td>-</td>
+        </tr>
+    </table>
+
+    <h2>5. Dipendenze Ereditarietà</h2>
+    <table>
+        <tr>
+            <th>Feature</th>
+            <th>Stato</th>
+            <th>Esempi & Differenze Linguistiche</th>
+            <th>Modellazione (IR & Grafo)</th>
+            <th>Implementazione (Heuristics)</th>
+        </tr>
+        <tr>
+            <td>Inheritance</td>
+            <td><span class="status-yes">Sì</span></td>
+            <td><pre>class A extends B // Java
+class A : public B // C++</pre></td>
+            <td>Vettore: <code>super_types</code><br>Arco: <code>Inherits</code></td>
+            <td><span class="function-ref">extract_super_types</span></td>
+        </tr>
+        <tr>
+            <td>Implementation</td>
+            <td><span class="status-yes">Sì</span></td>
+            <td><pre>class C implements D // Java</pre></td>
+            <td>Unificato nel vettore: <code>super_types</code><br>Arco: <code>Inherits</code> (unificato in modo agnostico per semplicità)</td>
+            <td><span class="function-ref">extract_super_types</span></td>
+        </tr>
+        <tr>
+            <td>Trait / Impl Blocks</td>
+            <td><span class="status-yes">Sì</span></td>
+            <td><pre>impl Trait for Struct // Rust</pre></td>
+            <td>Modulo IR temporaneo: <code>ImplBlock</code> (appiattito dal Risolutore).<br>Arco: <code>Implements</code></td>
+            <td><span class="function-ref">try_parse_impl_block</span>, <span class="function-ref">resolve_impl_block</span></td>
+        </tr>
+        <tr>
+            <td>Mixins</td>
+            <td><span class="status-no">No</span></td>
+            <td><pre>class A with B</pre></td>
+            <td>
+                <div class="implementation-idea"><strong>Idea di implementazione:</strong> Aggiungere i nodi sintattici tipici dei mixin (es. `with_clause`) a `extract_super_types`. Una volta estratti in `super_types`, l'analizzatore creerà naturalmente l'arco <code>Inherits</code>.</div>
+            </td>
+            <td>-</td>
+        </tr>
+        <tr>
+            <td>Method Override</td>
+            <td><span class="status-partial">Parz</span></td>
+            <td><pre>@Override void do()</pre></td>
+            <td>
+                <div class="implementation-idea"><strong>Idea di implementazione:</strong> Per tracciare esplicitamente un arco <code>Overrides</code>, il risolutore finale dovrebbe navigare l'arco <code>Inherits</code> della classe corrente, ispezionare la classe padre in &Sigma;, verificare se esiste una funzione con la stessa firma &sigma;, e in caso affermativo generare l'arco aggiuntivo.</div>
+            </td>
+            <td>-</td>
+        </tr>
+    </table>
+
+    <h2>6. Dipendenze da Controllo di Flusso</h2>
+    <table>
+        <tr>
+            <th>Feature</th>
+            <th>Stato</th>
+            <th>Esempi & Differenze Linguistiche</th>
+            <th>Modellazione (IR & Grafo)</th>
+            <th>Implementazione (Heuristics)</th>
+        </tr>
+        <tr>
+            <td>Exception Handling</td>
+            <td><span class="status-no">No</span></td>
+            <td><pre>catch (IOException e)</pre></td>
+            <td>
+                <div class="implementation-idea"><strong>Idea di implementazione:</strong> Aggiungere `catches: Vec&lt;TypeRef&gt;` in `Function`. In `traverse_for_body_deps`, mappare il nodo `catch_clause`, estrarne il tipo dell'eccezione, e poi generare un arco <code>CatchesException</code> nel grafo.</div>
+            </td>
+            <td>-</td>
+        </tr>
+        <tr>
+            <td>Throw</td>
+            <td><span class="status-partial">Parz</span></td>
+            <td><pre>throw new MyException()</pre></td>
+            <td>
+                <div class="implementation-idea"><strong>Idea di implementazione:</strong> Attualmente l'istanza interna <code>new</code> viene catturata in `instantiates`. Per differenziarla, `traverse_for_body_deps` dovrebbe controllare se il genitore dell'espressione è un nodo `throw_statement`. Se sì, aggiungere il tipo in un vettore dedicato `throws` piuttosto che `instantiates`.</div>
+            </td>
+            <td><span class="function-ref">traverse_for_body_deps</span></td>
+        </tr>
+    </table>
+
+    <h2>7. Dipendenze da Macro / Metaprogrammazione</h2>
+    <table>
+        <tr>
+            <th>Feature</th>
+            <th>Stato</th>
+            <th>Esempi & Differenze Linguistiche</th>
+            <th>Modellazione (IR & Grafo)</th>
+            <th>Implementazione (Heuristics)</th>
+        </tr>
+        <tr>
+            <td>Macro</td>
+            <td><span class="status-no">No</span></td>
+            <td><pre>println!("Hello") // Rust
+#define MAX 10 // C</pre></td>
+            <td>
+                <div class="implementation-idea"><strong>Idea di implementazione:</strong> Molto critico per Rust e C++. L'approccio più ortodosso sarebbe eseguire un comando di pre-processing nativo (es. `cargo expand` o `gcc -E`) <em>prima</em> di passare il codice all'analizzatore Tree-sitter. In alternativa, si tracciano ciecamente i nodi `macro_invocation` come fossero `Calls`.</div>
+            </td>
+            <td>-</td>
+        </tr>
+        <tr>
+            <td>Code Generation (es. Lombok)</td>
+            <td><span class="status-no">N/A</span></td>
+            <td><pre>@Data class User {}</pre></td>
+            <td>L'analizzatore guarda il sorgente grezzo prima della compilazione. Se getter/setter non ci sono non verranno visti.</td>
+            <td>-</td>
+        </tr>
+    </table>
+
+    <h2>8. Moduli e Linking</h2>
+    <table>
+        <tr>
+            <th>Feature</th>
+            <th>Stato</th>
+            <th>Esempi & Differenze Linguistiche</th>
+            <th>Modellazione (IR & Grafo)</th>
+            <th>Implementazione (Heuristics)</th>
+        </tr>
+        <tr>
+            <td>Imports / Include</td>
+            <td><span class="status-yes">Sì</span></td>
+            <td><pre>use std::vec::Vec; // Rust
+#include &lt;iostream&gt; // C++</pre></td>
+            <td>Vettore <code>imports</code> in <code>Module</code> (i "Jump Points"). Il <code>TypeRef</code> assume stato <code>External</code> se non corrisponde a nodi in memoria locale.</td>
+            <td><span class="function-ref">try_parse_import</span>, <span class="function-ref">resolve_name_in_context</span></td>
+        </tr>
+        <tr>
+            <td>NameSpaces / Modules Usage</td>
+            <td><span class="status-yes">Sì</span></td>
+            <td><pre>mod core { } // Rust
+        namespace math { } // C++</pre>
+                <div class="notes">Annidamento ricorsivo di <code>Module</code>. Funziona bene in Rust (mod) e C++ (namespace). In Java (packages) e Python (moduli/file) attualmente non produce moduli annidati ma inserisce tutto nel modulo root. <strong>Da sistemare per un supporto language-agnostic completo.</strong></div>
+            </td>
+            <td>Annidamento ricorsivo di <code>Module</code>.<br>Arco: <code>ModuleContainment</code></td>
+            <td><span class="function-ref">try_parse_module_node</span></td>
+        </tr>
+        <tr>
+            <td>Dynamic Imports</td>
+            <td><span class="status-no">N/A</span></td>
+            <td><pre>import('./module') // JS</pre></td>
+            <td>Richiede esecuzione comportamentale a runtime, incompatibile con la lettura AST statica.</td>
+            <td>-</td>
+        </tr>
+        <tr>
+            <td>Re-Export</td>
+            <td><span class="status-no">No</span></td>
+            <td><pre>pub use crate::other::Type;</pre></td>
+            <td>
+                <div class="implementation-idea"><strong>Idea di implementazione:</strong> L'analizzatore dovrebbe riconoscere il modifier `pub` di un import. Il Risolutore inserirebbe l'Alias dell'import direttamente nella `Symbol Table` (&Sigma;) associandolo al `ResolvedName` originale, permettendo ai file dipendenti di vederlo come se fosse dichiarato localmente.</div>
+            </td>
+            <td>-</td>
+        </tr>
+    </table>
+</body>
+</html>
