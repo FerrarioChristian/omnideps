@@ -31,8 +31,19 @@ def convert(input_path, output_path):
 
     def add_edge(source_id, target_id, label):
         nonlocal global_edge_id
+        if not source_id or not target_id:
+            return
+
+        # Assicuriamoci che i nodi esistano (se sono esterni li creiamo)
+        if source_id not in added_nodes:
+            label_node = source_id.split("::")[-1]
+            add_node(source_id, label_node, "External")
+        if target_id not in added_nodes:
+            label_node = target_id.split("::")[-1]
+            add_node(target_id, label_node, "External")
+
         edge_sig = f"{source_id}->{target_id}:{label}"
-        if edge_sig not in added_edges and source_id and target_id:
+        if edge_sig not in added_edges:
             added_edges.add(edge_sig)
             elements.append({
                 "data": {
@@ -44,36 +55,45 @@ def convert(input_path, output_path):
             })
             global_edge_id += 1
 
-    # 1. Caricamento Nativo dei Nodi esportati dall'IR Rust
-    for node_comp in data.get("nodes", []):
-        if "Module" in node_comp:
-            m = node_comp["Module"]
-            name_parts = m.get("name", [])
-            node_id = qn_to_id(name_parts)
-            label = name_parts[-1] if name_parts else "root"
-            add_node(node_id, label, "Module")
-            
-        elif "StructuredType" in node_comp:
-            st = node_comp["StructuredType"]
-            name_parts = st.get("name", [])
-            node_id = qn_to_id(name_parts)
-            label = name_parts[-1] if name_parts else "Unknown"
-            add_node(node_id, label, st.get("kind", "Struct"))
-            
-        elif "Function" in node_comp:
-            ff = node_comp["Function"]
-            name_parts = ff.get("name", [])
-            node_id = qn_to_id(name_parts)
-            label = name_parts[-1] + "()" if name_parts else "()"
-            add_node(node_id, label, "Function")
+    if isinstance(data, dict):
+        graphs = [data]
+    elif isinstance(data, list):
+        graphs = data
+    else:
+        print("Errore: Formato JSON non supportato.")
+        sys.exit(1)
 
-    # 2. Caricamento Nativo degli Archi estratti dal Type Resolver Rust
-    for edge in data.get("edges", []):
-        source_id = qn_to_id(edge.get("from"))
-        target_id = qn_to_id(edge.get("to"))
-        label = edge.get("kind", "")
-        
-        add_edge(source_id, target_id, label)
+    for graph in graphs:
+        # 1. Caricamento Nativo dei Nodi esportati dall'IR Rust
+        for node_comp in graph.get("nodes", []):
+            if "Module" in node_comp:
+                m = node_comp["Module"]
+                name_parts = m.get("name", [])
+                node_id = qn_to_id(name_parts)
+                label = name_parts[-1] if name_parts else "root"
+                add_node(node_id, label, "Module")
+                
+            elif "StructuredType" in node_comp:
+                st = node_comp["StructuredType"]
+                name_parts = st.get("name", [])
+                node_id = qn_to_id(name_parts)
+                label = name_parts[-1] if name_parts else "Unknown"
+                add_node(node_id, label, st.get("kind", "Struct"))
+                
+            elif "Function" in node_comp:
+                ff = node_comp["Function"]
+                name_parts = ff.get("name", [])
+                node_id = qn_to_id(name_parts)
+                label = name_parts[-1] + "()" if name_parts else "()"
+                add_node(node_id, label, "Function")
+
+        # 2. Caricamento Nativo degli Archi estratti dal Type Resolver Rust
+        for edge in graph.get("edges", []):
+            source_id = qn_to_id(edge.get("from"))
+            target_id = qn_to_id(edge.get("to"))
+            label = edge.get("kind", "")
+            
+            add_edge(source_id, target_id, label)
         
     # Validazione finale (per sicurezza rimuoviamo archi fantasma senza cancellare i nodi)
     valid_elements = [el for el in elements if el["data"].get("type")] # Tieni tutti i nodi

@@ -106,10 +106,27 @@
                             }
                         },
                         {
+                            selector: 'node[type = "Enum"]',
+                            style: {
+                                'background-color': '#f1c40f',
+                                'color': '#000',
+                                'text-outline-color': '#f1c40f'
+                            }
+                        },
+                        {
                             selector: 'node[type = "Function"]',
                             style: {
                                 'background-color': '#8e44ad',
                                 'shape': 'ellipse'
+                            }
+                        },
+                        {
+                            selector: 'node[type = "External"]',
+                            style: {
+                                'background-color': '#34495e',
+                                'opacity': 0.7,
+                                'border-width': 1,
+                                'border-color': '#95a5a6'
                             }
                         },
                         {
@@ -123,15 +140,15 @@
                             selector: 'edge',
                             style: {
                                 'width': 2,
-                                'line-color': '#aaa',
-                                'target-arrow-color': '#aaa',
+                                'line-color': '#aaaaaa',
+                                'target-arrow-color': '#aaaaaa',
                                 'target-arrow-shape': 'triangle',
                                 'curve-style': 'bezier',
                                 'label': 'data(label)',
-                                'font-size': '10px',
+                                'font-size': '8px',
                                 'color': '#ccc',
                                 'text-rotation': 'autorotate',
-                                'text-background-opacity': 1,
+                                'text-background-opacity': 0.8,
                                 'text-background-color': '#1e1e1e',
                                 'text-background-padding': '2px'
                             }
@@ -139,6 +156,7 @@
                         {
                             selector: 'edge[label = "Inherits"], edge[label = "Implements"]',
                             style: {
+                                'width': 3,
                                 'line-style': 'dashed',
                                 'line-color': '#f39c12',
                                 'target-arrow-color': '#f39c12',
@@ -146,10 +164,36 @@
                             }
                         },
                         {
+                            selector: 'edge[label = "Calls"]',
+                            style: {
+                                'line-color': '#2ecc71',
+                                'target-arrow-color': '#2ecc71',
+                                'width': 2
+                            }
+                        },
+                        {
+                            selector: 'edge[label = "Instantiates"]',
+                            style: {
+                                'line-color': '#3498db',
+                                'target-arrow-color': '#3498db',
+                                'line-style': 'dashed',
+                                'width': 2
+                            }
+                        },
+                        {
+                            selector: 'edge[label ^= "Uses"]',
+                            style: {
+                                'line-color': '#ccd1d1',
+                                'target-arrow-color': '#ccd1d1',
+                                'line-style': 'dotted',
+                                'opacity': 0.7
+                            }
+                        },
+                        {
                             selector: 'edge[label = "NestedIn"], edge[label = "ModuleContainment"]',
                             style: {
-                                'line-color': '#34495e',
-                                'target-arrow-color': '#34495e',
+                                'line-color': '#707b7c',
+                                'target-arrow-color': '#707b7c',
                                 'target-arrow-shape': 'circle',
                                 'line-style': 'dotted'
                             }
