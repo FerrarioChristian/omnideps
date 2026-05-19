@@ -47,7 +47,15 @@ fn test_benchmarks_analysis() {
             let filename = path.file_name().unwrap().to_str().unwrap();
             let json_path = outputs_dir.join(format!("{}.json", filename));
             let json = serde_json::to_string_pretty(&graph).expect("Impossibile serializzare il grafo");
-            fs::write(json_path, json).expect("Impossibile salvare il JSON di test");
+            fs::write(&json_path, json).expect("Impossibile salvare il JSON di test");
+
+            // Esporta anche la versione Cytoscape per i test
+            let cyto_path = outputs_dir.join(format!("cyto_{}.json", filename));
+            language_agnostic_analyzer::export::cytoscape::export_graphs(
+                std::slice::from_ref(&graph),
+                &cyto_path,
+            )
+            .expect("Impossibile esportare il grafo Cytoscape di test");
         }
     }
 }

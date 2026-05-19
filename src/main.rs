@@ -43,6 +43,20 @@ fn analyze_single_file(
         let json = serde_json::to_string_pretty(&graph)?;
         fs::write(out, json)?;
         println!("Grafo salvato in {}", out.display());
+
+        // Esportazione automatica Cytoscape
+        if let Some(parent) = out.parent() {
+            let file_name = out
+                .file_name()
+                .and_then(|n| n.to_str())
+                .unwrap_or("graph.json");
+            let cyto_path = parent.join(format!("cyto_{}", file_name));
+            language_agnostic_analyzer::export::cytoscape::export_graphs(
+                std::slice::from_ref(&graph),
+                &cyto_path,
+            )?;
+            println!("Grafo Cytoscape salvato in {}", cyto_path.display());
+        }
     }
 
     if let Some(csv) = csv_out {
@@ -81,6 +95,17 @@ fn analyze_directory(
     if let Some(out) = json_out {
         let json = serde_json::to_string_pretty(&all_graphs)?;
         fs::write(out, json)?;
+
+        // Esportazione automatica Cytoscape
+        if let Some(parent) = out.parent() {
+            let file_name = out
+                .file_name()
+                .and_then(|n| n.to_str())
+                .unwrap_or("graph.json");
+            let cyto_path = parent.join(format!("cyto_{}", file_name));
+            language_agnostic_analyzer::export::cytoscape::export_graphs(&all_graphs, &cyto_path)?;
+            println!("Grafo Cytoscape salvato in {}", cyto_path.display());
+        }
     }
     if let Some(csv) = csv_out {
         save_summary_csv(&total_summary, csv)?;

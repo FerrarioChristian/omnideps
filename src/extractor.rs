@@ -100,8 +100,8 @@ pub fn full_analysis(
     crate::ir::AnalysisSummary,
 )> {
     let modules = generic_extract(lang, source)?;
-    let resolved = crate::analysis::resolve_type_refs(modules);
-    let graph = crate::analysis::build_dependency_graph(&resolved);
-    let summary = crate::analysis::build_analysis_summary(&resolved);
+    let resolved = crate::resolver::resolve_type_refs(modules);
+    let graph = crate::export::graph::build_dependency_graph(&resolved);
+    let summary = crate::export::summary::build_analysis_summary(&resolved);
     Ok((resolved, graph, summary))
 }
