@@ -35,13 +35,13 @@ fn walk_cst(node: tree_sitter::Node, source: &str, modules: &mut Vec<Module>) {
         
         match comp {
             crate::heuristics::ParsedItem::Component(crate::ir::Component::Module(m)) => {
-                // Attraversa i figli popolando il nuovo modulo prima di aggiungerlo
+                // Traverse children to populate the new module before adding it
                 let mut cursor = node.walk();
                 let mut new_modules = vec![m];
                 for child in node.children(&mut cursor) {
                     walk_cst(child, source, &mut new_modules);
                 }
-                // Il nuovo modulo ora è popolato (si trova in new_modules[0])
+                // The new module is now populated (it is located at new_modules[0])
                 modules[0].sub_modules.push(new_modules.remove(0));
             }
             crate::heuristics::ParsedItem::Component(crate::ir::Component::StructuredType(st)) => modules[0].structured_types.push(st),

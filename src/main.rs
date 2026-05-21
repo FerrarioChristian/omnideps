@@ -1,7 +1,7 @@
 use anyhow::Result;
 use clap::Parser;
 use language_agnostic_analyzer::{
-    extractor::{self, full_analysis},
+    analyzer::{self, full_analysis},
     ir::AnalysisSummary,
 };
 use std::fs;
@@ -80,7 +80,7 @@ fn analyze_directory(
             && let Ok(lang) = detect_language(entry.path())
         {
             let source = fs::read_to_string(entry.path())?;
-            let (_modules, graph, summary) = extractor::full_analysis(lang, &source)?;
+            let (_modules, graph, summary) = analyzer::full_analysis(lang, &source)?;
             total_summary.total_modules += summary.total_modules;
             total_summary.total_structured_types += summary.total_structured_types;
             total_summary.total_free_functions += summary.total_free_functions;
@@ -116,11 +116,11 @@ fn analyze_directory(
 /// Helper function to match file extensions to tree-sitter language parsers.
 fn detect_language(path: &std::path::Path) -> Result<tree_sitter::Language> {
     match path.extension().and_then(|s| s.to_str()) {
-        Some("rs") => Ok(extractor::languages::rust()),
-        Some("java") => Ok(extractor::languages::java()),
-        Some("py") => Ok(extractor::languages::python()),
-        Some("c") | Some("h") => Ok(extractor::languages::c()),
-        Some("cpp") | Some("cxx") | Some("cc") | Some("hxx") => Ok(extractor::languages::cpp()),
+        Some("rs") => Ok(analyzer::languages::rust()),
+        Some("java") => Ok(analyzer::languages::java()),
+        Some("py") => Ok(analyzer::languages::python()),
+        Some("c") | Some("h") => Ok(analyzer::languages::c()),
+        Some("cpp") | Some("cxx") | Some("cc") | Some("hxx") => Ok(analyzer::languages::cpp()),
         _ => anyhow::bail!("Language not supported for file: {}", path.display()),
     }
 }
