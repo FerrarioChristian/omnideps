@@ -3,60 +3,28 @@
 <head>
     <title>Language Agnostic Analyzer - Dependency Graph</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.26.0/cytoscape.min.js"></script>
-    <style>
-        body {
-            font-family: sans-serif;
-            margin: 0;
-            padding: 0;
-            overflow: hidden;
-            background-color: #1e1e1e;
-        }
-        #cy {
-            width: 100vw;
-            height: 100vh;
-            display: block;
-        }
-        #info {
-            position: absolute;
-            top: 10px;
-            left: 10px;
-            background: rgba(0,0,0,0.8);
-            color: white;
-            padding: 10px 15px;
-            border-radius: 5px;
-            z-index: 10;
-        }
-        select {
-            margin-top: 10px;
-            padding: 5px;
-            width: 100%;
-            background: #333;
-            color: #fff;
-            border: 1px solid #555;
-            border-radius: 3px;
-        }
-    </style>
+        <link rel="stylesheet" href="style.css" type="text/css" /> 
 </head>
 <body>
     <div id="info">
-        <div id="status">Caricamento elenco grafi...</div>
+        <div id="status">Loading...</div>
         <select id="graph-selector" style="display: none;"></select>
     </div>
     <div id="cy"></div>
 
-    <script>
+    <script type="module">
+        import style from './cytoscape_style.js';
         let cy = null;
 
         function loadGraph(jsonPath) {
             document.getElementById('status').innerText = "Caricamento: " + jsonPath;
             
-            // Assicuriamoci che il path sia assoluto rispetto alla root del server
             const fetchPath = jsonPath.startsWith('/') ? jsonPath : '/' + jsonPath;
             
             fetch(fetchPath)
                 .then(res => res.json())
                 .then(elements => {
-                    document.getElementById('status').innerText = "Visualizzazione: " + jsonPath;
+                    document.getElementById('status').innerText =  jsonPath;
                     
                     if (cy) {
                         cy.destroy();
@@ -65,173 +33,39 @@
                     cy = cytoscape({
                         container: document.getElementById('cy'),
                         elements: elements,
-                    style: [
-                        {
-                            selector: 'node',
-                            style: {
-                                'label': 'data(label)',
-                                'text-valign': 'center',
-                                'text-halign': 'center',
-                                'color': '#fff',
-                                'text-outline-width': 2,
-                                'text-outline-color': '#444',
-                                'background-color': '#555',
-                                'font-size': '12px',
-                                'width': 'label',
-                                'height': 'label',
-                                'padding': '10px',
-                                'shape': 'round-rectangle'
-                            }
-                        },
-                        {
-                            selector: 'node[type = "Module"]',
-                            style: {
-                                'background-color': '#d35400',
-                                'shape': 'hexagon'
-                            }
-                        },
-                        {
-                            selector: 'node[type = "Struct"], node[type = "Class"]',
-                            style: {
-                                'background-color': '#2980b9'
-                            }
-                        },
-                        {
-                            selector: 'node[type = "Trait"], node[type = "Interface"]',
-                            style: {
-                                'background-color': '#27ae60',
-                                'border-style': 'dashed',
-                                'border-width': 2,
-                                'border-color': '#fff'
-                            }
-                        },
-                        {
-                            selector: 'node[type = "Enum"]',
-                            style: {
-                                'background-color': '#f1c40f',
-                                'color': '#000',
-                                'text-outline-color': '#f1c40f'
-                            }
-                        },
-                        {
-                            selector: 'node[type = "Function"]',
-                            style: {
-                                'background-color': '#8e44ad',
-                                'shape': 'ellipse'
-                            }
-                        },
-                        {
-                            selector: 'node[type = "External"]',
-                            style: {
-                                'background-color': '#34495e',
-                                'opacity': 0.7,
-                                'border-width': 1,
-                                'border-color': '#95a5a6'
-                            }
-                        },
-                        {
-                            selector: 'node[type = "ImplBlock"]',
-                            style: {
-                                'background-color': '#7f8c8d',
-                                'shape': 'rectangle'
-                            }
-                        },
-                        {
-                            selector: 'edge',
-                            style: {
-                                'width': 2,
-                                'line-color': '#aaaaaa',
-                                'target-arrow-color': '#aaaaaa',
-                                'target-arrow-shape': 'triangle',
-                                'curve-style': 'bezier',
-                                'label': 'data(label)',
-                                'font-size': '8px',
-                                'color': '#ccc',
-                                'text-rotation': 'autorotate',
-                                'text-background-opacity': 0.8,
-                                'text-background-color': '#1e1e1e',
-                                'text-background-padding': '2px'
-                            }
-                        },
-                        {
-                            selector: 'edge[label = "Inherits"], edge[label = "Implements"]',
-                            style: {
-                                'width': 3,
-                                'line-style': 'dashed',
-                                'line-color': '#f39c12',
-                                'target-arrow-color': '#f39c12',
-                                'target-arrow-shape': 'triangle-tee'
-                            }
-                        },
-                        {
-                            selector: 'edge[label = "Calls"]',
-                            style: {
-                                'line-color': '#2ecc71',
-                                'target-arrow-color': '#2ecc71',
-                                'width': 2
-                            }
-                        },
-                        {
-                            selector: 'edge[label = "Instantiates"]',
-                            style: {
-                                'line-color': '#3498db',
-                                'target-arrow-color': '#3498db',
-                                'line-style': 'dashed',
-                                'width': 2
-                            }
-                        },
-                        {
-                            selector: 'edge[label ^= "Uses"]',
-                            style: {
-                                'line-color': '#ccd1d1',
-                                'target-arrow-color': '#ccd1d1',
-                                'line-style': 'dotted',
-                                'opacity': 0.7
-                            }
-                        },
-                        {
-                            selector: 'edge[label = "NestedIn"], edge[label = "ModuleContainment"]',
-                            style: {
-                                'line-color': '#707b7c',
-                                'target-arrow-color': '#707b7c',
-                                'target-arrow-shape': 'circle',
-                                'line-style': 'dotted'
-                            }
+                        style: style,
+                        layout: {
+                            name: 'cose',
+                            idealEdgeLength: 100,
+                            nodeOverlap: 20,
+                            refresh: 20,
+                            fit: true,
+                            padding: 30,
+                            randomize: false,
+                            componentSpacing: 100,
+                            nodeRepulsion: 400000,
+                            edgeElasticity: 100,
+                            nestingFactor: 5,
+                            gravity: 80,
+                            numIter: 1000,
+                            initialTemp: 200,
+                            coolingFactor: 0.95,
+                            minTemp: 1.0
                         }
-                    ],
-                    layout: {
-                        name: 'cose', // 'cose' è un buon layout physics-based
-                        idealEdgeLength: 100,
-                        nodeOverlap: 20,
-                        refresh: 20,
-                        fit: true,
-                        padding: 30,
-                        randomize: false,
-                        componentSpacing: 100,
-                        nodeRepulsion: 400000,
-                        edgeElasticity: 100,
-                        nestingFactor: 5,
-                        gravity: 80,
-                        numIter: 1000,
-                        initialTemp: 200,
-                        coolingFactor: 0.95,
-                        minTemp: 1.0
-                    }
                 });
             })
             .catch(err => {
-                document.getElementById('status').innerText = "Errore: impossibile caricare il grafo.";
+                document.getElementById('status').innerText = "Error: Load graph failed for " + jsonPath;
                 console.error(err);
             });
         }
 
-        // Caricamento iniziale della lista dei grafi
         fetch('/api/list_graphs')
             .then(res => res.json())
             .then(files => {
                 const selector = document.getElementById('graph-selector');
                 if (files.length === 0) {
-                    document.getElementById('status').innerText = "Nessun grafo trovato. Esegui 'cargo test' prima.";
+                    document.getElementById('status').innerText = "No graphs found. Please run the analyzer first.";
                     return;
                 }
                 
@@ -245,16 +79,14 @@
                 
                 selector.style.display = 'block';
                 
-                // Carica il primo
                 loadGraph(files[0]);
                 
-                // Gestisci cambio di selezione
                 selector.addEventListener('change', (e) => {
                     loadGraph(e.target.value);
                 });
             })
             .catch(err => {
-                document.getElementById('status').innerText = "Errore nel contattare il server locale per la lista dei grafi.";
+                document.getElementById('status').innerText = "Error: Failed to load graph list.";
                 console.error(err);
             });
     </script>
