@@ -44,7 +44,14 @@ pipeline di analisi.
     gerarchica di identificatori ($\langle i_1, \dots, i_n \rangle$)
     che rappresenta il percorso assoluto e univoco di un'entità (es.
     il namespace o il modulo).
-  \item $\tau$ (\textbf{Type Reference}): Un riferimento astratto a un tipo. Rappresentato da un tipo somma a cinque stati che ne modella il ciclo di vita durante l'analisi: \texttt{Prim} (primitivo di base), \texttt{Unresolved} (nome grezzo appena estratto), \texttt{Resolved} (percorso assoluto accertato nel codebase), \texttt{External} (percorso risolto tramite import ma non analizzato nel codebase), o \texttt{Failed} (tentativo di risoluzione non andato a buon fine).
+  \item $\tau$ (\textbf{Type Reference}): Un riferimento astratto a
+    un tipo. Rappresentato da un tipo somma a cinque stati che ne
+    modella il ciclo di vita durante l'analisi: \texttt{Prim}
+    (primitivo di base), \texttt{Unresolved} (nome grezzo appena
+    estratto), \texttt{Resolved} (percorso assoluto accertato nel
+    codebase), \texttt{External} (percorso risolto tramite import ma
+    non analizzato nel codebase), o \texttt{Failed} (tentativo di
+    risoluzione non andato a buon fine).
 \end{itemize}
 
 \subsection{Membri Strutturali e Firme}
@@ -85,12 +92,13 @@ pipeline di analisi.
 
 \subsection{Modello di Risoluzione e Grafo}
 \begin{itemize}
-  \item $\Sigma$ (\textbf{Symbol Table}): La funzione di mappa
-    globale che associa i nomi qualificati ($\mathcal{QN}$) alle
-    effettive istanze dei componenti ($\mathcal{C}$).
-  \item $\Gamma$ (\textbf{Resolution Context}): Il contesto locale
-    (comprendente scope attuale e importazioni) utilizzato per
-    risolvere riferimenti ambigui durante la fase di risoluzione.
+  \item $\Sigma$ (\textbf{Symbol Table}): L'albero gerarchico degli
+    ambiti di visibilità (Scope Tree) in cui vengono registrati tutti
+    i componenti estratti, rimpiazzando l'obsoleta mappa globale piatta.
+  \item $\Gamma$ (\textbf{Resolution Context}): Il contesto di
+    attraversamento (comprendente lo scope attuale $\Sigma_{curr}$,
+    il path e la cache di memoization) utilizzato per risolvere i
+    riferimenti ambigui navigando l'albero $\Sigma$.
   \item $\mathcal{G}$ (\textbf{Dependency Graph}): Il grafo orientato
     finale $\langle V, E \rangle$. I vertici $V$ sono i componenti
     estratti dal codice e gli archi $E$ sono le relazioni semantiche

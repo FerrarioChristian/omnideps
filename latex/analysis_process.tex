@@ -92,80 +92,17 @@ trasforma i riferimenti simbolici estratti dal codice in puntatori
 semantici certi. Questa fase opera interamente sul dominio dell'IR ed
 è indipendente dal linguaggio sorgente.
 
-\subsection{Tabella dei Simboli ($\Sigma$)}
-La \textbf{Tabella dei Simboli} $\Sigma$ è definita come una funzione
-parziale (o mappa) che associa ogni nome qualificato univoco al
-componente corrispondente:
-$$\Sigma : \mathcal{QN} \to \mathcal{C}$$
-La funzione $\text{build\_sym\_table}(M)$ scansiona ricorsivamente il
-modulo radice $M$ e popola $\Sigma$ registrando ogni $\mathcal{S},
-\mathcal{F}, \mathcal{B}_{lk}$ e modulo annidato. Questa tabella
-funge da registro globale (Global Scope) necessario per risolvere
-riferimenti tra entità definite in file o moduli diversi.
-
-% La \textbf{Tabella dei Simboli} $\Sigma$ è definita come una
-% funzione parziale (o mappa) che associa un identificatore univoco
-% al componente corrispondente:
-% $$\Sigma : \mathcal{QN}_{id} \to \mathcal{C}$$
-% Per i moduli e i tipi strutturati, $\mathcal{QN}_{id}$ coincide con
-% il normale nome qualificato ($\mathcal{QN}$). Tuttavia, per
-% supportare l'\textbf{Overloading} delle funzioni (più funzioni con
-% lo stesso nome ma firme diverse), l'identificatore univoco per $M$
-% e $FN$ è generato attraverso un processo di \textit{Name Mangling},
-% che concatena il nome qualificato con la codifica dei tipi dei
-% parametri $\vec{P}$:
-% $$\mathcal{QN}_{id}(f) = \mathcal{QN} \oplus \text{encode}(\vec{P})$$
-% La funzione $\text{build\_sym\_table}(M)$ scansiona ricorsivamente
-% il modulo radice $M$ e popola $\Sigma$. Questa tabella funge da
-% registro globale (Global Scope) necessario per risolvere
-% riferimenti tra entità definite in file o moduli diversi senza
-% rischio di collisioni.
-
-\subsection{Contesto di Risoluzione ($\Gamma$) e Punti di Salto}
-Per gestire la visibilità locale e le dipendenze, ogni operazione di
-risoluzione avviene all'interno di un \textbf{Contesto} $\Gamma$:
-$$\Gamma = \langle \Sigma, \mathcal{QN}_{curr}, \mathcal{I}_{imports} \rangle$$
-dove $\mathcal{QN}_{curr}$ è il percorso del modulo attuale e
-$\mathcal{I}_{imports}$ è l'insieme delle clausole di importazione.
-In questo contesto, costrutti come gli import o le relazioni di
-ereditarietà agiscono come \textbf{punti di salto}. Durante la
-ricerca del punto di partenza per la risoluzione di una catena di
-identificatori, il sistema può utilizzare tutti i componenti resi
-visibili tramite questi punti di salto. Tale meccanismo è
-implementato attraverso una \textit{visita ricorsiva controllata},
-che esplora il grafo delle visibilità rispettando le regole
-semantiche del linguaggio: ad esempio, gli import potrebbero non
-essere transitivi, mentre l'ereditarietà generalmente lo è, seppur
-soggetta a filtri di visibilità (\texttt{public}, \texttt{private},
-\texttt{protected}).
-
-\subsection{Logica di Risoluzione ($R_{\tau}$)}
-La funzione core $\text{resolve}_{\tau} : \Gamma \times \tau \to
-\tau$ opera la transizione di stato della reference secondo la seguente logica:
-\begin{enumerate}
-  \item Se $\tau = \text{Prim}(p)$, la funzione restituisce l'input
-    inalterato poiché i primitivi non necessitano di risoluzione.
-  \item Se $\tau = \text{Unresolved}(qn_{raw})$, la funzione tenta di
-    risolvere il nome grezzo cercando la corrispondenza univoca:
-    \begin{itemize}
-      \item Nel percorso locale ($\mathcal{QN}_{curr} + qn_{raw}$).
-      \item Attraverso la visita ricorsiva controllata dei
-        \textit{punti di salto} (es. alias definiti in
-        $\mathcal{I}_{imports}$ o super-tipi ereditati).
-      \item Nel Global Scope fornito da $\Sigma$.
-    \end{itemize}
-  \item Se la ricerca ha successo, la funzione restituisce:
-    \begin{itemize}
-      \item $\text{Resolved}(qn_{abs})$ se il percorso assoluto
-        $qn_{abs}$ è registrato e presente nel Global Scope $\Sigma$.
-      \item $\text{External}(qn_{abs})$ se il percorso è stato
-        risolto tramite un import $\mathcal{I}_{imports}$, ma non
-        appartiene al Global Scope analizzato. Questo permette di
-        mappare confini verso librerie esterne e dipendenze di terze
-        parti senza generare falsi fallimenti.
-    \end{itemize}
-  \item Se la ricerca fallisce, la funzione restituisce $\text{Failed}$.
-\end{enumerate}
+\subsection{Tabella dei Simboli ($\Sigma$) e Logica di Risoluzione}
+La costruzione della \textbf{Tabella dei Simboli} $\Sigma$, del
+\textbf{Contesto di Risoluzione} $\Gamma$ e le relative regole di
+Lexical Scoping sono state progettate per garantire massima fedeltà
+architetturale e prestazioni ottimali in scenari complessi multi-modulo.
+Essendo questa fase il cuore logico dell'analizzatore (e una
+  soluzione al problema del Name Clashing e del decadimento
+computazionale $O(L)$), l'intera formalizzazione del \textit{Modello
+Gerarchico} e dell'algoritmo di risoluzione (inclusa la
+\textit{Memoization}) è trattata in modo esaustivo nel Capitolo
+\ref{ch:name_resolution}.
 
 \subsection{Appiattimento (Flattening) dei Blocchi di Implementazione}
 Durante la fase di risoluzione, il sistema applica una trasformazione

@@ -1,0 +1,114 @@
+\chapter{Risoluzione dei Nomi: Un Approccio Gerarchico}
+\label{ch:name_resolution}
+
+La fase di \textit{Name Resolution} (Risoluzione dei Nomi) è il cuore
+logico dell'analizzatore architetturale. Il suo scopo è trasformare
+riferimenti astratti ed esposti ad ambiguità testuali (i nomi grezzi
+estratti dall'albero sintattico) in identificatori univoci e
+globalmente validi, permettendo la costruzione di un grafo delle
+dipendenze coerente.
+
+\section{Limiti di una Symbol Table Piatta}
+Nella prima formalizzazione dell'architettura, la \textit{Symbol
+Table} globale ($\Sigma$) era modellata come una mappa piatta:
+$$\Sigma : \mathcal{QN} \to \mathcal{C}$$
+Questo approccio, seppur semplice, presenta due gravi criticità
+architetturali e algoritmiche in un contesto
+\textit{language-agnostic} su larga scala:
+
+\begin{enumerate}
+  \item \textbf{Decadimento delle Performance $O(L)$:} L'hashing di
+    una chiave di tipo $\mathcal{QN}$ (una tupla di stringhe di
+    lunghezza variabile) degrada le performance di lookup.
+    L'operazione non è più rigorosamente $O(1)$, bensì $O(L)$, dove
+    $L$ è la lunghezza cumulativa del percorso testuale. Nei
+    tentativi di risoluzione tramite \textit{climbing} degli
+    \textit{enclosing scopes}, le continue clonazioni e
+    concatenazioni di stringhe comportano un Memory Allocation
+    Overhead proibitivo.
+  \item \textbf{Violazione del Lexical Scoping e Name Clashing:} Una
+    tabella piatta non modella correttamente lo \textit{scope} locale
+    di un programma. Due classi con lo stesso nome definite in
+    blocchi funzionali o moduli diversi rischiano collisioni (Name
+    Clashing), a meno di non generare identificatori univoci
+    (mangling) artificialmente.
+\end{enumerate}
+
+\section{Il Modello Gerarchico: Environment Chain}
+Per superare questi limiti, la nostra architettura adotta una
+\textbf{Hierarchical Symbol Table} (o \textit{Environment Chain}).
+Invece di un unico dizionario globale, il sistema costruisce un
+albero di ambiti di visibilità (Scope Tree), la cui struttura
+isomorfa ricalca l'Abstract Syntax Tree (AST) originale.
+
+Definiamo un nodo Scope $\Sigma_{node}$ come la seguente tupla:
+$$\Sigma_{node} = \langle \mathcal{N}, \text{Symbols},
+\mathcal{I}_{imports}, \text{Parent}, \text{Children} \rangle$$
+Dove:
+\begin{itemize}
+  \item $\mathcal{N} \in \mathcal{I}$: Il nome locale dello scope
+    (es. "core", "User").
+  \item $\text{Symbols}: \mathcal{I} \to \mathcal{C}$: La mappa dei
+    componenti definiti *esclusivamente* in questo scope. Si noti che
+    la chiave ora è una singola stringa $\mathcal{I}$, garantendo un
+    accesso $O(1)$ autentico.
+  \item $\mathcal{I}_{imports}$: L'insieme dei \textit{Jump Points}
+    (es. clausole `use` o `import`) visibili in questo scope.
+  \item $\text{Parent}: \Sigma_{node}^?$: Il riferimento allo scope
+    contenitore (necessario per il \textit{Lexical Climb}).
+  \item $\text{Children}: \mathcal{I} \to \Sigma_{node}$: La mappa
+    verso gli scope annidati.
+\end{itemize}
+
+L'intera Tabella dei Simboli $\Sigma$ coincide ora con la radice
+(Root) dello Scope Tree.
+
+\section{Algoritmo di Risoluzione Lexical Scoping ($R_\tau$)}
+
+Dato un riferimento irrisolto $\text{Unresolved}(\langle i_1, i_2,
+\dots, i_n \rangle)$ e uno scope di partenza $\Sigma_{curr}$,
+l'algoritmo di risoluzione si articola in tre fasi (Memoization,
+Lexical Climb, e Ascensione).
+
+\subsection{1. Lexical Climb e Punti di Salto}
+Se il riferimento non è nella Cache (vedi Sezione
+\ref{sec:memoization}), l'algoritmo ispeziona $\Sigma_{curr}$:
+\begin{enumerate}
+  \item \textbf{Ricerca Locale}: Verifica se $i_1 \in
+    \text{Symbols}$. Se esiste, l'algoritmo \textit{scende}
+    ricorsivamente nell'albero dei $\text{Children}$ seguendo il
+    percorso $\langle i_2, \dots, i_n \rangle$. Se la discesa termina
+    con successo, il tipo è risolto come $\text{Local}$.
+  \item \textbf{Jump Points}: Se $i_1 \notin \text{Symbols}$,
+    verifica se $i_1$ coincide con un alias definito in
+    $\mathcal{I}_{imports}$. Se esiste un match, l'algoritmo applica
+    una sostituzione del prefisso e avvia una nuova risoluzione
+    assoluta partendo dalla Root dell'albero. Questo permette
+    l'aggancio a librerie esterne, generando un riferimento allo
+    stato \texttt{External}.
+\end{enumerate}
+
+\subsection{2. Ascensione (Scope Bubbling)}
+Se la fase precedente fallisce per $\Sigma_{curr}$, l'algoritmo
+risale al genitore:
+$$\Sigma_{curr} \leftarrow \Sigma_{curr}.\text{Parent}$$
+L'ispezione si ripete fino al raggiungimento del nodo Root. Se il
+nodo Root viene esaurito senza successo, il riferimento transita
+nello stato \texttt{Failed}.
+
+\section{Ottimizzazione tramite Memoization}
+\label{sec:memoization}
+In un software reale, lo stesso identificatore viene referenziato
+decine o centinaia di volte all'interno del medesimo blocco (es.
+invocazioni multiple a un metodo). Ripetere il Lexical Climb per ogni
+occorrenza costituisce un onere computazionale evitabile.
+
+Per garantire la massima efficienza, il \textit{Resolution Context}
+implementa un design pattern di \textbf{Memoization} (Caching locale):
+$$\mathcal{C}_{ache} : \mathcal{QN} \to \text{ResolutionResult}$$
+Ogni volta che l'algoritmo di Lexical Scoping risolve con successo (o
+dichiara \texttt{Failed}) un percorso all'interno di uno specifico
+contesto, il risultato viene memorizzato in $\mathcal{C}_{ache}$.
+Nelle successive interrogazioni per il medesimo $\mathcal{QN}$ nello
+stesso modulo, l'analizzatore bypassa completamente la navigazione
+dello Scope Tree, restituendo il risultato archiviato in tempo $O(1)$.
