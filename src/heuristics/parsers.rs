@@ -108,7 +108,8 @@ pub fn try_parse_import(node: Node, source: &str) -> Option<Import> {
     }
 
     // Try to extract path using tree-sitter fields, fallback to regex-like
-    let path = if let Some(p_node) = node.child_by_field_name("name")
+    let path = if let Some(p_node) = node.child_by_field_name("argument")
+        .or_else(|| node.child_by_field_name("name"))
         .or_else(|| node.child_by_field_name("path")) 
         .or_else(|| node.child_by_field_name("module_name"))
     {

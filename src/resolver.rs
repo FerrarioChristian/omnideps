@@ -1,86 +1,170 @@
 use crate::ir::*;
+use std::cell::RefCell;
 use std::collections::HashMap;
 
-// ==================== CONTEXT PER RISOLUZIONE NOMI ====================
-/// Contains the current prefix (namespace) and a flat symbol table for fast lookups.
+// ==================== HIERARCHICAL SCOPE TREE ====================
+
 #[derive(Debug)]
-pub struct ResolutionContext {
-    pub current_prefix: QualifiedName,
-    pub symbol_table: HashMap<QualifiedName, Component>,
+pub struct ScopeNode {
+    pub name: Identifier,
+    pub symbols: HashMap<Identifier, Component>,
+    pub children: HashMap<Identifier, usize>,
+    pub parent: Option<usize>,
     pub imports: Vec<Import>,
 }
 
-/// Builds a flat symbol table from a list of root modules, indexing every nested component.
-pub fn build_symbol_table(modules: &[Module]) -> HashMap<QualifiedName, Component> {
-    let mut table = HashMap::new();
-    fn populate(
-        m: &Module,
-        table: &mut HashMap<QualifiedName, Component>,
-        prefix: &mut QualifiedName,
-    ) {
-        prefix.push(m.name.last().cloned().unwrap_or_default());
-        table.insert(prefix.clone(), Component::Module(m.clone()));
+#[derive(Debug)]
+pub struct ScopeTree {
+    pub arena: Vec<ScopeNode>,
+    pub root: usize,
+}
 
-        fn populate_st(
-            st: &StructuredType,
-            table: &mut HashMap<QualifiedName, Component>,
-            prefix: &mut QualifiedName,
+impl ScopeTree {
+    pub fn new() -> Self {
+        let root_node = ScopeNode {
+            name: "ROOT".to_string(),
+            symbols: HashMap::new(),
+            children: HashMap::new(),
+            parent: None,
+            imports: vec![],
+        };
+        ScopeTree {
+            arena: vec![root_node],
+            root: 0,
+        }
+    }
+
+    fn add_node(&mut self, parent: usize, name: Identifier, imports: Vec<Import>) -> usize {
+        let idx = self.arena.len();
+        let node = ScopeNode {
+            name: name.clone(),
+            symbols: HashMap::new(),
+            children: HashMap::new(),
+            parent: Some(parent),
+            imports,
+        };
+        self.arena.push(node);
+        self.arena[parent].children.insert(name, idx);
+        idx
+    }
+
+    pub fn build(modules: &[Module]) -> Self {
+        let mut tree = ScopeTree::new();
+        let root = tree.root;
+
+        fn populate(
+            m: &Module,
+            tree: &mut ScopeTree,
+            parent_idx: usize,
         ) {
-            let mut name = prefix.clone();
-            name.extend(st.name.clone());
-            table.insert(name.clone(), Component::StructuredType(st.clone()));
+            let m_name = m.name.last().cloned().unwrap_or_default();
+            let node_idx = tree.add_node(parent_idx, m_name.clone(), m.imports.clone());
+            tree.arena[parent_idx].symbols.insert(m_name.clone(), Component::Module(m.clone()));
 
-            for nested in &st.nested_types {
-                populate_st(nested, table, &mut name);
+            fn populate_st(
+                st: &StructuredType,
+                tree: &mut ScopeTree,
+                parent_idx: usize,
+            ) {
+                let st_name = st.name.last().cloned().unwrap_or_default();
+                let node_idx = tree.add_node(parent_idx, st_name.clone(), vec![]);
+                tree.arena[parent_idx].symbols.insert(st_name.clone(), Component::StructuredType(st.clone()));
+
+                for nested in &st.nested_types {
+                    populate_st(nested, tree, node_idx);
+                }
+            }
+
+            for st in &m.structured_types {
+                populate_st(st, tree, node_idx);
+            }
+            for f in &m.free_functions {
+                let f_name = f.name.last().cloned().unwrap_or_default();
+                tree.arena[node_idx].symbols.insert(f_name, Component::Function(f.clone()));
+            }
+            for ib in &m.impl_blocks {
+                let target_name = match &ib.impl_for {
+                    TypeRef::Unresolved(qn) | TypeRef::Resolved(qn) => qn.last().cloned().unwrap_or_default(),
+                    _ => continue,
+                };
+                
+                let target_idx = if let Some(&idx) = tree.arena[node_idx].children.get(&target_name) {
+                    idx
+                } else {
+                    tree.add_node(node_idx, target_name.clone(), vec![])
+                };
+
+                for nested in &ib.nested_types {
+                    populate_st(nested, tree, target_idx);
+                }
+                for method in &ib.methods {
+                    let method_name = method.name.last().cloned().unwrap_or_default();
+                    tree.arena[target_idx].symbols.insert(method_name, Component::Function(method.clone()));
+                }
+            }
+            for sub in &m.sub_modules {
+                populate(sub, tree, node_idx);
             }
         }
 
-        for st in &m.structured_types {
-            populate_st(st, table, prefix);
+        for m in modules {
+            populate(m, &mut tree, root);
         }
-        for f in &m.free_functions {
-            let mut name = prefix.clone();
-            name.extend(f.name.clone());
-            table.insert(name, Component::Function(f.clone()));
-        }
-        for ib in &m.impl_blocks {
-            // Un ImplBlock è zucchero sintattico e verrà appiattito nella struct target.
-            // Poiché la Symbol Table viene costruita prima del flattening,
-            // indicizziamo i tipi annidati dell'impl block simulando che si trovino
-            // già sotto il percorso assoluto della struct target.
-            if let TypeRef::Unresolved(target) = &ib.impl_for {
-                let mut base_name = prefix.clone();
-                base_name.extend(target.clone());
-                for nested in &ib.nested_types {
-                    populate_st(nested, table, &mut base_name);
-                }
-            } else if let TypeRef::Resolved(target) = &ib.impl_for {
-                let mut base_name = target.clone();
-                for nested in &ib.nested_types {
-                    populate_st(nested, table, &mut base_name);
-                }
+        tree
+    }
+    
+    pub fn get_path_for_node(&self, mut node_idx: usize) -> QualifiedName {
+        let mut path = vec![];
+        while node_idx != self.root {
+            path.push(self.arena[node_idx].name.clone());
+            if let Some(p) = self.arena[node_idx].parent {
+                node_idx = p;
+            } else {
+                break;
             }
         }
-        for sub in &m.sub_modules {
-            populate(sub, table, prefix);
+        path.reverse();
+        path
+    }
+    pub fn find_node_by_path(&self, path: &QualifiedName) -> Option<usize> {
+        if path.is_empty() { return None; }
+        
+        let mut curr = self.root;
+        // The root itself might be named "root", or maybe the path starts with the child of root
+        // If path[0] is in root's children, start there.
+        let mut parts = path.iter();
+        
+        // This logic simulates absolute path matching against the global scope tree.
+        // It's a simplification. A real absolute match would start at the true root.
+        while let Some(part) = parts.next() {
+            if let Some(&child) = self.arena[curr].children.get(part) {
+                curr = child;
+            } else {
+                return None;
+            }
         }
-        prefix.pop();
+        Some(curr)
     }
+}
 
-    let mut prefix = vec![];
-    for m in modules {
-        populate(m, &mut table, &mut prefix);
-    }
-    table
+// ==================== CONTEXT PER RISOLUZIONE NOMI ====================
+#[derive(Debug)]
+pub struct ResolutionContext<'a> {
+    pub current_prefix: QualifiedName,
+    pub tree: &'a ScopeTree,
+    pub current_scope: usize,
+    pub cache: &'a RefCell<HashMap<(usize, QualifiedName), ResolutionResult>>,
 }
 
 /// Resolves type references across all modules by matching them against the global symbol table.
 pub fn resolve_type_refs(modules: Vec<Module>) -> Vec<Module> {
-    let symbol_table = build_symbol_table(&modules);
+    let tree = ScopeTree::build(&modules);
+    let cache = RefCell::new(HashMap::new());
     let ctx = ResolutionContext {
         current_prefix: vec![],
-        symbol_table,
-        imports: vec![],
+        tree: &tree,
+        current_scope: tree.root,
+        cache: &cache,
     };
     modules
         .into_iter()
@@ -88,75 +172,156 @@ pub fn resolve_type_refs(modules: Vec<Module>) -> Vec<Module> {
         .collect()
 }
 
-enum ResolutionResult {
+#[derive(Debug, Clone)]
+pub enum ResolutionResult {
     Local(QualifiedName),
     External(QualifiedName),
 }
 
-// Regole di risoluzione (come formalizzate: assoluto -> relativo -> enclosing)
+// Regole di risoluzione: Memoization -> Lexical Climb (Locale -> Imports) -> Ascensione
 fn resolve_name_in_context(
     ctx: &ResolutionContext,
     name: &QualifiedName,
 ) -> Option<ResolutionResult> {
-    // 0. Imports (Punti di salto)
-    if let Some(first_part) = name.first() {
-        for imp in &ctx.imports {
+    if name.is_empty() { return None; }
+    let first_part = name.first().unwrap();
+
+    // 0. Cache (Memoization)
+    let cache_key = (ctx.current_scope, name.clone());
+    if let Some(res) = ctx.cache.borrow().get(&cache_key) {
+        return Some(res.clone());
+    }
+
+    let validate_import = |candidate: &QualifiedName| -> ResolutionResult {
+        if ctx.tree.find_node_by_path(candidate).is_some() {
+            ResolutionResult::Local(candidate.clone())
+        } else {
+            // Fallback: try prepending "root"
+            let mut root_cand = vec!["root".to_string()];
+            root_cand.extend(candidate.clone());
+            if ctx.tree.find_node_by_path(&root_cand).is_some() {
+                ResolutionResult::Local(root_cand)
+            } else {
+                // Fallback: replace "crate" with "root"
+                if candidate.first() == Some(&"crate".to_string()) {
+                    let mut crate_cand = vec!["root".to_string()];
+                    crate_cand.extend(candidate.iter().skip(1).cloned());
+                    if ctx.tree.find_node_by_path(&crate_cand).is_some() {
+                        ResolutionResult::Local(crate_cand)
+                    } else {
+                        ResolutionResult::External(candidate.clone())
+                    }
+                } else {
+                    ResolutionResult::External(candidate.clone())
+                }
+            }
+        }
+    };
+
+    let mut curr_idx = ctx.current_scope;
+    
+    // Lexical Climb
+    loop {
+        let node = &ctx.tree.arena[curr_idx];
+        
+        // 1. Ricerca Locale (Relative to this scope)
+        if node.symbols.contains_key(first_part) {
+            // Found base! Need to resolve the rest of the path by traversing children
+            if let Some(&child_idx) = node.children.get(first_part) {
+                 let mut resolved_idx = child_idx;
+                 let mut valid = true;
+                 for part in name.iter().skip(1) {
+                     if let Some(&next_idx) = ctx.tree.arena[resolved_idx].children.get(part) {
+                         resolved_idx = next_idx;
+                     } else {
+                         valid = false;
+                         break;
+                     }
+                 }
+                 if valid {
+                     let abs_path = ctx.tree.get_path_for_node(resolved_idx);
+                     let res = ResolutionResult::Local(abs_path);
+                     ctx.cache.borrow_mut().insert(cache_key.clone(), res.clone());
+                     return Some(res);
+                 }
+            } else if name.len() == 1 {
+                // It's a leaf (like a function) with no children
+                let mut abs_path = ctx.tree.get_path_for_node(curr_idx);
+                abs_path.push(first_part.clone());
+                let res = ResolutionResult::Local(abs_path);
+                ctx.cache.borrow_mut().insert(cache_key.clone(), res.clone());
+                return Some(res);
+            }
+        }
+
+        // 2. Jump Points (Imports)
+        for imp in &node.imports {
             if let Some(alias) = &imp.alias {
                 if alias == first_part {
                     let mut candidate = imp.path.clone();
                     candidate.extend(name.iter().skip(1).cloned());
-                    if ctx.symbol_table.contains_key(&candidate) {
-                        return Some(ResolutionResult::Local(candidate));
-                    } else {
-                        return Some(ResolutionResult::External(candidate));
-                    }
+                    
+                    let res = validate_import(&candidate);
+                    ctx.cache.borrow_mut().insert(cache_key.clone(), res.clone());
+                    return Some(res);
                 }
             } else if !imp.is_wildcard {
                 if let Some(last_part) = imp.path.last() {
                     if last_part == first_part {
                         let mut candidate = imp.path.clone();
+                        // Se l'import è `use std::vec::Vec`, e usiamo `Vec::new`, 
+                        // vogliamo che parta da dopo `Vec`.
                         candidate.extend(name.iter().skip(1).cloned());
-                        if ctx.symbol_table.contains_key(&candidate) {
-                            return Some(ResolutionResult::Local(candidate));
-                        } else {
-                            return Some(ResolutionResult::External(candidate));
-                        }
+                        
+                        let res = validate_import(&candidate);
+                        ctx.cache.borrow_mut().insert(cache_key.clone(), res.clone());
+                        return Some(res);
                     }
                 }
             }
         }
-        // Wildcards (richiede validazione in symbol_table)
-        for imp in &ctx.imports {
+        
+        // 2b. Wildcard Jump Points
+        for imp in &node.imports {
             if imp.is_wildcard {
                 let mut candidate = imp.path.clone();
                 candidate.extend(name.clone());
-                if ctx.symbol_table.contains_key(&candidate) {
-                    return Some(ResolutionResult::Local(candidate));
+                let res = validate_import(&candidate);
+                // Non registriamo sempre external da wildcard perché causerebbe falsi positivi massicci
+                if let ResolutionResult::Local(_) = res {
+                    ctx.cache.borrow_mut().insert(cache_key.clone(), res.clone());
+                    return Some(res);
                 }
             }
         }
-    }
 
-    // 1. Assoluto
-    if ctx.symbol_table.contains_key(name) {
-        return Some(ResolutionResult::Local(name.clone()));
-    }
-    // 2. Relativo al current_prefix
-    let mut relative = ctx.current_prefix.clone();
-    relative.extend(name.clone());
-    if ctx.symbol_table.contains_key(&relative) {
-        return Some(ResolutionResult::Local(relative));
-    }
-    // 3. Climb sugli enclosing scopes
-    let mut prefix = ctx.current_prefix.clone();
-    while !prefix.is_empty() {
-        prefix.pop();
-        let mut candidate = prefix.clone();
-        candidate.extend(name.clone());
-        if ctx.symbol_table.contains_key(&candidate) {
-            return Some(ResolutionResult::Local(candidate));
+        // 3. Ascensione (Scope Bubbling)
+        if let Some(parent) = node.parent {
+            curr_idx = parent;
+        } else {
+            break;
         }
     }
+
+    // Ultimo fallback assoluto se si passa il percorso dalla radice o se i path sono slegati
+    // Nel caso di "A::InnerA", proviamo a vedere se esiste a partire dalla root globale.
+    if let Some(idx) = ctx.tree.find_node_by_path(name) {
+        let abs_path = ctx.tree.get_path_for_node(idx);
+        let res = ResolutionResult::Local(abs_path);
+        ctx.cache.borrow_mut().insert(cache_key.clone(), res.clone());
+        return Some(res);
+    }
+    
+    // Tentativo super globale: aggiungi root
+    let mut root_cand = vec!["root".to_string()];
+    root_cand.extend(name.clone());
+    if let Some(idx) = ctx.tree.find_node_by_path(&root_cand) {
+        let abs_path = ctx.tree.get_path_for_node(idx);
+        let res = ResolutionResult::Local(abs_path);
+        ctx.cache.borrow_mut().insert(cache_key.clone(), res.clone());
+        return Some(res);
+    }
+
     None
 }
 
@@ -181,11 +346,14 @@ fn resolve_module_in_context(ctx: &ResolutionContext, mut module: Module) -> Mod
     let mut new_prefix = ctx.current_prefix.clone();
     new_prefix.extend(module.name.clone());
 
+    let new_scope = ctx.tree.find_node_by_path(&new_prefix).unwrap_or(ctx.current_scope);
+
     module.name = new_prefix.clone();
     let new_ctx = ResolutionContext {
         current_prefix: new_prefix.clone(),
-        symbol_table: ctx.symbol_table.clone(),
-        imports: module.imports.clone(),
+        tree: ctx.tree,
+        current_scope: new_scope,
+        cache: ctx.cache,
     };
 
     module.structured_types = module
@@ -205,7 +373,9 @@ fn resolve_module_in_context(ctx: &ResolutionContext, mut module: Module) -> Mod
         .map(|i| resolve_impl_block(&new_ctx, i))
         .collect();
 
+    let mut unfused_impls = vec![];
     for ib in resolved_impls {
+        let mut fused = false;
         if let TypeRef::Resolved(target_name) = &ib.impl_for {
             if let Some(target_st) = module
                 .structured_types
@@ -217,10 +387,14 @@ fn resolve_module_in_context(ctx: &ResolutionContext, mut module: Module) -> Mod
                 if let Some(trait_ref) = ib.implements_trait.clone() {
                     target_st.super_types.push(trait_ref);
                 }
+                fused = true;
             }
         }
+        if !fused {
+            unfused_impls.push(ib);
+        }
     }
-    module.impl_blocks = vec![]; // Flattened
+    module.impl_blocks = unfused_impls; // Keep unfused ones
 
     module.sub_modules = module
         .sub_modules
@@ -235,11 +409,14 @@ fn resolve_structured_type(ctx: &ResolutionContext, mut st: StructuredType) -> S
     let mut new_prefix = ctx.current_prefix.clone();
     new_prefix.extend(st.name.clone());
     st.name = new_prefix.clone();
+    
+    let new_scope = ctx.tree.find_node_by_path(&new_prefix).unwrap_or(ctx.current_scope);
 
     let new_ctx = ResolutionContext {
         current_prefix: new_prefix.clone(),
-        symbol_table: ctx.symbol_table.clone(),
-        imports: ctx.imports.clone(),
+        tree: ctx.tree,
+        current_scope: new_scope,
+        cache: ctx.cache,
     };
 
     st.super_types = st
@@ -304,10 +481,27 @@ fn resolve_impl_block(ctx: &ResolutionContext, mut i: ImplBlock) -> ImplBlock {
     new_prefix.extend(i.name.clone());
     i.name = new_prefix.clone();
 
+    // Try to determine the scope based on the impl block's target
+    let target_name = match &i.impl_for {
+        TypeRef::Unresolved(qn) | TypeRef::Resolved(qn) => qn.last().cloned().unwrap_or_default(),
+        _ => "".to_string(),
+    };
+    
+    let new_scope = if !target_name.is_empty() {
+        if let Some(&child_idx) = ctx.tree.arena[ctx.current_scope].children.get(&target_name) {
+            child_idx
+        } else {
+            ctx.tree.find_node_by_path(&new_prefix).unwrap_or(ctx.current_scope)
+        }
+    } else {
+        ctx.tree.find_node_by_path(&new_prefix).unwrap_or(ctx.current_scope)
+    };
+
     let new_ctx = ResolutionContext {
         current_prefix: new_prefix.clone(),
-        symbol_table: ctx.symbol_table.clone(),
-        imports: ctx.imports.clone(),
+        tree: ctx.tree,
+        current_scope: new_scope,
+        cache: ctx.cache,
     };
 
     i.impl_for = resolve_type_ref(&new_ctx, i.impl_for);
