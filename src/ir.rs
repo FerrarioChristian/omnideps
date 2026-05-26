@@ -116,7 +116,7 @@ pub enum Component {
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum DependencyEdgeKind {
-    Inherits,
+    IsA,
     Implements,
     UsesFieldType,
     UsesParamType,

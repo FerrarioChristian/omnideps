@@ -87,7 +87,7 @@ fn add_super_edges(st: &StructuredType, edges: &mut Vec<Dependency>) {
                 edges.push(Dependency {
                     from: st.name.clone(),
                     to: to.clone(),
-                    kind: DependencyEdgeKind::Inherits,
+                    kind: DependencyEdgeKind::IsA,
                 });
             }
             _ => {}

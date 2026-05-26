@@ -87,7 +87,7 @@ const style = [
 		}
 	},
 	{
-		selector: 'edge[label = "Inherits"], edge[label = "Implements"]',
+		selector: 'edge[label = "Inherits"], edge[label = "Implements"], edge[label = "IsA"]',
 		style: {
 			'width': 3,
 			'line-style': 'dashed',

@@ -11,7 +11,10 @@ pub fn node_text(node: Node, source: &str) -> String {
 
 /// Helper to split "std::vector" or "Outer.Inner" into a QualifiedName vector.
 pub fn split_qualified_name(text: &str) -> QualifiedName {
-    text.split(&[':', '.', ' '][..])
+    // Rimuoviamo i generic per la name resolution di base
+    let text = text.split('<').next().unwrap_or(text);
+    
+    text.split(&[':', '.'][..])
         .filter(|s| !s.trim().is_empty())
         .map(|s| s.trim().to_string())
         .collect()
@@ -119,7 +122,7 @@ pub fn extract_fields(node: Node, source: &str) -> Vec<Field> {
     extract_list_of(node, source, |child, src| {
         if matches!(
             child.kind(),
-            "field_declaration" | "property_declaration" | "field"
+            "field_declaration" | "property_declaration" | "field" | "member_declaration" | "variable_declarator" | "attribute"
         ) {
             if let Some(name) = extract_identifier(child, src) {
                 let ty = extract_type_ref(child, src);
@@ -221,13 +224,17 @@ pub fn extract_impl_for(node: Node, source: &str) -> TypeRef {
 }
 
 pub fn extract_implements_trait(node: Node, source: &str) -> Option<TypeRef> {
+    if let Some(trait_node) = node.child_by_field_name("trait") {
+        return Some(extract_type_ref(trait_node, source));
+    }
+
     let text = node_text(node, source);
     if let Some(for_pos) = text.find("for ") {
         let before_for = text[..for_pos].trim();
         if before_for.contains("impl") && !before_for.ends_with("impl") {
-            // e.g. "impl Trait for Type"
-            if let Some(name) = extract_name_from_text(before_for) {
-                return Some(TypeRef::Unresolved(name));
+            let trait_name = before_for.replace("impl", "").trim().to_string();
+            if !trait_name.is_empty() {
+                return Some(TypeRef::Unresolved(split_qualified_name(&trait_name)));
             }
         }
     }
