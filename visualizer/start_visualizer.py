@@ -1,8 +1,8 @@
-import os
-import json
-import threading
 import http.server
+import json
+import os
 import socketserver
+import threading
 import webbrowser
 
 # Cambiamo directory nella root del progetto per far sì che il webserver possa servire
