@@ -131,7 +131,7 @@ fn print_summary(s: &AnalysisSummary) {
     println!("Structured types: {}", s.total_structured_types);
     println!("Free functions: {}", s.total_free_functions);
     println!("Riferimenti risolti: {}", s.resolved_refs);
-    println!("Riferimenti sconosciuti: {}", s.unknown_refs);
+    println!("Riferimenti sconosciuti: {}", s.failed_refs);
 }
 
 /// Appends a CSV header and row detailing the total component counts.

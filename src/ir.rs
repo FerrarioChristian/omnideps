@@ -114,7 +114,7 @@ pub enum Component {
     Function(Function),
 }
 
-#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize)]
 pub enum DependencyEdgeKind {
     IsA,
     Implements,
@@ -127,7 +127,7 @@ pub enum DependencyEdgeKind {
     Instantiates,
 }
 
-#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize)]
 pub struct Dependency {
     pub from: QualifiedName,
     pub to: QualifiedName,
@@ -147,5 +147,5 @@ pub struct AnalysisSummary {
     pub total_structured_types: usize,
     pub total_free_functions: usize,
     pub resolved_refs: usize,
-    pub unknown_refs: usize,
+    pub failed_refs: usize,
 }
