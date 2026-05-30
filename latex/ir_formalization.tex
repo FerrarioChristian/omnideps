@@ -54,7 +54,7 @@ Dove:
     per cui la fase di Risoluzione ha trovato una corrispondenza
     univoca nella Tabella dei Simboli. Contiene il nome qualificato
     assoluto (es. \texttt{java::util::List}).
-  \item \textbf{External}: Rappresenta un tipo per cui la fase di Risoluzione ha 
+  \item \textbf{External}: Rappresenta un tipo per cui la fase di Risoluzione ha
     trovato una corrispondenza in una clausola di importazione esplicita
     ma che non appartiene al codice analizzato.
   \item \textbf{Failed}: Indica che la fase di risoluzione ha tentato
@@ -86,11 +86,28 @@ che la implementa, introduciamo il tipo \textbf{Signature} ($\sigma$):
 $$\sigma = \vec{P} \times \tau_{ret}$$
 dove $\vec{P}$ è il vettore dei parametri e $\tau_{ret}$ è il tipo di ritorno.
 
-Su questa base, definiamo il tipo universale \textbf{Function}
+Su questa base, per modellare il corpo gerarchico di una funzione,
+introduciamo il costrutto \textbf{Block} ($\mathcal{B}$). Un blocco
+lessicale (tipicamente delimitato da parentesi graffe \texttt{\{\}})
+isola uno scope interno in cui possono essere dichiarate variabili
+locali. Sfruttando la medesima struttura dei campi dati ($F =
+\mathcal{I} \times \tau$), le variabili locali sono formalizzate
+elegantemente come un vettore di $F$. Il blocco traccia le proprie
+dipendenze comportamentali e può annidare ricorsivamente ulteriori
+blocchi (come nei costrutti \texttt{if} o \texttt{while}):
+$$\mathcal{B} = \langle \vec{F}_{local}, \vec{\tau}_{calls},
+\vec{\tau}_{inst}, \vec{\mathcal{B}}_{sub} \rangle$$
+dove $\vec{\tau}_{calls}$ rappresenta l'insieme dei riferimenti ai
+tipi (classi, moduli o altre funzioni libere) le cui funzioni vengono
+esplicitamente invocate nel blocco, mentre $\vec{\tau}_{inst}$
+rappresenta i tipi strutturati esplicitamente istanziati (es. tramite
+operatori come \texttt{new}).
+
+Definiamo infine il tipo universale \textbf{Function}
 ($\mathcal{F}$) come contenitore che lega un nome qualificato a una
-specifica firma e alle sue dipendenze comportamentali (il corpo della funzione):
-$$\mathcal{F} = \langle \text{id} \in \mathcal{QN}, \sigma, \vec{\tau}_{calls}, \vec{\tau}_{inst} \rangle$$
-dove $\vec{\tau}_{calls}$ rappresenta l'insieme dei riferimenti ai tipi (classi, moduli o altre funzioni libere) le cui funzioni vengono esplicitamente invocate nel corpo, mentre $\vec{\tau}_{inst}$ rappresenta i tipi strutturati esplicitamente istanziati (es. tramite operatori come \texttt{new}).
+specifica firma e a un opzionale blocco radice che ne modella il corpo:
+$$\mathcal{F} = \langle \text{id} \in \mathcal{QN}, \sigma,
+\mathcal{B}^? \rangle$$
 
 Il ruolo architetturale di una $\mathcal{F}$ (se funge da Metodo o da
 Free Function) non è codificato nel suo tipo, ma è determinato
@@ -135,9 +152,12 @@ $$\mathcal{B}_{lk} = \langle \text{target} \in \tau, \text{trait}^?
 \in \tau, \vec{\mathcal{F}}, \vec{\mathcal{S}}_{nest} \rangle$$
 dove $\text{target}$ è il tipo a cui si applica l'implementazione,
 $\text{trait}^?$ è un riferimento opzionale al trait o interfaccia
-che si sta implementando, $\vec{\mathcal{F}}$ è il vettore delle funzioni (metodi) e $\vec{\mathcal{S}}_{nest}$ è il vettore di eventuali tipi strutturati annidati.
+che si sta implementando, $\vec{\mathcal{F}}$ è il vettore delle
+funzioni (metodi) e $\vec{\mathcal{S}}_{nest}$ è il vettore di
+eventuali tipi strutturati annidati.
 Come vedremo nella fase di Risoluzione, i blocchi di implementazione
-fungono da "zucchero sintattico": i loro metodi, i tipi annidati e i trait vengono
+fungono da "zucchero sintattico": i loro metodi, i tipi annidati e i
+trait vengono
 \textit{appiattiti} all'interno del tipo strutturato di riferimento,
 scomparendo di fatto dal modello architetturale finale.
 
@@ -162,9 +182,13 @@ $$\mathcal{C} ::= \text{Mod}(\mathcal{M}) \mid
 L'intera struttura del programma è catturata dal tipo \textbf{Modulo}
 ($\mathcal{M}$), definito ricorsivamente per riflettere la gerarchia
 del file system o dei namespace:
-$$\mathcal{M} = \langle \mathcal{QN}, \mathcal{I}_{imports}, \vec{\mathcal{M}_{nest}},
+$$\mathcal{M} = \langle \mathcal{QN}, \mathcal{I}_{imports},
+\vec{\mathcal{M}_{nest}},
 \vec{\mathcal{S}}, \vec{\mathcal{F}}, \vec{\mathcal{B}}_{lk} \rangle$$
-dove $\mathcal{I}_{imports}$ è l'insieme delle dipendenze esplicite (import/use/include) definite nel modulo. Ogni elemento in $\mathcal{I}_{imports}$ contiene il percorso qualificato, un eventuale alias, e un flag per indicare l'inclusione \textit{wildcard}.
+dove $\mathcal{I}_{imports}$ è l'insieme delle dipendenze esplicite
+(import/use/include) definite nel modulo. Ogni elemento in
+$\mathcal{I}_{imports}$ contiene il percorso qualificato, un
+eventuale alias, e un flag per indicare l'inclusione \textit{wildcard}.
 Ogni elemento del software è quindi un nodo in un albero di
 componenti $T \in \mathcal{D}_{IR}$.
 

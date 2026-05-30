@@ -302,8 +302,69 @@ pub fn extract_type_ref(node: Node, source: &str) -> TypeRef {
     TypeRef::Failed(vec![])
 }
 
-pub fn traverse_for_body_deps(node: Node, source: &str, calls: &mut Vec<TypeRef>, instantiates: &mut Vec<TypeRef>) {
+pub fn extract_block(node: Node, source: &str) -> crate::ir::Block {
+    let mut declarations = vec![];
+    let mut calls = vec![];
+    let mut instantiates = vec![];
+    let mut sub_blocks = vec![];
+
+    let mut cursor = node.walk();
+    for child in node.children(&mut cursor) {
+        let kind = child.kind();
+
+        // 1. Variable Declarations
+        if matches!(
+            kind,
+            "field_declaration"
+                | "property_declaration"
+                | "field"
+                | "member_declaration"
+                | "variable_declarator"
+                | "attribute"
+                | "local_variable_declaration"
+                | "lexical_declaration"
+                | "variable_declaration"
+                | "let_declaration"
+        ) {
+            if let Some(name) = extract_identifier(child, source) {
+                let ty = extract_type_ref(child, source);
+                declarations.push(Field { name, ty });
+            }
+        }
+        // 2. Nested Blocks
+        else if kind.contains("body") || kind.contains("block") || kind == "compound_statement" {
+            sub_blocks.push(extract_block(child, source));
+        }
+        // 3. Behavioral Deps (recursive search within current level, avoiding deep blocks)
+        else {
+            let mut inner_calls = vec![];
+            let mut inner_inst = vec![];
+            find_behavioral_deps(child, source, &mut inner_calls, &mut inner_inst);
+            calls.extend(inner_calls);
+            instantiates.extend(inner_inst);
+        }
+    }
+
+    crate::ir::Block {
+        declarations,
+        calls,
+        instantiates,
+        sub_blocks,
+    }
+}
+
+fn find_behavioral_deps(
+    node: Node,
+    source: &str,
+    calls: &mut Vec<TypeRef>,
+    instantiates: &mut Vec<TypeRef>,
+) {
     let kind = node.kind();
+
+    // Skip nested blocks to avoid double counting (they are handled by extract_block)
+    if kind.contains("body") || kind.contains("block") || kind == "compound_statement" {
+        return;
+    }
 
     // --- Instantiations ---
     if matches!(kind, "object_creation_expression" | "new_expression") {
@@ -321,18 +382,26 @@ pub fn traverse_for_body_deps(node: Node, source: &str, calls: &mut Vec<TypeRef>
         if let Some(f) = node.child_by_field_name("function") {
             let f_kind = f.kind();
             if matches!(f_kind, "qualified_identifier" | "scoped_identifier") {
-                if let Some(scope) = f.child_by_field_name("scope").or_else(|| f.child_by_field_name("path")) {
+                if let Some(scope) = f
+                    .child_by_field_name("scope")
+                    .or_else(|| f.child_by_field_name("path"))
+                {
                     calls.push(extract_type_ref(scope, source));
                 }
             } else if matches!(f_kind, "field_expression" | "attribute") {
-                if let Some(obj) = f.child_by_field_name("argument").or_else(|| f.child_by_field_name("object")).or_else(|| f.child_by_field_name("value")) {
+                if let Some(obj) = f
+                    .child_by_field_name("argument")
+                    .or_else(|| f.child_by_field_name("object"))
+                    .or_else(|| f.child_by_field_name("value"))
+                {
                     calls.push(extract_type_ref(obj, source));
                 }
             } else if matches!(f_kind, "identifier" | "type_identifier") {
                 calls.push(extract_type_ref(f, source));
             }
         }
-    } else if kind == "method_invocation" { // Java
+    } else if kind == "method_invocation" {
+        // Java
         if let Some(obj) = node.child_by_field_name("object") {
             calls.push(extract_type_ref(obj, source));
         } else if let Some(name) = node.child_by_field_name("name") {
@@ -342,6 +411,6 @@ pub fn traverse_for_body_deps(node: Node, source: &str, calls: &mut Vec<TypeRef>
 
     let mut cursor = node.walk();
     for child in node.children(&mut cursor) {
-        traverse_for_body_deps(child, source, calls, instantiates);
+        find_behavioral_deps(child, source, calls, instantiates);
     }
 }

@@ -158,9 +158,13 @@ risolti all'interno di ogni componente:
     metodo o funzione libera), ovvero dai parametri $\vec{P}$ e dal
     tipo di ritorno $\tau_{ret}$ ($k = \text{UsesParamType},
     \text{UsesReturnType}$).
-  \item \textbf{Interazione Comportamentale}: Generata dall'analisi del corpo
-    di ogni funzione, includendo le chiamate dirette a funzioni o metodi statici
-    ($\vec{\tau}_{calls}$, $k = \text{Calls}$) e l'istanziazione di tipi
+  \item \textbf{Interazione Comportamentale}: Generata dall'analisi ricorsiva
+    dei blocchi lessicali $\mathcal{B}$ che costituiscono il corpo
+    di ogni funzione, includendo le dichiarazioni di variabili locali
+    ($k = \text{UsesLocalType}$),
+    le chiamate a funzioni o metodi
+    ($\vec{\tau}_{calls}$, $k = \text{Calls}$) e l'istanziazione
+    esplicita di tipi
     strutturati ($\vec{\tau}_{inst}$, $k = \text{Instantiates}$).
   \item \textbf{Contenimento}: Generata dalla gerarchia dei moduli e
     dei tipi annidati ($k = \text{NestedIn}, \text{Contains}$).

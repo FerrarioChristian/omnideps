@@ -1,51 +1,119 @@
 \chapter{Risoluzione dei Nomi: Un Approccio Gerarchico tramite Symbol Stack}
 \label{ch:name_resolution}
 
-La fase di \textit{Name Resolution} (Risoluzione dei Nomi) è il cuore logico dell'analizzatore architetturale. Il suo scopo è trasformare riferimenti astratti ed esposti ad ambiguità testuali (i nomi grezzi estratti dall'albero sintattico) in identificatori univoci e globalmente validi, permettendo la costruzione di un grafo delle dipendenze coerente.
+La fase di \textit{Name Resolution} (Risoluzione dei Nomi) è il cuore
+logico dell'analizzatore architetturale. Il suo scopo è trasformare
+riferimenti astratti ed esposti ad ambiguità testuali (i nomi grezzi
+estratti dall'albero sintattico) in identificatori univoci e
+globalmente validi, permettendo la costruzione di un grafo delle
+dipendenze coerente.
 
 \section{Limiti di una Symbol Table Piatta}
-Nella prima formalizzazione dell'architettura, la \textit{Symbol Table} globale ($\Sigma$) era modellata come una mappa piatta:
+Nella prima formalizzazione dell'architettura, la \textit{Symbol
+Table} globale ($\Sigma$) era modellata come una mappa piatta:
 $$\Sigma : \mathcal{QN} \to \mathcal{C}$$
-Questo approccio, seppur semplice, presentava due gravi criticità architetturali e algoritmiche in un contesto \textit{language-agnostic} su larga scala:
+Questo approccio, seppur semplice, presentava due gravi criticità
+architetturali e algoritmiche in un contesto
+\textit{language-agnostic} su larga scala:
 
 \begin{enumerate}
-  \item \textbf{Decadimento delle Performance $O(L)$:} L'hashing di una chiave di tipo $\mathcal{QN}$ (una tupla di stringhe di lunghezza variabile) degrada le performance di lookup. L'operazione non è più rigorosamente $O(1)$, bensì $O(L)$, dove $L$ è la lunghezza cumulativa del percorso testuale. Nei tentativi di risoluzione tramite \textit{climbing} degli \textit{enclosing scopes}, le continue clonazioni e concatenazioni di stringhe comportano un Memory Allocation Overhead proibitivo.
-  \item \textbf{Violazione del Lexical Scoping e Name Clashing:} Una tabella piatta non modella correttamente lo \textit{scope} locale di un programma. Due classi con lo stesso nome definite in blocchi funzionali o moduli diversi rischiano collisioni (Name Clashing). Inoltre, nei linguaggi C-like, ogni coppia di parentesi graffe \texttt{\{\}} genera uno scope, rendendo l'approccio piatto inadeguato per la corretta inferenza comportamentale.
+  \item \textbf{Decadimento delle Performance $O(L)$:} L'hashing di
+    una chiave di tipo $\mathcal{QN}$ (una tupla di stringhe di
+    lunghezza variabile) degrada le performance di lookup.
+    L'operazione non è più rigorosamente $O(1)$, bensì $O(L)$, dove
+    $L$ è la lunghezza cumulativa del percorso testuale. Nei
+    tentativi di risoluzione tramite \textit{climbing} degli
+    \textit{enclosing scopes}, le continue clonazioni e
+    concatenazioni di stringhe comportano un Memory Allocation
+    Overhead proibitivo.
+  \item \textbf{Violazione del Lexical Scoping e Name Clashing:} Una
+    tabella piatta non modella correttamente lo \textit{scope} locale
+    di un programma. Due classi con lo stesso nome definite in
+    blocchi funzionali o moduli diversi rischiano collisioni (Name
+    Clashing). Inoltre, nei linguaggi C-like, ogni coppia di
+    parentesi graffe \texttt{\{\}} genera uno scope, rendendo
+    l'approccio piatto inadeguato per la corretta inferenza comportamentale.
 \end{enumerate}
 
 \section{Il Modello Dinamico: Environment ($\rho$) tramite Symbol Stack}
-Per allinearci rigorosamente alla teoria classica della progettazione dei compilatori, abbiamo sostituito l'approccio statico con una modellazione dinamica dell'ambiente lessicale. Definiamo l'ambiente (Environment) $\rho$ come uno \textbf{Stack (pila) di Tabelle dei Simboli}. 
+Per allinearci rigorosamente alla teoria classica della progettazione
+dei compilatori, abbiamo sostituito l'approccio statico con una
+modellazione dinamica dell'ambiente lessicale. Definiamo l'ambiente
+(Environment) $\rho$ come uno \textbf{Stack (pila) di Tabelle dei Simboli}.
 
-L'Environment $\rho$ cresce e decresce in tempo reale durante l'attraversamento dell'AST (o dell'IR):
+L'Environment $\rho$ cresce e decresce in tempo reale durante
+l'attraversamento dell'AST (o dell'IR):
 $$ \rho = \langle \Sigma_0, \Sigma_1, \dots, \Sigma_n \rangle $$
 
-Ogni \textit{frame} dello stack $\Sigma_k$ rappresenta un singolo livello di annidamento lessicale (un modulo, un tipo strutturato, o un blocco if/while) ed è definito come:
+Ogni \textit{frame} dello stack $\Sigma_k$ rappresenta un singolo
+livello di annidamento lessicale (un modulo, un tipo strutturato, o
+un blocco if/while) ed è definito come:
 $$ \Sigma_k = \langle \text{Symbols}, \mathcal{I}_{imports} \rangle $$
 
-L'API matematica del nostro \textit{Symbol Stack} supporta nativamente le operazioni di mutazione dell'ambiente:
+L'API matematica del nostro \textit{Symbol Stack} supporta
+nativamente le operazioni di mutazione dell'ambiente:
 \begin{itemize}
-    \item \texttt{push()}: Inizializza un nuovo frame $\Sigma_{n+1}$ vuoto in cima allo stack ogni volta che l'analizzatore accede a uno scope più profondo. ($\rho' = \rho \cup \{ \Sigma_{n+1} \}$)
-    \item \texttt{pop()}: Distrugge il frame $\Sigma_n$ in cima allo stack all'uscita dal blocco lessicale, prevenendo il leakage di simboli locali. ($\rho' = \text{tail}(\rho)$)
-    \item \texttt{define(name, path)}: Registra un simbolo locale e il suo puntatore assoluto all'interno della mappa $\text{Symbols}$ del frame corrente in cima allo stack.
+  \item \texttt{push()}: Inizializza un nuovo frame $\Sigma_{n+1}$
+    vuoto in cima allo stack ogni volta che l'analizzatore accede a
+    uno scope più profondo. ($\rho' = \rho \cup \{ \Sigma_{n+1} \}$)
+  \item \texttt{pop()}: Distrugge il frame $\Sigma_n$ in cima allo
+    stack all'uscita dal blocco lessicale, prevenendo il leakage di
+    simboli locali. ($\rho' = \text{tail}(\rho)$)
+  \item \texttt{define(name, path)}: Registra un simbolo locale e il
+    suo percorso assoluto (sia esso uno stato \texttt{Resolved} locale o un riferimento \texttt{External}) all'interno della mappa $\text{Symbols}$
+    del frame corrente in cima allo stack.
 \end{itemize}
 
 \section{Algoritmo di Risoluzione Lexical Scoping ($R_\tau$)}
 
-Dato un riferimento irrisolto $\text{Unresolved}(\langle i_1, i_2, \dots, i_n \rangle)$ e un Environment corrente $\rho$, l'algoritmo di risoluzione naviga lo stack \textit{top-down} (dalla cima al fondo):
+Dato un riferimento irrisolto $\text{Unresolved}(\langle i_1, i_2,
+\dots, i_n \rangle)$ e un Environment corrente $\rho$, l'algoritmo di
+risoluzione naviga lo stack \textit{top-down} (dalla cima al fondo):
 
 \subsection{1. Lexical Climb e Punti di Salto}
-Se il riferimento non è nella Cache (vedi Sezione \ref{sec:memoization}), l'algoritmo itera sui frame $\Sigma_k$ partendo da $k=n$ scendendo fino a $k=0$:
+Se il riferimento non è nella Cache (vedi Sezione
+\ref{sec:memoization}), l'algoritmo itera sui frame $\Sigma_k$
+partendo da $k=n$ scendendo fino a $k=0$:
 \begin{enumerate}
-  \item \textbf{Ricerca Locale}: Verifica se $i_1 \in \Sigma_k.\text{Symbols}$. Se esiste, l'algoritmo calcola l'identificatore globale unendo il path trovato con il suffisso rimanente e convalida se tale risorsa esiste effettivamente nel \textit{Global Registry} (generato nel Pass 1 dell'analisi).
-  \item \textbf{Jump Points}: Se $i_1 \notin \Sigma_k.\text{Symbols}$, verifica se $i_1$ coincide con un alias tra gli import definiti nel frame $\Sigma_k.\mathcal{I}_{imports}$. Se esiste un match, l'algoritmo applica la sostituzione e valuta se si tratta di un nodo \texttt{Local} o se deve transitare in un boundary \texttt{External} verso terze parti.
+  \item \textbf{Ricerca Locale}: Verifica se $i_1 \in
+    \Sigma_k.\text{Symbols}$. Se esiste, l'algoritmo calcola
+    l'identificatore globale unendo il path trovato con il suffisso
+    rimanente e convalida se tale risorsa esiste effettivamente nel
+    \textit{Global Registry} (generato nel Pass 1 dell'analisi
+    indicizzando ricorsivamente moduli, tipi strutturati e tutti i loro
+    tipi annidati o blocchi implementativi).
+  \item \textbf{Jump Points}: Se $i_1 \notin
+    \Sigma_k.\text{Symbols}$, verifica se $i_1$ coincide con un alias
+    tra gli import definiti nel frame
+    $\Sigma_k.\mathcal{I}_{imports}$. Se esiste un match, l'algoritmo
+    applica la sostituzione e valuta se si tratta di un nodo
+    \texttt{Local} o se deve transitare in un boundary
+    \texttt{External} verso terze parti.
 \end{enumerate}
-Se l'intero stack viene esaurito senza che alcun frame fornisca un match per il primo token $i_1$, l'algoritmo tenta una ricerca di fallback globale (Absolute Fallback) prima di dichiarare il riferimento \texttt{Failed}.
+Se l'intero stack viene esaurito senza che alcun frame fornisca un
+match per il primo token $i_1$, l'algoritmo tenta una ricerca di
+fallback globale (Absolute Fallback) prima di dichiarare il
+riferimento \texttt{Failed}.
 
 \section{Ottimizzazione tramite Cache Tree (Memoization)}
 \label{sec:memoization}
-Poiché l'Environment $\rho$ è effimero e si distrugge col procedere dell'analisi (tramite chiamate \texttt{pop()}), non possiamo sfruttarlo per memorizzare a lungo termine l'esito di lookup complessi e preservare cicli di CPU per scope fratelli.
+Poiché l'Environment $\rho$ è effimero e si distrugge col procedere
+dell'analisi (tramite chiamate \texttt{pop()}), non possiamo
+sfruttarlo per memorizzare a lungo termine l'esito di lookup
+complessi e preservare cicli di CPU per scope fratelli.
 
-Per garantire la massima efficienza e annullare il degrado prestazionale causato dalla profonda navigazione \textit{top-down} dello stack, il contesto di risoluzione introduce un \textbf{Cache Tree}. Tale albero di mappe mima la ramificazione dei path qualificati, isolando la memoria per ogni specifico livello architetturale.
-$$\mathcal{C}_{tree} : (\text{ScopePath}) \to (\mathcal{QN} \to \text{ResolutionResult})$$
+Per garantire la massima efficienza e annullare il degrado
+prestazionale causato dalla profonda navigazione \textit{top-down}
+dello stack, il contesto di risoluzione introduce un \textbf{Cache
+Tree}. Tale albero di mappe mima la ramificazione dei path
+qualificati, isolando la memoria per ogni specifico livello architetturale.
+$$\mathcal{C}_{tree} : (\text{ScopePath}) \to (\mathcal{QN} \to
+\text{ResolutionResult})$$
 
-Ogni volta che l'algoritmo di Lexical Scoping affronta il costo per risolvere con successo un percorso in uno specifico blocco, il risultato viene registrato nell'albero della Cache al corrispettivo path (es. \texttt{"root::core::Auto"}). Nelle successive interrogazioni, l'analizzatore intercetta e restituisce in puro tempo $O(1)$ la reference precedentemente associata al blocco lessicale, coniugando l'agilità computazionale dell'uso di Hash Maps con il rigore semantico proprio dei veri motori di compilazione.
+Ogni volta che l'algoritmo di Lexical Scoping affronta il costo per
+risolvere con successo un percorso in uno specifico blocco, il
+risultato viene registrato nell'albero della Cache al corrispettivo
+path (es. \texttt{"root::core::Auto"}). Nelle successive
+interrogazioni, l'analizzatore intercetta e restituisce direttamente
+la reference precedentemente associata al blocco lessicale, senza
+dover risolvere nuovamente il simbolo.

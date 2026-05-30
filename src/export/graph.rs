@@ -123,7 +123,26 @@ fn add_function_edges(ff: &Function, edges: &mut Vec<Dependency>) {
             kind: DependencyEdgeKind::UsesReturnType,
         });
     }
-    for call in &ff.calls {
+
+    if let Some(body) = &ff.body {
+        add_block_edges(ff, body, edges);
+    }
+}
+
+fn add_block_edges(ff: &Function, block: &Block, edges: &mut Vec<Dependency>) {
+    // 1. Declarations (Local variables)
+    for decl in &block.declarations {
+        if let Some(to) = type_ref_target(&decl.ty) {
+            edges.push(Dependency {
+                from: ff.name.clone(),
+                to: to.clone(),
+                kind: DependencyEdgeKind::UsesLocalType,
+            });
+        }
+    }
+
+    // 2. Behavioral dependencies
+    for call in &block.calls {
         if let Some(to) = type_ref_target(call) {
             edges.push(Dependency {
                 from: ff.name.clone(),
@@ -132,7 +151,7 @@ fn add_function_edges(ff: &Function, edges: &mut Vec<Dependency>) {
             });
         }
     }
-    for inst in &ff.instantiates {
+    for inst in &block.instantiates {
         if let Some(to) = type_ref_target(inst) {
             edges.push(Dependency {
                 from: ff.name.clone(),
@@ -140,6 +159,11 @@ fn add_function_edges(ff: &Function, edges: &mut Vec<Dependency>) {
                 kind: DependencyEdgeKind::Instantiates,
             });
         }
+    }
+
+    // 3. Recurse into sub-blocks
+    for sub in &block.sub_blocks {
+        add_block_edges(ff, sub, edges);
     }
 }
 

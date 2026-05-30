@@ -1,7 +1,7 @@
 pub type Identifier = String;
 pub type QualifiedName = Vec<Identifier>;
 
-#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize)]
 pub enum PrimitiveType {
     Int,
     Float,
@@ -12,7 +12,7 @@ pub enum PrimitiveType {
     // Aggiungere altri tipi primitivi comuni se necessario
 }
 
-#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize)]
 pub enum TypeRef {
     Primitive(PrimitiveType),
     Unresolved(QualifiedName),
@@ -21,7 +21,7 @@ pub enum TypeRef {
     Failed(QualifiedName),
 }
 
-#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize)]
 pub enum StructuredTypeKind {
     Class,
     Struct,
@@ -29,13 +29,13 @@ pub enum StructuredTypeKind {
     Trait,
 }
 
-#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize)]
 pub struct Field {
     pub name: Identifier,
     pub ty: TypeRef,
 }
 
-#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize)]
 pub struct Parameter {
     pub name: Option<Identifier>,
     pub ty: TypeRef,
@@ -49,14 +49,27 @@ pub struct Signature {
     pub return_type: TypeRef,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize)]
+pub struct Block {
+    /// Local variables declared in this block (reusing Field)
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub declarations: Vec<Field>,
+    /// Types whose methods are called in this block
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub calls: Vec<TypeRef>,
+    /// Types instantiated in this block
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub instantiates: Vec<TypeRef>,
+    /// Nested blocks (if, while, anonymous scopes)
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub sub_blocks: Vec<Block>,
+}
+
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Function {
     pub name: QualifiedName,
     pub signature: Signature,
-    #[serde(skip_serializing_if = "Vec::is_empty", default)]
-    pub calls: Vec<TypeRef>,
-    #[serde(skip_serializing_if = "Vec::is_empty", default)]
-    pub instantiates: Vec<TypeRef>,
+    pub body: Option<Block>,
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -119,6 +132,7 @@ pub enum DependencyEdgeKind {
     IsA,
     Implements,
     UsesFieldType,
+    UsesLocalType,
     UsesParamType,
     UsesReturnType,
     NestedIn,

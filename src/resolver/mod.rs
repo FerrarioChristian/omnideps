@@ -34,16 +34,7 @@ impl GlobalRegistry {
         self.paths.insert(prefix.clone());
 
         for st in &m.structured_types {
-            let mut st_prefix = prefix.clone();
-            st_prefix.extend(st.name.clone());
-            self.paths.insert(st_prefix.clone());
-            
-            // Methods
-            for method in &st.methods {
-                let mut m_prefix = st_prefix.clone();
-                m_prefix.extend(method.name.clone());
-                self.paths.insert(m_prefix);
-            }
+            self.register_structured_type(st, prefix.clone());
         }
         for ff in &m.free_functions {
             let mut ff_prefix = prefix.clone();
@@ -51,7 +42,7 @@ impl GlobalRegistry {
             self.paths.insert(ff_prefix);
         }
         for ib in &m.impl_blocks {
-            // Register ImplBlock methods
+            // Register ImplBlock methods and nested types
             let target_name = match &ib.impl_for {
                 TypeRef::Unresolved(qn) | TypeRef::Resolved(qn) => qn.last().cloned().unwrap_or_default(),
                 _ => "".to_string(),
@@ -64,10 +55,27 @@ impl GlobalRegistry {
                     m_prefix.extend(method.name.clone());
                     self.paths.insert(m_prefix);
                 }
+                for nested in &ib.nested_types {
+                    self.register_structured_type(nested, target_prefix.clone());
+                }
             }
         }
         for sub in &m.sub_modules {
             self.register_module(sub, prefix.clone());
+        }
+    }
+
+    fn register_structured_type(&mut self, st: &StructuredType, mut prefix: QualifiedName) {
+        prefix.extend(st.name.clone());
+        self.paths.insert(prefix.clone());
+
+        for method in &st.methods {
+            let mut m_prefix = prefix.clone();
+            m_prefix.extend(method.name.clone());
+            self.paths.insert(m_prefix);
+        }
+        for nested in &st.nested_types {
+            self.register_structured_type(nested, prefix.clone());
         }
     }
 
@@ -126,20 +134,21 @@ fn resolve_name_in_context(
     let validate_import = |candidate: &QualifiedName| -> ResolutionResult {
         if ctx.registry.exists(candidate) {
             ResolutionResult::Local(candidate.clone())
+        } else if candidate.first() == Some(&"crate".to_string()) {
+            // First fallback: replace "crate" with "root"
+            let mut crate_cand = vec!["root".to_string()];
+            crate_cand.extend(candidate.iter().skip(1).cloned());
+            if ctx.registry.exists(&crate_cand) {
+                ResolutionResult::Local(crate_cand)
+            } else {
+                ResolutionResult::External(candidate.clone())
+            }
         } else {
-            // Fallback: prepending "root"
+            // Second fallback: prepending "root"
             let mut root_cand = vec!["root".to_string()];
             root_cand.extend(candidate.clone());
             if ctx.registry.exists(&root_cand) {
                 ResolutionResult::Local(root_cand)
-            } else if candidate.first() == Some(&"crate".to_string()) {
-                let mut crate_cand = vec!["root".to_string()];
-                crate_cand.extend(candidate.iter().skip(1).cloned());
-                if ctx.registry.exists(&crate_cand) {
-                    ResolutionResult::Local(crate_cand)
-                } else {
-                    ResolutionResult::External(candidate.clone())
-                }
             } else {
                 ResolutionResult::External(candidate.clone())
             }
@@ -388,39 +397,57 @@ fn resolve_function(ctx: &ResolutionContext, mut ff: Function) -> Function {
     new_prefix.extend(ff.name.clone());
     ff.name = new_prefix.clone();
 
-    // We use the same context without pushing a scope for the function because currently our IR
-    // doesn't store inner `{}` scopes. If we ever parse `{}` blocks, we would push/pop here!
-    
-    // We do push a scope for the function arguments!
+    // We do push a scope for the function (which includes parameters)
     ctx.stack.borrow_mut().push_scope();
 
-    // For pure architectural resolution, we just resolve the signature
+    // Resolve Signature
     ff.signature.parameters = ff
         .signature
         .parameters
         .into_iter()
         .map(|mut p| {
             p.ty = resolve_type_ref(ctx, p.ty);
+            // If the parameter has a name, define it in the function scope
+            if let Some(name) = &p.name {
+                if let TypeRef::Resolved(abs_path) | TypeRef::External(abs_path) = &p.ty {
+                    ctx.stack.borrow_mut().define_symbol(name.clone(), abs_path.clone());
+                }
+            }
             p
         })
         .collect();
     ff.signature.return_type = resolve_type_ref(ctx, ff.signature.return_type);
     
-    // And behavioral calls
-    ff.calls = ff
-        .calls
-        .into_iter()
-        .map(|c| resolve_type_ref(ctx, c))
-        .collect();
-    ff.instantiates = ff
-        .instantiates
-        .into_iter()
-        .map(|i| resolve_type_ref(ctx, i))
-        .collect();
+    // Resolve Body
+    ff.body = ff.body.map(|b| resolve_block(ctx, b));
 
     ctx.stack.borrow_mut().pop_scope();
 
     ff
+}
+
+fn resolve_block(ctx: &ResolutionContext, mut block: Block) -> Block {
+    // Entering a block creates a new lexical scope
+    ctx.stack.borrow_mut().push_scope();
+
+    // 1. Resolve Declarations and Define them in the stack
+    block.declarations = block.declarations.into_iter().map(|mut decl| {
+        decl.ty = resolve_type_ref(ctx, decl.ty);
+        if let TypeRef::Resolved(abs_path) | TypeRef::External(abs_path) = &decl.ty {
+            ctx.stack.borrow_mut().define_symbol(decl.name.clone(), abs_path.clone());
+        }
+        decl
+    }).collect();
+
+    // 2. Resolve Behavioral Dependencies
+    block.calls = block.calls.into_iter().map(|c| resolve_type_ref(ctx, c)).collect();
+    block.instantiates = block.instantiates.into_iter().map(|i| resolve_type_ref(ctx, i)).collect();
+
+    // 3. Recurse into sub-blocks
+    block.sub_blocks = block.sub_blocks.into_iter().map(|b| resolve_block(ctx, b)).collect();
+
+    ctx.stack.borrow_mut().pop_scope();
+    block
 }
 
 fn resolve_impl_block(ctx: &ResolutionContext, mut i: ImplBlock) -> ImplBlock {

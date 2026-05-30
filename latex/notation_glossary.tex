@@ -65,8 +65,12 @@ pipeline di analisi.
     funzione, composta dalla tupla $\langle \vec{P}, \tau_{ret}
     \rangle$. Astrae i tipi di input e output isolandoli dal
     componente implementativo.
+  \item $\mathcal{B}$ (\textbf{Block}): Un blocco lessicale (es.
+    delimitato da \texttt{\{\}}) che modella uno scope interno.
+    Traccia le variabili locali dichiarate, le chiamate, le
+    istanziazioni e annida in modo ricorsivo eventuali sotto-blocchi.
   \item $\mathcal{F}$ (\textbf{Function}): Un componente funzionale
-    universale definito dalla coppia $\langle \mathcal{I}, \sigma
+    universale definito dalla tupla $\langle \mathcal{I}, \sigma, \mathcal{B}
     \rangle$. Il suo ruolo architetturale (metodo o funzione libera)
     è determinato unicamente dal costrutto in cui è annidato.
 \end{itemize}

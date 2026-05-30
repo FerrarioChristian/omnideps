@@ -56,11 +56,24 @@ fn count_refs_in_func(f: &Function, resolved: &mut usize, failed: &mut usize) {
         tally_ref(&p.ty, resolved, failed);
     }
     tally_ref(&f.signature.return_type, resolved, failed);
-    for call in &f.calls {
+    
+    if let Some(body) = &f.body {
+        count_refs_in_block(body, resolved, failed);
+    }
+}
+
+fn count_refs_in_block(block: &Block, resolved: &mut usize, failed: &mut usize) {
+    for decl in &block.declarations {
+        tally_ref(&decl.ty, resolved, failed);
+    }
+    for call in &block.calls {
         tally_ref(call, resolved, failed);
     }
-    for inst in &f.instantiates {
+    for inst in &block.instantiates {
         tally_ref(inst, resolved, failed);
+    }
+    for sub in &block.sub_blocks {
+        count_refs_in_block(sub, resolved, failed);
     }
 }
 

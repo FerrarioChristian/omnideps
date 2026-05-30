@@ -52,11 +52,11 @@ pub fn try_parse_function(node: Node, source: &str) -> Option<Function> {
     let parameters = extract_parameters(node, source);
     let return_type = extract_return_type(node, source);
 
-    let mut calls = vec![];
-    let mut instantiates = vec![];
-    if let Some(body) = node.child_by_field_name("body") {
-        traverse_for_body_deps(body, source, &mut calls, &mut instantiates);
-    }
+    let body = if let Some(body_node) = node.child_by_field_name("body") {
+        Some(extract_block(body_node, source))
+    } else {
+        None
+    };
 
     Some(Function {
         name: vec![name],
@@ -64,8 +64,7 @@ pub fn try_parse_function(node: Node, source: &str) -> Option<Function> {
             parameters,
             return_type,
         },
-        calls,
-        instantiates,
+        body,
     })
 }
 
