@@ -37,6 +37,7 @@ pub fn extract_identifier(node: Node, source: &str) -> Option<String> {
         .child_by_field_name("name")
         .or_else(|| node.child_by_field_name("type_identifier"))
         .or_else(|| node.child_by_field_name("identifier"))
+        .or_else(|| node.child_by_field_name("pattern"))
     {
         let text = node_text(n, source).trim().to_string();
         if !text.is_empty() { return Some(text); }
@@ -63,6 +64,7 @@ pub fn extract_qualified_name(node: Node, source: &str) -> Option<QualifiedName>
         .child_by_field_name("name")
         .or_else(|| node.child_by_field_name("type_identifier"))
         .or_else(|| node.child_by_field_name("identifier"))
+        .or_else(|| node.child_by_field_name("pattern"))
     {
         let text = &node_text(n, source);
         return Some(split_qualified_name(text));
@@ -248,7 +250,7 @@ pub fn extract_type_ref(node: Node, source: &str) -> TypeRef {
     // 0. Handle direct access and identifiers
     if matches!(
         kind,
-        "field_access" | "scoped_identifier" | "qualified_identifier" | "identifier" | "type_identifier" | "attribute"
+        "field_access" | "scoped_identifier" | "qualified_identifier" | "identifier" | "type_identifier" | "attribute" | "field_expression"
     ) {
         let text = node_text(node, source);
         if !text.is_empty() {
@@ -327,7 +329,25 @@ pub fn extract_block(node: Node, source: &str) -> crate::ir::Block {
                 | "let_declaration"
         ) {
             if let Some(name) = extract_identifier(child, source) {
-                let ty = extract_type_ref(child, source);
+                // For declarations, check if there is an explicit type. 
+                // Using extract_type_ref on the whole declaration node can falsely extract the variable name as type.
+                let mut ty = if let Some(type_node) = child.child_by_field_name("type") {
+                    extract_type_ref(type_node, source)
+                } else {
+                    infer_variable_type(child, source)
+                };
+                
+                if matches!(ty, TypeRef::Failed(_)) {
+                    // Fallback to old behavior if everything fails
+                    let extracted = extract_type_ref(child, source);
+                    if !matches!(extracted, TypeRef::Failed(_)) {
+                        // Check if the extracted "type" is just the variable name itself, 
+                        // if so it's a false positive from the identifier fallback
+                        if extracted != TypeRef::Unresolved(vec![name.clone()]) {
+                            ty = extracted;
+                        }
+                    }
+                }
                 declarations.push(Field { name, ty });
             }
         }
@@ -389,13 +409,7 @@ fn find_behavioral_deps(
                     calls.push(extract_type_ref(scope, source));
                 }
             } else if matches!(f_kind, "field_expression" | "attribute") {
-                if let Some(obj) = f
-                    .child_by_field_name("argument")
-                    .or_else(|| f.child_by_field_name("object"))
-                    .or_else(|| f.child_by_field_name("value"))
-                {
-                    calls.push(extract_type_ref(obj, source));
-                }
+                calls.push(extract_type_ref(f, source));
             } else if matches!(f_kind, "identifier" | "type_identifier") {
                 calls.push(extract_type_ref(f, source));
             }
@@ -413,4 +427,40 @@ fn find_behavioral_deps(
     for child in node.children(&mut cursor) {
         find_behavioral_deps(child, source, calls, instantiates);
     }
+}
+
+fn infer_variable_type(node: Node, source: &str) -> TypeRef {
+    // 1. If it has a explicit "value" field (like Rust let_declaration)
+    if let Some(val) = node.child_by_field_name("value") {
+        if matches!(val.kind(), "object_creation_expression" | "new_expression") {
+            if let Some(t_node) = val.child_by_field_name("type") {
+                return extract_type_ref(t_node, source);
+            }
+        } else if val.kind() == "struct_expression" {
+            if let Some(name_node) = val.child_by_field_name("name") {
+                return extract_type_ref(name_node, source);
+            }
+        }
+        // It could just be an identifier (e.g. let x = Factory;)
+        let text = node_text(val, source);
+        if !text.is_empty() && text.chars().all(|c| c.is_alphanumeric() || c == '_' || c == ':') {
+             return TypeRef::Unresolved(split_qualified_name(&text));
+        }
+    }
+
+    // 2. Fallback: Search children for initializers
+    let mut cursor = node.walk();
+    for child in node.children(&mut cursor) {
+        let kind = child.kind();
+        if matches!(kind, "object_creation_expression" | "new_expression") {
+            if let Some(t_node) = child.child_by_field_name("type") {
+                return extract_type_ref(t_node, source);
+            }
+        } else if kind == "struct_expression" {
+            if let Some(name_node) = child.child_by_field_name("name") {
+                return extract_type_ref(name_node, source);
+            }
+        }
+    }
+    TypeRef::Failed(vec![])
 }

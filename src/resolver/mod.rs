@@ -238,6 +238,11 @@ fn resolve_type_ref(ctx: &ResolutionContext, tr: TypeRef) -> TypeRef {
 
 // ==================== TRAVERSAL ====================
 
+fn register_self_keywords(ctx: &ResolutionContext, class_path: &QualifiedName) {
+    ctx.stack.borrow_mut().define_symbol("self".to_string(), class_path.clone());
+    ctx.stack.borrow_mut().define_symbol("this".to_string(), class_path.clone());
+}
+
 fn resolve_module_in_context(ctx: &ResolutionContext, mut module: Module) -> Module {
     let mut new_prefix = ctx.current_prefix.clone();
     new_prefix.extend(module.name.clone());
@@ -345,6 +350,9 @@ fn resolve_structured_type(ctx: &ResolutionContext, mut st: StructuredType) -> S
 
     // PUSH scope for StructuredType
     new_ctx.stack.borrow_mut().push_scope();
+    
+    // Inject "self" and "this" to refer to the current type
+    register_self_keywords(&new_ctx, &new_prefix);
 
     // Hoist nested components
     for nested in &st.nested_types {
@@ -459,6 +467,9 @@ fn resolve_impl_block(ctx: &ResolutionContext, mut i: ImplBlock) -> ImplBlock {
     ctx.stack.borrow_mut().push_scope();
 
     i.impl_for = resolve_type_ref(ctx, i.impl_for);
+    if let TypeRef::Resolved(abs_path) | TypeRef::External(abs_path) = &i.impl_for {
+        register_self_keywords(ctx, abs_path);
+    }
     i.implements_trait = i.implements_trait.map(|t| resolve_type_ref(ctx, t));
 
     i.methods = i

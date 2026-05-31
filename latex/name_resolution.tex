@@ -95,6 +95,27 @@ match per il primo token $i_1$, l'algoritmo tenta una ricerca di
 fallback globale (Absolute Fallback) prima di dichiarare il
 riferimento \texttt{Failed}.
 
+\subsection{2. Risoluzione Comportamentale e Inferenza Semantica}
+L'architettura del \textit{Symbol Stack} esprime il suo massimo
+potenziale nella risoluzione dei blocchi comportamentali $\mathcal{B}$.
+Durante la traversata di un metodo, il sistema applica le seguenti
+euristiche di inferenza semantica per garantire il corretto
+funzionamento del Lexical Scoping:
+\begin{itemize}
+  \item \textbf{Auto-Registrazione di \texttt{self} e \texttt{this}}:
+    All'ingresso di un \textit{Structured Type}, l'ambiente $\rho$ inietta
+    implicitamente nel frame locale i lessemi \texttt{self} e \texttt{this}, facendoli
+    puntare al percorso assoluto del tipo strutturato corrente. Questo
+    permette di risolvere in $O(1)$ le chiamate a metodi di classe (es. \texttt{self.get\_id()}).
+  \item \textbf{Inferenza di Tipo Best-Effort}: Nel caso in cui il
+    linguaggio permetta l'omissione del tipo a sinistra di una dichiarazione
+    di variabile (es. tramite \texttt{let} o \texttt{auto}), l'algoritmo analizza
+    il lato destro dell'espressione (l'inizializzatore). Se viene
+    intercettata un'istanza esplicita (es. \texttt{new\_expression}), il tipo dedotto
+    viene formalizzato come $\tau$ e registrato nell'ambiente tramite
+    \texttt{define(id, $\tau$)}.
+\end{itemize}
+
 \section{Ottimizzazione tramite Cache Tree (Memoization)}
 \label{sec:memoization}
 Poiché l'Environment $\rho$ è effimero e si distrugge col procedere
