@@ -23,4 +23,8 @@ pub struct Cli {
     /// Output CSV summary
     #[arg(short, long)]
     pub csv: Option<PathBuf>,
+
+    /// Print debug info for all resolved and failed references
+    #[arg(short = 'd', long)]
+    pub debug_refs: bool,
 }

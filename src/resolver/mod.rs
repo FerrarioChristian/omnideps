@@ -1,11 +1,13 @@
 pub mod stack;
 pub mod cache;
+pub mod primitives;
 
 use crate::ir::*;
 use std::cell::RefCell;
 use std::collections::HashSet;
 use stack::SymbolStack;
 use cache::ResolutionCache;
+use primitives::PrimitiveRegistry;
 
 #[derive(Debug, Clone)]
 pub enum ResolutionResult {
@@ -90,10 +92,11 @@ pub struct ResolutionContext<'a> {
     pub stack: &'a RefCell<SymbolStack>,
     pub cache: &'a RefCell<ResolutionCache>,
     pub registry: &'a GlobalRegistry,
+    pub primitives: &'a PrimitiveRegistry,
 }
 
 // ==================== CORE ALGORITHM ====================
-pub fn resolve_type_refs(modules: Vec<Module>) -> Vec<Module> {
+pub fn resolve_type_refs(modules: Vec<Module>, primitives: &PrimitiveRegistry) -> Vec<Module> {
     let registry = GlobalRegistry::build(&modules);
     let stack = RefCell::new(SymbolStack::new());
     let cache = RefCell::new(ResolutionCache::new());
@@ -106,6 +109,7 @@ pub fn resolve_type_refs(modules: Vec<Module>) -> Vec<Module> {
         stack: &stack,
         cache: &cache,
         registry: &registry,
+        primitives,
     };
 
     let resolved_modules = modules
@@ -229,7 +233,12 @@ fn resolve_type_ref(ctx: &ResolutionContext, tr: TypeRef) -> TypeRef {
                     ResolutionResult::External(ext_qn) => TypeRef::External(ext_qn),
                 }
             } else {
-                TypeRef::Failed(qn)
+                // Check if it's a primitive type
+                if qn.len() == 1 && ctx.primitives.is_primitive(&qn[0]) {
+                    TypeRef::Primitive(PrimitiveType::Other(qn[0].clone()))
+                } else {
+                    TypeRef::Failed(qn)
+                }
             }
         }
         _ => tr,
@@ -253,6 +262,7 @@ fn resolve_module_in_context(ctx: &ResolutionContext, mut module: Module) -> Mod
         stack: ctx.stack,
         cache: ctx.cache,
         registry: ctx.registry,
+        primitives: ctx.primitives,
     };
 
     // PUSH lexical scope for this module
@@ -346,6 +356,7 @@ fn resolve_structured_type(ctx: &ResolutionContext, mut st: StructuredType) -> S
         stack: ctx.stack,
         cache: ctx.cache,
         registry: ctx.registry,
+        primitives: ctx.primitives,
     };
 
     // PUSH scope for StructuredType

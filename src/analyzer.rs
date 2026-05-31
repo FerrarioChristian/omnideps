@@ -69,20 +69,36 @@ fn walk_cst(node: tree_sitter::Node, source: &str, modules: &mut Vec<Module>) {
 /// Wrappers around tree-sitter language loading.
 pub mod languages {
     use super::*;
-    pub fn c() -> Language {
-        tree_sitter_c::LANGUAGE.into()
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub enum SupportedLanguage {
+        Rust,
+        Java,
+        Python,
+        C,
+        Cpp,
     }
-    pub fn cpp() -> Language {
-        tree_sitter_cpp::LANGUAGE.into()
-    }
-    pub fn java() -> Language {
-        tree_sitter_java::LANGUAGE.into()
-    }
-    pub fn python() -> Language {
-        tree_sitter_python::LANGUAGE.into()
-    }
-    pub fn rust() -> Language {
-        tree_sitter_rust::LANGUAGE.into()
+
+    impl SupportedLanguage {
+        pub fn to_tree_sitter_lang(&self) -> Language {
+            match self {
+                Self::Rust => tree_sitter_rust::LANGUAGE.into(),
+                Self::Java => tree_sitter_java::LANGUAGE.into(),
+                Self::Python => tree_sitter_python::LANGUAGE.into(),
+                Self::C => tree_sitter_c::LANGUAGE.into(),
+                Self::Cpp => tree_sitter_cpp::LANGUAGE.into(),
+            }
+        }
+
+        pub fn name(&self) -> &'static str {
+            match self {
+                Self::Rust => "rust",
+                Self::Java => "java",
+                Self::Python => "python",
+                Self::C => "c",
+                Self::Cpp => "cpp",
+            }
+        }
     }
 }
 
@@ -92,15 +108,21 @@ pub mod languages {
 /// 3. Dependency graph construction
 /// 4. Statistics aggregation (summary)
 pub fn full_analysis(
-    lang: Language,
+    lang: languages::SupportedLanguage,
     source: &str,
 ) -> anyhow::Result<(
     Vec<Module>,
     crate::ir::DependencyGraph,
     crate::ir::AnalysisSummary,
 )> {
-    let modules = generic_extract(lang, source)?;
-    let resolved = crate::resolver::resolve_type_refs(modules);
+    let modules = generic_extract(lang.to_tree_sitter_lang(), source)?;
+    
+    // Load primitives from external registry
+    let prim_registry = crate::resolver::primitives::PrimitiveRegistry::load(lang.name()).unwrap_or_else(|_| {
+        crate::resolver::primitives::PrimitiveRegistry::empty()
+    });
+
+    let resolved = crate::resolver::resolve_type_refs(modules, &prim_registry);
     let graph = crate::export::graph::build_dependency_graph(&resolved);
     let summary = crate::export::summary::build_analysis_summary(&resolved);
     Ok((resolved, graph, summary))

@@ -1,0 +1,74 @@
+use crate::ir::*;
+
+pub fn print_references(modules: &[Module]) {
+    println!("\n=== ELENCO RIFERIMENTI ===");
+    for m in modules {
+        visit_module(m);
+    }
+}
+
+fn visit_module(m: &Module) {
+    for st in &m.structured_types {
+        visit_structured_type(st);
+    }
+    for ff in &m.free_functions {
+        visit_function(ff, &m.name.join("::"));
+    }
+    for sub in &m.sub_modules {
+        visit_module(sub);
+    }
+}
+
+fn visit_structured_type(st: &StructuredType) {
+    let context = st.name.join("::");
+    for sup in &st.super_types {
+        print_ref("SuperType", &context, sup);
+    }
+    for f in &st.fields {
+        print_ref(&format!("Field '{}'", f.name), &context, &f.ty);
+    }
+    for method in &st.methods {
+        visit_function(method, &context);
+    }
+    for nested in &st.nested_types {
+        visit_structured_type(nested);
+    }
+}
+
+fn visit_function(f: &Function, context: &str) {
+    let fn_context = format!("{}::{}", context, f.name.last().unwrap_or(&"".to_string()));
+    for p in &f.signature.parameters {
+        print_ref(&format!("Param '{}'", p.name.as_deref().unwrap_or("?")), &fn_context, &p.ty);
+    }
+    print_ref("Return", &fn_context, &f.signature.return_type);
+    
+    if let Some(body) = &f.body {
+        visit_block(body, &fn_context);
+    }
+}
+
+fn visit_block(b: &Block, context: &str) {
+    for decl in &b.declarations {
+        print_ref(&format!("LocalVar '{}'", decl.name), context, &decl.ty);
+    }
+    for call in &b.calls {
+        print_ref("Call", context, call);
+    }
+    for inst in &b.instantiates {
+        print_ref("Instantiates", context, inst);
+    }
+    for sub in &b.sub_blocks {
+        visit_block(sub, context);
+    }
+}
+
+fn print_ref(kind: &str, context: &str, tr: &TypeRef) {
+    let (state, text) = match tr {
+        TypeRef::Primitive(p) => ("PRIMITIVE", format!("{:?}", p)),
+        TypeRef::Resolved(q) => ("✅ RESOLVED", q.join("::")),
+        TypeRef::External(q) => ("🌐 EXTERNAL", q.join("::")),
+        TypeRef::Failed(q) => ("❌ FAILED", q.join("::")),
+        TypeRef::Unresolved(q) => ("⚠️ UNRESOLVED", q.join("::")),
+    };
+    println!("[{:^12}] {:<30} | {} ({})", state, kind, text, context);
+}
