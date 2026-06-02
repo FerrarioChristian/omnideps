@@ -1,5 +1,16 @@
+//! Provides debugging utilities to inspect the final state of the Name Resolution phase.
+//!
+//! This module contains a recursive visitor that traverses the resolved Intermediate Representation (IR)
+//! and prints a clear, human-readable report of every `TypeRef` encountered (e.g. `Resolved`, `Failed`, `External`),
+//! alongside its architectural context (e.g. `SuperType`, `Param`, `LocalVar`).
+
 use crate::ir::*;
 
+/// Traverses a list of parsed and resolved modules, printing a formatted report
+/// of all type references found within their nested components.
+///
+/// # Arguments
+/// * `modules` - A slice of resolved `Module` components to inspect.
 pub fn print_references(modules: &[Module]) {
     println!("\n=== ELENCO RIFERIMENTI ===");
     for m in modules {
@@ -7,6 +18,7 @@ pub fn print_references(modules: &[Module]) {
     }
 }
 
+/// Recursively visits a module's contents (sub-modules, structured types, and free functions).
 fn visit_module(m: &Module) {
     for st in &m.structured_types {
         visit_structured_type(st);
@@ -19,6 +31,8 @@ fn visit_module(m: &Module) {
     }
 }
 
+/// Visits a structured type (Class, Struct, Interface, Trait), printing references
+/// for its super-types, fields, and recursively visiting its methods and nested types.
 fn visit_structured_type(st: &StructuredType) {
     let context = st.name.join("::");
     for sup in &st.super_types {
@@ -35,6 +49,8 @@ fn visit_structured_type(st: &StructuredType) {
     }
 }
 
+/// Visits a function or method, printing references for its parameters and return type,
+/// and recursively visiting its behavioral body block.
 fn visit_function(f: &Function, context: &str) {
     let fn_context = format!("{}::{}", context, f.name.last().unwrap_or(&"".to_string()));
     for p in &f.signature.parameters {
@@ -47,6 +63,8 @@ fn visit_function(f: &Function, context: &str) {
     }
 }
 
+/// Recursively visits a block's statements, printing references for local variable
+/// declarations, method calls, instantiations, and exploring nested sub-blocks.
 fn visit_block(b: &Block, context: &str) {
     for decl in &b.declarations {
         print_ref(&format!("LocalVar '{}'", decl.name), context, &decl.ty);
@@ -62,6 +80,7 @@ fn visit_block(b: &Block, context: &str) {
     }
 }
 
+/// Helper function that formats and prints a single `TypeRef` state to the standard output.
 fn print_ref(kind: &str, context: &str, tr: &TypeRef) {
     let (state, text) = match tr {
         TypeRef::Primitive(p) => ("PRIMITIVE", format!("{:?}", p)),

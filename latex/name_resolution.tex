@@ -60,7 +60,9 @@ nativamente le operazioni di mutazione dell'ambiente:
     stack all'uscita dal blocco lessicale, prevenendo il leakage di
     simboli locali. ($\rho' = \text{tail}(\rho)$)
   \item \texttt{define(name, path)}: Registra un simbolo locale e il
-    suo percorso assoluto (sia esso uno stato \texttt{Resolved} locale o un riferimento \texttt{External}) all'interno della mappa $\text{Symbols}$
+    suo percorso assoluto (sia esso uno stato \texttt{Resolved}
+    locale o un riferimento \texttt{External}) all'interno della
+    mappa $\text{Symbols}$
     del frame corrente in cima allo stack.
 \end{itemize}
 
@@ -80,7 +82,7 @@ partendo da $k=n$ scendendo fino a $k=0$:
     l'identificatore globale unendo il path trovato con il suffisso
     rimanente e convalida se tale risorsa esiste effettivamente nel
     \textit{Global Registry} (generato nel Pass 1 dell'analisi
-    indicizzando ricorsivamente moduli, tipi strutturati e tutti i loro
+      indicizzando ricorsivamente moduli, tipi strutturati e tutti i loro
     tipi annidati o blocchi implementativi).
   \item \textbf{Jump Points}: Se $i_1 \notin
     \Sigma_k.\text{Symbols}$, verifica se $i_1$ coincide con un alias
@@ -104,16 +106,28 @@ funzionamento del Lexical Scoping:
 \begin{itemize}
   \item \textbf{Auto-Registrazione di \texttt{self} e \texttt{this}}:
     All'ingresso di un \textit{Structured Type}, l'ambiente $\rho$ inietta
-    implicitamente nel frame locale i lessemi \texttt{self} e \texttt{this}, facendoli
+    implicitamente nel frame locale i lessemi \texttt{self} e
+    \texttt{this}, facendoli
     puntare al percorso assoluto del tipo strutturato corrente. Questo
-    permette di risolvere in $O(1)$ le chiamate a metodi di classe (es. \texttt{self.get\_id()}).
+    permette di risolvere in $O(1)$ le chiamate a metodi di classe
+    (es. \texttt{self.get\_id()}).
   \item \textbf{Inferenza di Tipo Best-Effort}: Nel caso in cui il
     linguaggio permetta l'omissione del tipo a sinistra di una dichiarazione
-    di variabile (es. tramite \texttt{let} o \texttt{auto}), l'algoritmo analizza
+    di variabile (es. tramite \texttt{let} o \texttt{auto}),
+    l'algoritmo analizza
     il lato destro dell'espressione (l'inizializzatore). Se viene
-    intercettata un'istanza esplicita (es. \texttt{new\_expression}), il tipo dedotto
+    intercettata un'istanza esplicita (es. \texttt{new\_expression}),
+    il tipo dedotto
     viene formalizzato come $\tau$ e registrato nell'ambiente tramite
     \texttt{define(id, $\tau$)}.
+  \item \textbf{Decoppiamento Primitivo}: Al termine della catena di fallback,
+    prima di contrassegnare definitivamente un riferimento come \texttt{Failed},
+    il contesto interroga il \textit{Primitive Registry} (popolato
+      con le keyword
+    del linguaggio corrente, es. \texttt{int}, \texttt{String}). Se
+    vi è corrispondenza,
+    il riferimento viene declassato a \texttt{Prim}, evitando falsi negativi
+    sulla valutazione dell'architettura.
 \end{itemize}
 
 \section{Ottimizzazione tramite Cache Tree (Memoization)}

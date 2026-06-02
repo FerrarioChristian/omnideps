@@ -28,11 +28,11 @@ fn test_benchmarks_analysis() {
 
             // Definisce il parser Tree-sitter corrispondente in base all'estensione
             let lang = match ext {
-                "rs" => analyzer::languages::rust(),
-                "java" => analyzer::languages::java(),
-                "py" => analyzer::languages::python(),
-                "c" | "h" => analyzer::languages::c(),
-                "cpp" | "cxx" | "cc" | "hxx" => analyzer::languages::cpp(),
+                "rs" => analyzer::languages::SupportedLanguage::Rust,
+                "java" => analyzer::languages::SupportedLanguage::Java,
+                "py" => analyzer::languages::SupportedLanguage::Python,
+                "c" | "h" => analyzer::languages::SupportedLanguage::C,
+                "cpp" | "cxx" | "cc" | "hxx" => analyzer::languages::SupportedLanguage::Cpp,
                 _ => continue, // Ignora file JSON e altri non supportati
             };
 

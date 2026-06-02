@@ -2,7 +2,10 @@ use crate::ir::{Function, ImplBlock, Import, Module, StructuredType};
 use tree_sitter::Node;
 
 use super::classifiers::*;
-use super::extractors::*;
+use super::text_parsing::*;
+use super::type_extraction::*;
+use super::structural_extraction::*;
+use super::body_extraction::*;
 
 pub fn try_parse_module_node(node: Node, source: &str) -> Option<Module> {
     if !is_module(node) {

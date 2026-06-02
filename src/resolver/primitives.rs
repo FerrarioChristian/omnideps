@@ -1,3 +1,9 @@
+//! A data-driven registry for language-specific primitive types.
+//!
+//! This module decouples primitive type recognition from the AST extraction logic, allowing
+//! the resolver to intercept and mark tokens like `String` or `int` as `PrimitiveType` 
+//! instead of logging them as `Failed` resolutions.
+
 use std::collections::{HashMap, HashSet};
 
 /// A registry that loads and stores the language-specific primitive types.

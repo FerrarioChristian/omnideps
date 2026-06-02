@@ -1,89 +1,19 @@
 pub mod stack;
 pub mod cache;
 pub mod primitives;
+pub mod registry;
 
 use crate::ir::*;
 use std::cell::RefCell;
-use std::collections::HashSet;
 use stack::SymbolStack;
 use cache::ResolutionCache;
 use primitives::PrimitiveRegistry;
+use registry::GlobalRegistry;
 
 #[derive(Debug, Clone)]
 pub enum ResolutionResult {
     Local(QualifiedName),
     External(QualifiedName),
-}
-
-// ==================== GLOBAL REGISTRY ====================
-// Pass 1: We scan the whole IR to record every absolute path that exists in the project.
-// This is used to validate if a resolved path is Local or External.
-pub struct GlobalRegistry {
-    pub paths: HashSet<QualifiedName>,
-}
-
-impl GlobalRegistry {
-    pub fn build(modules: &[Module]) -> Self {
-        let mut registry = Self { paths: HashSet::new() };
-        for m in modules {
-            registry.register_module(m, vec![]);
-        }
-        registry
-    }
-
-    fn register_module(&mut self, m: &Module, mut prefix: QualifiedName) {
-        prefix.extend(m.name.clone());
-        self.paths.insert(prefix.clone());
-
-        for st in &m.structured_types {
-            self.register_structured_type(st, prefix.clone());
-        }
-        for ff in &m.free_functions {
-            let mut ff_prefix = prefix.clone();
-            ff_prefix.extend(ff.name.clone());
-            self.paths.insert(ff_prefix);
-        }
-        for ib in &m.impl_blocks {
-            // Register ImplBlock methods and nested types
-            let target_name = match &ib.impl_for {
-                TypeRef::Unresolved(qn) | TypeRef::Resolved(qn) => qn.last().cloned().unwrap_or_default(),
-                _ => "".to_string(),
-            };
-            if !target_name.is_empty() {
-                let mut target_prefix = prefix.clone();
-                target_prefix.push(target_name);
-                for method in &ib.methods {
-                    let mut m_prefix = target_prefix.clone();
-                    m_prefix.extend(method.name.clone());
-                    self.paths.insert(m_prefix);
-                }
-                for nested in &ib.nested_types {
-                    self.register_structured_type(nested, target_prefix.clone());
-                }
-            }
-        }
-        for sub in &m.sub_modules {
-            self.register_module(sub, prefix.clone());
-        }
-    }
-
-    fn register_structured_type(&mut self, st: &StructuredType, mut prefix: QualifiedName) {
-        prefix.extend(st.name.clone());
-        self.paths.insert(prefix.clone());
-
-        for method in &st.methods {
-            let mut m_prefix = prefix.clone();
-            m_prefix.extend(method.name.clone());
-            self.paths.insert(m_prefix);
-        }
-        for nested in &st.nested_types {
-            self.register_structured_type(nested, prefix.clone());
-        }
-    }
-
-    pub fn exists(&self, path: &QualifiedName) -> bool {
-        self.paths.contains(path)
-    }
 }
 
 // ==================== CONTEXT ====================

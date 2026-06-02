@@ -44,9 +44,11 @@ $$\tau ::= \text{Prim}(\mathcal{T}_{p}) \mid
 Dove:
 \begin{itemize}
   \item \textbf{Prim}: Rappresenta i tipi primitivi fondamentali
-    ($\mathcal{T}_{p} = \{ \text{Int, Float, Bool, String, Void,
-    Other} \}$). Essendo definiti a livello di linguaggio, non
-    necessitano di risoluzione.
+    ($\mathcal{T}_{p}$). Poiché le parole chiave primitive variano drasticamente
+    tra i linguaggi, il set $\mathcal{T}_{p}$ non è statico ma è
+    fornito da un \textit{Primitive Registry}
+    architetturale (\textit{Data-Driven}) alimentato in fase di caricamento.
+    Essendo definiti a livello di linguaggio, non necessitano di risoluzione.
   \item \textbf{Unresolved}: Rappresenta un identificatore estratto
     dal parser (es. \texttt{List}) di cui non si conosce ancora il
     percorso assoluto. È lo stato tipico prodotto dalla Fase 1 di Estrazione.
