@@ -1,0 +1,1311 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fase 1: Estrazione CST → IR — Deep Dive Tecnico</title>
+    <style>
+        :root {
+            --bg: #fafbfc;
+            --card-bg: #ffffff;
+            --text: #24292f;
+            --text-secondary: #57606a;
+            --border: #d0d7de;
+            --accent: #0969da;
+            --accent-subtle: #ddf4ff;
+            --success: #1a7f37;
+            --success-subtle: #dafbe1;
+            --warning: #9a6700;
+            --warning-subtle: #fff8c5;
+            --danger: #cf222e;
+            --danger-subtle: #ffebe9;
+            --purple: #8250df;
+            --purple-subtle: #fbefff;
+            --code-bg: #f6f8fa;
+            --pre-bg: #1b1f23;
+            --pre-text: #e6edf3;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif;
+            line-height: 1.7;
+            max-width: 1060px;
+            margin: 0 auto;
+            padding: 2.5rem 2rem;
+            color: var(--text);
+            background: var(--bg);
+        }
+
+        h1 {
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+            color: var(--text);
+            letter-spacing: -0.02em;
+        }
+        h1 + p { color: var(--text-secondary); font-size: 1.1em; margin-bottom: 2rem; }
+
+        h2 {
+            font-size: 1.45rem;
+            font-weight: 600;
+            color: var(--text);
+            margin-top: 2.8rem;
+            margin-bottom: 1rem;
+            padding-bottom: 0.4rem;
+            border-bottom: 1px solid var(--border);
+        }
+        h3 {
+            font-size: 1.15rem;
+            font-weight: 600;
+            color: var(--accent);
+            margin-top: 1.6rem;
+            margin-bottom: 0.6rem;
+        }
+        h4 {
+            font-size: 1.05rem;
+            font-weight: 600;
+            color: var(--text);
+            margin-top: 1.2rem;
+            margin-bottom: 0.4rem;
+        }
+
+        p, li { font-size: 1rem; color: var(--text); }
+        p { margin-bottom: 0.8rem; }
+        li { margin-bottom: 0.3rem; }
+        ol, ul { padding-left: 1.5rem; margin-bottom: 1rem; }
+
+        code {
+            background: var(--code-bg);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+            font-size: 0.88em;
+            color: var(--text);
+            border: 1px solid var(--border);
+        }
+        pre {
+            background: var(--pre-bg);
+            color: var(--pre-text);
+            padding: 1.2rem 1.4rem;
+            border-radius: 8px;
+            overflow-x: auto;
+            font-size: 0.88em;
+            line-height: 1.55;
+            margin: 0.8rem 0 1.2rem 0;
+            border: 1px solid #30363d;
+        }
+        pre code {
+            background: none;
+            border: none;
+            padding: 0;
+            color: inherit;
+        }
+
+        .card {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1.2rem 1.4rem;
+            margin: 1rem 0;
+        }
+
+        .step {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-left: 4px solid var(--accent);
+            padding: 1.2rem 1.4rem;
+            margin-bottom: 1.2rem;
+            border-radius: 0 8px 8px 0;
+        }
+        .step h3 { margin-top: 0; }
+
+        .step-success { border-left-color: var(--success); }
+        .step-success h3 { color: var(--success); }
+        .step-warning { border-left-color: var(--warning); }
+        .step-warning h3 { color: var(--warning); }
+        .step-danger { border-left-color: var(--danger); }
+        .step-danger h3 { color: var(--danger); }
+        .step-purple { border-left-color: var(--purple); }
+        .step-purple h3 { color: var(--purple); }
+
+        .info-box {
+            background: var(--accent-subtle);
+            border: 1px solid #84c5f5;
+            padding: 1rem 1.2rem;
+            border-radius: 8px;
+            margin: 1rem 0;
+        }
+        .info-box strong { color: var(--accent); }
+
+        .warn-box {
+            background: var(--warning-subtle);
+            border: 1px solid #d4a72c;
+            padding: 1rem 1.2rem;
+            border-radius: 8px;
+            margin: 1rem 0;
+        }
+        .warn-box strong { color: var(--warning); }
+
+        .tree-container {
+            background: #f0f3f6;
+            border: 1px solid var(--border);
+            padding: 1.4rem 1.6rem;
+            border-radius: 8px;
+            font-family: 'SFMono-Regular', Consolas, monospace;
+            font-size: 0.88em;
+            line-height: 1.65;
+            margin: 1rem 0;
+            white-space: pre;
+            overflow-x: auto;
+        }
+        .node { font-weight: 700; color: #cf222e; }
+        .symbol { color: var(--accent); font-weight: 600; }
+        .import { color: #9a6700; font-style: italic; }
+        .highlight { background: #fff8c5; padding: 1px 5px; border-radius: 3px; color: var(--text); font-weight: 600; border: 1px solid #d4a72c; }
+        .arrow { color: #8b949e; }
+        .dim { color: #8b949e; font-style: italic; }
+        .green { color: var(--success); font-weight: 600; }
+        .red { color: var(--danger); font-weight: 600; }
+        .purple { color: var(--purple); font-weight: 600; }
+
+        .flowchart {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            align-items: center;
+            margin: 1rem 0;
+            font-family: 'SFMono-Regular', Consolas, monospace;
+            font-size: 0.88em;
+        }
+        .flowchart .box {
+            background: var(--accent-subtle);
+            border: 1px solid #84c5f5;
+            padding: 0.4rem 0.8rem;
+            border-radius: 6px;
+            font-weight: 600;
+            color: var(--accent);
+        }
+        .flowchart .box.active {
+            background: var(--success-subtle);
+            border-color: #4ac26b;
+            color: var(--success);
+        }
+        .flowchart .box.purple {
+            background: var(--purple-subtle);
+            border-color: #c297ff;
+            color: var(--purple);
+        }
+        .flowchart .box.fail {
+            background: var(--danger-subtle);
+            border-color: #ff8182;
+            color: var(--danger);
+        }
+        .flowchart .sep { color: #8b949e; font-size: 1.2em; }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1rem 0;
+            font-size: 0.95em;
+        }
+        th, td {
+            border: 1px solid var(--border);
+            padding: 0.6rem 0.8rem;
+            text-align: left;
+        }
+        th {
+            background: var(--code-bg);
+            font-weight: 600;
+        }
+        td code { font-size: 0.85em; }
+
+        .toc {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1.2rem 1.6rem;
+            margin: 1.5rem 0 2rem 0;
+        }
+        .toc h3 { margin-top: 0; color: var(--text); font-size: 1rem; }
+        .toc ol { margin-bottom: 0; }
+        .toc li { margin-bottom: 0.15rem; }
+        .toc a { color: var(--accent); text-decoration: none; }
+        .toc a:hover { text-decoration: underline; }
+
+        .ref { font-size: 0.85em; color: var(--text-secondary); font-style: italic; }
+
+        .layer-diagram {
+            display: flex;
+            flex-direction: column;
+            gap: 0;
+            margin: 1.2rem 0;
+            font-family: 'SFMono-Regular', Consolas, monospace;
+            font-size: 0.9em;
+        }
+        .layer-diagram .layer {
+            padding: 0.6rem 1rem;
+            border: 1px solid var(--border);
+            text-align: center;
+            font-weight: 600;
+        }
+        .layer-diagram .layer:first-child { border-radius: 8px 8px 0 0; }
+        .layer-diagram .layer:last-child { border-radius: 0 0 8px 8px; }
+        .layer-diagram .l1 { background: var(--accent-subtle); color: var(--accent); }
+        .layer-diagram .l2 { background: var(--purple-subtle); color: var(--purple); }
+        .layer-diagram .l3 { background: var(--success-subtle); color: var(--success); }
+        .layer-diagram .l4 { background: var(--warning-subtle); color: var(--warning); }
+        .wiki-nav {
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+            padding: 0.7rem 1rem;
+            margin-bottom: 2rem;
+            background: var(--code-bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-size: 0.88em;
+            flex-wrap: wrap;
+        }
+        .wiki-nav a {
+            color: var(--accent);
+            text-decoration: none;
+            padding: 0.25rem 0.6rem;
+            border-radius: 4px;
+            transition: background 0.15s;
+        }
+        .wiki-nav a:hover { background: var(--accent-subtle); }
+        .wiki-nav a.active {
+            background: var(--accent);
+            color: #fff;
+            font-weight: 600;
+        }
+        .wiki-nav .sep { color: var(--border); font-size: 1.1em; }
+        .wiki-nav .label { color: var(--text-secondary); font-weight: 600; margin-right: 0.2rem; }
+    </style>
+</head>
+<body>
+
+    <nav class="wiki-nav">
+        <span class="label">📖 Wiki:</span>
+        <a href="extraction_explained.html" class="active">Fase 1 — Estrazione</a>
+        <span class="sep">·</span>
+        <a href="name_resolution_explained.html">Fase 2 — Name Resolution</a>
+        <span class="sep">·</span>
+        <a href="dependency_graph_explained.html">Fase 3 — Dependency Graph</a>
+        <span class="sep">·</span>
+        <a href="features_roadmap.html">Features &amp; Roadmap</a>
+    </nav>
+
+    <h1>Deep Dive: Fase 1 — Estrazione CST → IR</h1>
+    <p>Documentazione tecnica esaustiva dell'attraversamento dell'albero Tree-sitter e della costruzione della Rappresentazione Intermedia, con spiegazione passo-passo di ogni componente.</p>
+
+    <div class="toc">
+        <h3>Indice</h3>
+        <ol>
+            <li><a href="#overview">Panoramica e Architettura</a></li>
+            <li><a href="#treesitter">Tree-sitter: dal Codice Sorgente al CST</a></li>
+            <li><a href="#ir">La Rappresentazione Intermedia (IR)</a></li>
+            <li><a href="#walk-cst">L'Attraversamento del CST: <code>walk_cst</code></a></li>
+            <li><a href="#dispatch">Il Dispatcher Euristico: <code>dispatch_node</code></a></li>
+            <li><a href="#classifiers">Livello 1 — Classificatori</a></li>
+            <li><a href="#parsers">Livello 2 — Parser</a></li>
+            <li><a href="#extractors">Livello 3 — Estrattori</a></li>
+            <li><a href="#type-extraction">Estrazione dei Tipi: <code>extract_type_ref</code></a></li>
+            <li><a href="#body-deps">Estrazione Strutturata del Body: <code>extract_block</code></a></li>
+            <li><a href="#full-example">Esempio Completo End-to-End</a></li>
+        </ol>
+    </div>
+
+    <!-- ============================================================ -->
+    <h2 id="overview">1. Panoramica e Architettura</h2>
+
+    <p>La <strong>Fase 1 (Estrazione)</strong> è il primo stadio della pipeline di analisi. Riceve in input il <strong>codice sorgente</strong> di un file e produce in output una lista di <code>Module</code> che costituiscono la <strong>Rappresentazione Intermedia (IR)</strong> — un modello strutturale del codice che è completamente indipendente dal linguaggio sorgente.</p>
+
+    <div class="flowchart">
+        <span class="box active">1. Estrazione CST→IR</span>
+        <span class="sep">→</span>
+        <span class="box">2. Name Resolution</span>
+        <span class="sep">→</span>
+        <span class="box">3. Dependency Graph</span>
+        <span class="sep">→</span>
+        <span class="box">4. Summary</span>
+    </div>
+    <p class="ref">Riferimento: <code>analyzer.rs:94-107</code> — funzione <code>full_analysis()</code></p>
+
+    <p>L'architettura interna della Fase 1 si compone di quattro strati logici, organizzati in modo che ogni strato dipenda solo da quelli sottostanti:</p>
+
+    <div class="layer-diagram">
+        <div class="layer l1">analyzer.rs — Orchestrazione (parsing + walk_cst)</div>
+        <div class="layer l2">heuristics/mod.rs — Dispatcher (dispatch_node)</div>
+        <div class="layer l3">heuristics/classifiers.rs + parsers.rs — Classificazione e Parsing</div>
+        <div class="layer l4">heuristics/text_parsing.rs + structural_extraction.rs + body_extraction.rs — Estrazione dati dal CST</div>
+    </div>
+
+    <p>I file coinvolti e il loro ruolo:</p>
+    <table>
+        <thead><tr><th>File</th><th>Responsabilità</th></tr></thead>
+        <tbody>
+            <tr><td><code>analyzer.rs</code></td><td>Entry point. Crea il parser Tree-sitter, genera il CST, e lo attraversa con <code>walk_cst</code>.</td></tr>
+            <tr><td><code>heuristics/mod.rs</code></td><td>Definisce <code>ParsedItem</code> e la funzione <code>dispatch_node</code> che coordina la classificazione.</td></tr>
+            <tr><td><code>heuristics/classifiers.rs</code></td><td>Funzioni booleane euristiche (<code>is_module</code>, <code>is_function</code>, ecc.) che identificano il <em>tipo</em> di un nodo CST.</td></tr>
+            <tr><td><code>heuristics/parsers.rs</code></td><td>Funzioni <code>try_parse_*</code> che convertono un nodo CST in un componente IR.</td></tr>
+            <tr><td><code>heuristics/*_extraction.rs</code></td><td>L'ex modulo <code>extractors.rs</code> è stato diviso per Single Responsibility Principle in <code>text_parsing</code>, <code>type_extraction</code>, <code>structural_extraction</code> e <code>body_extraction</code>.</td></tr>
+            <tr><td><code>ir.rs</code></td><td>Definizione delle strutture dati della Rappresentazione Intermedia.</td></tr>
+        </tbody>
+    </table>
+
+    <!-- ============================================================ -->
+    <h2 id="treesitter">2. Tree-sitter: dal Codice Sorgente al CST</h2>
+
+    <p class="ref">Riferimento: <code>analyzer.rs:6-18</code></p>
+
+    <p><strong>Tree-sitter</strong> è un generatore di parser incrementali. Per ogni linguaggio supportato, produce un parser specializzato che trasforma il codice sorgente in un <strong>Concrete Syntax Tree (CST)</strong> — un albero che rappresenta <em>ogni singolo token</em> del codice, inclusi spazi, punteggiatura e parole chiave.</p>
+
+    <pre><code>pub fn generic_extract(lang: Language, source: &amp;str) -&gt; anyhow::Result&lt;Vec&lt;Module&gt;&gt; {
+    // 1. Crea un parser Tree-sitter
+    let mut parser = tree_sitter::Parser::new();
+    parser.set_language(&amp;lang).unwrap();
+
+    // 2. Parsa il codice sorgente → CST
+    let tree = parser.parse(source, None)
+        .ok_or(anyhow::anyhow!("parse failed"))?;
+    let root = tree.root_node();
+
+    // 3. Attraversa il CST per costruire l'IR
+    let mut modules = vec![];
+    walk_cst(root, source, &amp;mut modules);
+    Ok(modules)
+}</code></pre>
+
+    <h3>2.1 Linguaggi Supportati</h3>
+    <p>La funzione <code>detect_language</code> in <code>main.rs</code> mappa le estensioni dei file ai parser Tree-sitter:</p>
+    <table>
+        <thead><tr><th>Estensione</th><th>Linguaggio</th><th>Crate Tree-sitter</th></tr></thead>
+        <tbody>
+            <tr><td><code>.rs</code></td><td>Rust</td><td><code>tree_sitter_rust</code></td></tr>
+            <tr><td><code>.java</code></td><td>Java</td><td><code>tree_sitter_java</code></td></tr>
+            <tr><td><code>.py</code></td><td>Python</td><td><code>tree_sitter_python</code></td></tr>
+            <tr><td><code>.c</code>, <code>.h</code></td><td>C</td><td><code>tree_sitter_c</code></td></tr>
+            <tr><td><code>.cpp</code>, <code>.cxx</code>, <code>.cc</code>, <code>.hxx</code></td><td>C++</td><td><code>tree_sitter_cpp</code></td></tr>
+        </tbody>
+    </table>
+
+    <h3>2.2 CST vs AST</h3>
+    <div class="info-box">
+        <strong>Differenza chiave:</strong> Un <em>Abstract Syntax Tree</em> (AST) omette i dettagli sintattici (parentesi, punti e virgola, ecc.) e ragiona in termini semantici. Un <em>Concrete Syntax Tree</em> (CST) preserva <strong>ogni token</strong> del codice — Tree-sitter produce un CST. I nodi CST hanno un <code>kind()</code> (tipo grammaticale, es. <code>"struct_item"</code>, <code>"function_definition"</code>) e possono avere <em>named fields</em> (es. <code>"name"</code>, <code>"body"</code>, <code>"parameters"</code>) per accedere ai figli con semantica.
+    </div>
+
+    <h3>2.3 Esempio di CST</h3>
+    <p>Per il codice Rust <code>struct Auto { base: Veicolo }</code>, Tree-sitter produce un albero simile a:</p>
+    <div class="tree-container">
+<span class="node">source_file</span>
+ <span class="arrow">└──</span> <span class="node">struct_item</span>
+      <span class="arrow">├──</span> <span class="dim">keyword "struct"</span>
+      <span class="arrow">├──</span> <span class="symbol">name:</span> <span class="node">type_identifier</span> <span class="green">"Auto"</span>
+      <span class="arrow">└──</span> <span class="symbol">body:</span> <span class="node">field_declaration_list</span>
+           <span class="arrow">└──</span> <span class="node">field_declaration</span>
+                <span class="arrow">├──</span> <span class="symbol">name:</span> <span class="node">field_identifier</span> <span class="green">"base"</span>
+                <span class="arrow">└──</span> <span class="symbol">type:</span> <span class="node">type_identifier</span> <span class="green">"Veicolo"</span></div>
+    <p>L'analizzatore usa il <code>kind()</code> dei nodi per classificarli (il nodo <code>struct_item</code> contiene <code>"struct"</code> → è un tipo strutturato) e i <em>named fields</em> per estrarre dati specifici (il campo <code>"name"</code> contiene il nome della struct).</p>
+
+    <!-- ============================================================ -->
+    <h2 id="ir">3. La Rappresentazione Intermedia (IR)</h2>
+    <p class="ref">Riferimento: <code>ir.rs</code></p>
+
+    <p>L'IR è l'output della Fase 1 e l'input della Fase 2 (Name Resolution). È un modello strutturale <strong>indipendente dal linguaggio</strong> che cattura la topologia del codice. È composta dalle seguenti strutture principali:</p>
+
+    <h3>3.1 <code>Module</code> — Il contenitore top-level</h3>
+    <pre><code>pub struct Module {
+    pub name: QualifiedName,                   // Es: ["root"] o ["core"]
+    pub imports: Vec&lt;Import&gt;,                  // Import dichiarati nel modulo
+    pub sub_modules: Vec&lt;Module&gt;,              // Moduli annidati
+    pub structured_types: Vec&lt;StructuredType&gt;, // Struct, class, interface, ecc.
+    pub free_functions: Vec&lt;Function&gt;,         // Funzioni non legate a un tipo
+    pub impl_blocks: Vec&lt;ImplBlock&gt;,           // Blocchi impl (specifici di Rust)
+}</code></pre>
+
+    <h3>3.2 <code>StructuredType</code> — Tipi strutturati</h3>
+    <pre><code>pub struct StructuredType {
+    pub name: QualifiedName,                    // Es: ["Veicolo"]
+    pub kind: StructuredTypeKind,               // Class | Struct | Interface | Trait
+    pub fields: Vec&lt;Field&gt;,                    // Campi della struttura
+    pub methods: Vec&lt;Function&gt;,                // Metodi dichiarati nel corpo
+    pub super_types: Vec&lt;TypeRef&gt;,             // Tipi da cui eredita/implementa
+    pub nested_types: Vec&lt;StructuredType&gt;,     // Tipi annidati
+}</code></pre>
+
+    <h3>3.3 <code>Function</code> — Funzioni e metodi</h3>
+    <pre><code>pub struct Function {
+    pub name: QualifiedName,                    // Es: ["calcola"]
+    pub signature: Signature {
+        pub parameters: Vec&lt;Parameter&gt;,        // Parametri con nome e tipo
+        pub return_type: TypeRef,               // Tipo di ritorno
+    },
+    pub body: Option&lt;Block&gt;,                   // Corpo strutturato della funzione
+}</code></pre>
+    <p>Il campo <code>body</code> contiene un <code>Option&lt;Block&gt;</code> che rappresenta il corpo della funzione in modo strutturato. Il <code>Block</code> cattura le dichiarazioni locali, le dipendenze comportamentali (chiamate e istanziazioni) e i blocchi annidati (if, while, scope anonimi). Se la funzione non ha un body (es. dichiarazioni in header C/C++), il campo è <code>None</code>.</p>
+
+    <h3>3.4 <code>Block</code> — Blocchi di codice strutturati</h3>
+    <pre><code>pub struct Block {
+    pub declarations: Vec&lt;Field&gt;,              // Variabili locali (let, var, ecc.)
+    pub calls: Vec&lt;TypeRef&gt;,                   // Funzioni chiamate in questo blocco
+    pub instantiates: Vec&lt;TypeRef&gt;,            // Tipi istanziati in questo blocco
+    pub sub_blocks: Vec&lt;Block&gt;,                // Blocchi annidati (if, while, scope)
+}</code></pre>
+    <p>La struttura <code>Block</code> modella la gerarchia dei blocchi di codice all'interno del corpo di una funzione. Ogni blocco contiene:</p>
+    <ul>
+        <li><strong><code>declarations</code></strong> — Variabili locali dichiarate nel blocco (es. <code>let x: i32</code>), estratte come <code>Field { name, ty }</code>.</li>
+        <li><strong><code>calls</code></strong> — Funzioni e metodi chiamati <em>direttamente</em> nel blocco (non nei sotto-blocchi).</li>
+        <li><strong><code>instantiates</code></strong> — Tipi istanziati <em>direttamente</em> nel blocco.</li>
+        <li><strong><code>sub_blocks</code></strong> — Blocchi annidati (es. body di un <code>if</code>, <code>while</code>, scope anonimi <code>{ ... }</code>), ognuno rappresentato ricorsivamente come un <code>Block</code>.</li>
+    </ul>
+    <div class="info-box">
+        <strong>Separazione per livello:</strong> Le dipendenze (<code>calls</code>/<code>instantiates</code>) di un blocco includono <em>solo</em> quelle trovate al suo livello diretto — le dipendenze nei sotto-blocchi sono registrate nei rispettivi <code>sub_blocks</code>. Questo evita il double-counting e permette un'analisi più precisa degli scope.
+    </div>
+
+    <h3>3.5 <code>TypeRef</code> — Riferimenti ai tipi</h3>
+    <p>Nella Fase 1, ogni riferimento a un tipo viene estratto come <code>TypeRef::Unresolved</code>. Sarà la Fase 2 a risolverlo:</p>
+    <pre><code>pub enum TypeRef {
+    Primitive(PrimitiveType),   // Int, Float, Bool, String, Void
+    Unresolved(QualifiedName),  // Nome estratto ma non ancora risolto ← Fase 1 produce questi
+    Resolved(QualifiedName),    // Risolto a percorso assoluto (Fase 2)
+    External(QualifiedName),    // Dipendenza esterna (Fase 2)
+    Failed(QualifiedName),      // Risoluzione fallita (Fase 2)
+}</code></pre>
+
+    <h3>3.6 <code>Import</code> e <code>ImplBlock</code></h3>
+    <pre><code>pub struct Import {
+    pub path: QualifiedName,        // Es: ["std", "vec", "Vec"]
+    pub alias: Option&lt;Identifier&gt;,  // Es: Some("Db")
+    pub is_wildcard: bool,          // true per "use std::*"
+}
+
+pub struct ImplBlock {
+    pub name: QualifiedName,                    // Nome estratto dal nodo
+    pub methods: Vec&lt;Function&gt;,                // Metodi dell'impl
+    pub impl_for: TypeRef,                      // Il tipo target
+    pub implements_trait: Option&lt;TypeRef&gt;,      // Trait implementato (opzionale)
+    pub nested_types: Vec&lt;StructuredType&gt;,     // Tipi annidati nell'impl
+}</code></pre>
+
+    <h3>3.7 <code>ParsedItem</code> — L'output del dispatcher</h3>
+    <pre><code>pub enum ParsedItem {
+    Component(Component),    // Module, StructuredType, o Function
+    ImplBlock(ImplBlock),    // Blocco impl (trattato separatamente)
+    Import(Import),          // Dichiarazione di import
+}</code></pre>
+    <p>Questo enum è il tipo di ritorno del dispatcher. Separa gli <code>ImplBlock</code> e gli <code>Import</code> dai <code>Component</code> standard perché richiedono un trattamento speciale durante l'inserimento nell'IR (vedi <a href="#walk-cst">Sezione 4</a>).</p>
+
+    <!-- ============================================================ -->
+    <h2 id="walk-cst">4. L'Attraversamento del CST: <code>walk_cst</code></h2>
+    <p class="ref">Riferimento: <code>analyzer.rs:23-67</code></p>
+
+    <p>La funzione <code>walk_cst</code> è il cuore dell'attraversamento. È una funzione ricorsiva che visita ogni nodo del CST, prova a classificarlo tramite il dispatcher, e gestisce l'inserimento nell'IR in base al tipo riconosciuto.</p>
+
+    <h3>4.1 Il Modulo "root" Implicito</h3>
+    <p>Alla prima chiamata, il vettore <code>modules</code> è vuoto. Non appena il dispatcher riconosce il <strong>primo componente</strong> di qualsiasi tipo, viene creato automaticamente un modulo "root" fittizio:</p>
+    <pre><code>if modules.is_empty() {
+    modules.push(Module {
+        name: vec!["root".to_string()],
+        imports: vec![],
+        sub_modules: vec![],
+        structured_types: vec![],
+        free_functions: vec![],
+        impl_blocks: vec![],
+    });
+}</code></pre>
+    <p>Tutti i componenti top-level (struct, funzioni, import, ecc. che non sono dentro un modulo esplicito) vengono inseriti in <code>modules[0]</code> — il modulo "root". Questo garantisce che l'IR abbia sempre almeno un modulo contenitore.</p>
+
+    <h3>4.2 Logica di Attraversamento</h3>
+    <p>Per ogni nodo del CST, <code>walk_cst</code> esegue la seguente logica:</p>
+
+    <div class="tree-container">
+<span class="symbol">walk_cst(node, source, modules)</span>
+
+  <span class="green">1.</span> Chiama <span class="purple">dispatch_node(node, source)</span>
+
+  <span class="green">2.</span> Se il dispatcher restituisce <span class="green">Some(item)</span>:
+     │
+     ├─ <span class="node">Module</span> → crea un vettore temporaneo con il modulo parsato,
+     │              ri-attraversa i figli del nodo corrente nel contesto del nuovo modulo,
+     │              poi inserisce il modulo popolato in <code>modules[0].sub_modules</code>.
+     │
+     ├─ <span class="node">StructuredType</span> → inserisce direttamente in <code>modules[0].structured_types</code>.
+     │                     <span class="dim">(Non attraversa i figli — i metodi/campi sono già stati estratti dal parser)</span>
+     │
+     ├─ <span class="node">Function</span> → inserisce in <code>modules[0].free_functions</code>,
+     │               poi attraversa i figli <em>solo</em> se sono "body" o "block"
+     │               <span class="dim">(per cercare struct/classi definite dentro la funzione)</span>
+     │
+     ├─ <span class="node">ImplBlock</span> → inserisce in <code>modules[0].impl_blocks</code>.
+     │
+     └─ <span class="node">Import</span> → inserisce in <code>modules[0].imports</code>.
+
+     <span class="red">return;</span>  <span class="dim">// STOP — non scende nei figli (per i casi non-Module/Function)</span>
+
+  <span class="green">3.</span> Se il dispatcher restituisce <span class="red">None</span>:
+     └─ Attraversa ricorsivamente <strong>tutti</strong> i figli del nodo corrente.
+        <span class="dim">(Il nodo non è stato riconosciuto, continua a scendere)</span></div>
+
+    <h3>4.3 Gestione Speciale dei Moduli</h3>
+    <p class="ref">Riga 37-46</p>
+    <p>Quando il dispatcher riconosce un modulo (es. <code>mod core { ... }</code>), il trattamento è diverso dagli altri componenti:</p>
+    <pre><code>crate::heuristics::ParsedItem::Component(crate::ir::Component::Module(m)) =&gt; {
+    // 1. Crea un vettore temporaneo col modulo appena parsato
+    let mut new_modules = vec![m];
+
+    // 2. Ri-attraversa i figli del nodo CST nel contesto del NUOVO modulo
+    let mut cursor = node.walk();
+    for child in node.children(&amp;mut cursor) {
+        walk_cst(child, source, &amp;mut new_modules);
+    }
+
+    // 3. Inserisce il modulo (ora popolato) come sotto-modulo del root
+    modules[0].sub_modules.push(new_modules.remove(0));
+}</code></pre>
+    <p>Questo meccanismo è cruciale: i componenti trovati <em>dentro</em> il nodo del modulo vengono inseriti nel <strong>nuovo modulo</strong> (tramite <code>new_modules</code>), non nel modulo root. Questo preserva la gerarchia del codice sorgente nell'IR.</p>
+
+    <div class="info-box">
+        <strong>Perché <code>new_modules</code> è un <code>Vec</code>?</strong> La funzione <code>walk_cst</code> riceve un <code>&amp;mut Vec&lt;Module&gt;</code> — non un singolo modulo. Per riutilizzare la stessa funzione nel contesto di un sotto-modulo, si crea un <code>Vec</code> temporaneo con il nuovo modulo in posizione <code>[0]</code>. Le chiamate ricorsive a <code>walk_cst</code> inseriranno i componenti trovati in <code>new_modules[0]</code>, che è il modulo appena creato.
+    </div>
+
+    <h3>4.4 Gestione Speciale delle Funzioni</h3>
+    <p class="ref">Riga 48-56</p>
+    <pre><code>crate::heuristics::ParsedItem::Component(crate::ir::Component::Function(ff)) =&gt; {
+    // 1. Inserisce la funzione nel modulo corrente
+    modules[0].free_functions.push(ff);
+
+    // 2. Attraversa i figli "body" per cercare componenti annidati
+    let mut cursor = node.walk();
+    for child in node.children(&amp;mut cursor) {
+        if child.kind().contains("body") || child.kind().contains("block") {
+            walk_cst(child, source, modules);
+        }
+    }
+}</code></pre>
+    <p>Quando viene riconosciuta una funzione, il nodo <strong>non viene completamente ignorato</strong> come per gli altri componenti. Il sistema continua a cercare componenti nel <em>corpo</em> della funzione — ma solo nei nodi di tipo "body" o "block". Questo gestisce il caso di struct o classi definite dentro una funzione (possibile in alcuni linguaggi).</p>
+
+    <div class="warn-box">
+        <strong>Attenzione:</strong> In questa seconda discesa, i componenti trovati vengono inseriti nel modulo corrente (<code>modules</code>), non in un modulo separato. Questo significa che una struct definita dentro una funzione viene trattata come una struct del modulo — non c'è concetto di "scope locale" per le definizioni all'interno dei corpi delle funzioni.
+    </div>
+
+    <h3>4.5 Il <code>return</code> Anti-Duplicazione</h3>
+    <p class="ref">Riga 60</p>
+    <p>Dopo aver processato un componente riconosciuto (tranne le eccezioni sopra), la funzione esegue <code>return</code> — <strong>non scende nei figli</strong> del nodo. Questo è fondamentale per evitare duplicazioni: senza il return, i metodi di una struct verrebbero estratti sia come metodi della struct (dal parser della struct) sia come funzioni libere (da una chiamata ricorsiva separata).</p>
+
+    <!-- ============================================================ -->
+    <h2 id="dispatch">5. Il Dispatcher Euristico: <code>dispatch_node</code></h2>
+    <p class="ref">Riferimento: <code>heuristics/mod.rs:15-32</code></p>
+
+    <p>Il dispatcher è il cervello decisionale. Per ogni nodo del CST, prova a classificarlo in ordine di priorità fisso:</p>
+
+    <pre><code>pub fn dispatch_node(node: Node, source: &amp;str) -&gt; Option&lt;ParsedItem&gt; {
+    // 1. Import (priorità massima)
+    if let Some(import) = parsers::try_parse_import(node, source) {
+        return Some(ParsedItem::Import(import));
+    }
+    // 2. Module
+    if let Some(m) = parsers::try_parse_module_node(node, source) {
+        return Some(ParsedItem::Component(Component::Module(m)));
+    }
+    // 3. Structured Type (struct, class, interface, trait)
+    if let Some(st) = parsers::try_parse_structured_type(node, source) {
+        return Some(ParsedItem::Component(Component::StructuredType(st)));
+    }
+    // 4. Function
+    if let Some(ff) = parsers::try_parse_function(node, source) {
+        return Some(ParsedItem::Component(Component::Function(ff)));
+    }
+    // 5. Impl Block (priorità minima)
+    if let Some(implb) = parsers::try_parse_impl_block(node, source) {
+        return Some(ParsedItem::ImplBlock(implb));
+    }
+    None  // Nodo non riconosciuto
+}</code></pre>
+
+    <div class="info-box">
+        <strong>L'ordine conta:</strong> Le funzioni <code>try_parse_*</code> vengono chiamate in sequenza e il primo match vince (<em>early return</em>). L'ordine è scelto strategicamente:
+        <ul style="margin-top: 0.5rem; margin-bottom: 0;">
+            <li><strong>Import prima di tutto:</strong> Le dichiarazioni di import hanno una grammatica molto distinta e non ambigua.</li>
+            <li><strong>Module prima di Struct:</strong> Un <code>mod_item</code> in Rust potrebbe contenere la stringa "struct" nei figli — il check del modulo deve avvenire prima.</li>
+            <li><strong>Struct prima di Function:</strong> In alcuni linguaggi, una classe contiene metodi — ma il nodo classe deve essere catturato intero, non frammentato in funzioni singole.</li>
+            <li><strong>Impl Block per ultimo:</strong> In Rust, <code>impl_item</code> contiene "impl" che potrebbe generare falsi positivi con altri pattern.</li>
+        </ul>
+    </div>
+
+    <p>Ogni funzione <code>try_parse_*</code> opera in due fasi: prima chiama un <strong>classificatore</strong> (booleano) per verificare il tipo, poi chiama gli <strong>estrattori</strong> per popolare la struttura IR.</p>
+
+    <!-- ============================================================ -->
+    <h2 id="classifiers">6. Livello 1 — Classificatori</h2>
+    <p class="ref">Riferimento: <code>heuristics/classifiers.rs</code></p>
+
+    <p>I classificatori sono funzioni booleane pure che rispondono alla domanda: "Questo nodo CST è un [tipo di componente]?". Usano un approccio <strong>euristico basato su stringhe</strong> per essere indipendenti dal linguaggio.</p>
+
+    <h3>6.1 <code>is_module</code></h3>
+    <pre><code>pub fn is_module(node: Node) -&gt; bool {
+    if !node.is_named() { return false; }
+    let kind = node.kind();
+    kind.contains("mod_item") || kind.contains("module") || kind.contains("namespace")
+}</code></pre>
+    <p>Riconosce moduli, namespaces e package. Copre:</p>
+    <table>
+        <thead><tr><th>Linguaggio</th><th>Node Kind</th><th>Match</th></tr></thead>
+        <tbody>
+            <tr><td>Rust</td><td><code>mod_item</code></td><td>✓ contiene "mod_item"</td></tr>
+            <tr><td>Python</td><td><code>module</code></td><td>✓ contiene "module"</td></tr>
+            <tr><td>C++</td><td><code>namespace_definition</code></td><td>✓ contiene "namespace"</td></tr>
+        </tbody>
+    </table>
+
+    <h3>6.2 <code>is_structured_type</code></h3>
+    <pre><code>pub fn is_structured_type(node: Node) -&gt; bool {
+    if !node.is_named() { return false; }
+    let kind = node.kind();
+    (kind.contains("struct") || kind.contains("class") || kind.contains("interface")
+     || kind.contains("trait") || kind.contains("enum") || kind.contains("union"))
+    &amp;&amp; !kind.contains("bound") &amp;&amp; !kind.contains("clause") &amp;&amp; !kind.contains("list")
+    &amp;&amp; !kind.contains("expression") &amp;&amp; !kind.contains("argument") &amp;&amp; !kind.contains("call")
+    &amp;&amp; !kind.contains("identifier") &amp;&amp; !kind.contains("reference") &amp;&amp; !kind.contains("body")
+    &amp;&amp; !kind.contains("mod") &amp;&amp; !kind.contains("variant")
+}</code></pre>
+    <p>La logica è un <strong>pattern positivo</strong> (deve contenere "struct", "class", ecc.) con <strong>esclusioni negative</strong> per evitare falsi positivi. Ad esempio:</p>
+    <ul>
+        <li><code>"struct_item"</code> → ✓ match (contiene "struct")</li>
+        <li><code>"struct_expression"</code> → ✗ escluso (contiene "expression") — è un'istanziazione, non una definizione</li>
+        <li><code>"class_body"</code> → ✗ escluso (contiene "body") — è il corpo della classe, non la dichiarazione</li>
+        <li><code>"trait_bound"</code> → ✗ escluso (contiene "bound") — è un vincolo generico, non un trait</li>
+        <li><code>"enum_variant"</code> → ✗ escluso (contiene "variant") — è una variante, non l'enum</li>
+    </ul>
+
+    <h3>6.3 <code>is_function</code></h3>
+    <pre><code>pub fn is_function(node: Node) -&gt; bool {
+    if !node.is_named() { return false; }
+    let kind = node.kind();
+    kind.contains("function") || kind.contains("method")
+     || kind.contains("fn_item") || kind.contains("def") || kind.contains("func")
+}</code></pre>
+    <p>Copre la maggior parte delle definizioni di funzione/metodo attraverso i linguaggi:</p>
+    <table>
+        <thead><tr><th>Linguaggio</th><th>Node Kind</th><th>Match</th></tr></thead>
+        <tbody>
+            <tr><td>Rust</td><td><code>function_item</code></td><td>✓ "function"</td></tr>
+            <tr><td>Java</td><td><code>method_declaration</code></td><td>✓ "method"</td></tr>
+            <tr><td>Python</td><td><code>function_definition</code></td><td>✓ "function" e "def"</td></tr>
+            <tr><td>C/C++</td><td><code>function_definition</code></td><td>✓ "function"</td></tr>
+        </tbody>
+    </table>
+
+    <h3>6.4 <code>is_impl_block</code> e <code>is_import</code></h3>
+    <pre><code>pub fn is_impl_block(node: Node) -&gt; bool {
+    if !node.is_named() { return false; }
+    node.kind().contains("impl")
+}
+
+pub fn is_import(node: Node) -&gt; bool {
+    if !node.is_named() { return false; }
+    matches!(node.kind(),
+        "use_declaration" | "import_declaration" | "import_statement"
+        | "import_from_statement" | "preproc_include"
+    )
+}</code></pre>
+    <p><code>is_import</code> è l'unico classificatore che usa <code>matches!</code> (confronto esatto) invece di <code>contains</code>. Questo perché i nomi dei nodi di import sono molto specifici e un matching parziale causerebbe troppi falsi positivi.</p>
+
+    <!-- ============================================================ -->
+    <h2 id="parsers">7. Livello 2 — Parser</h2>
+    <p class="ref">Riferimento: <code>heuristics/parsers.rs</code></p>
+
+    <p>Ogni funzione <code>try_parse_*</code> prima invoca il classificatore corrispondente, poi usa gli estrattori per popolare la struttura IR.</p>
+
+    <h3>7.1 <code>try_parse_module_node</code></h3>
+    <pre><code>pub fn try_parse_module_node(node: Node, source: &amp;str) -&gt; Option&lt;Module&gt; {
+    if !is_module(node) { return None; }
+
+    let name = extract_identifier(node, source)
+        .unwrap_or_else(|| "unnamed_module".to_string());
+
+    Some(Module {
+        name: vec![name],
+        imports: vec![],         // ← Vuoto: gli import verranno aggiunti da walk_cst
+        sub_modules: vec![],     // ← Vuoto: i sotto-moduli verranno aggiunti da walk_cst
+        structured_types: vec![],
+        free_functions: vec![],
+        impl_blocks: vec![],
+    })
+}</code></pre>
+    <div class="info-box">
+        <strong>Modulo "vuoto":</strong> Il parser crea un modulo con solo il nome — tutti gli altri campi sono vuoti. Sarà <code>walk_cst</code> (Sezione 4.3) a ri-attraversare i figli del nodo CST e a popolare il modulo con i componenti trovati al suo interno.
+    </div>
+
+    <h3>7.2 <code>try_parse_structured_type</code></h3>
+    <pre><code>pub fn try_parse_structured_type(node: Node, source: &amp;str) -&gt; Option&lt;StructuredType&gt; {
+    if !is_structured_type(node) { return None; }
+
+    let kind_text = node.kind();
+    let text = node_text(node, source);
+    let name = extract_qualified_name(node, source)
+        .unwrap_or_else(|| vec!["unnamed_type".to_string()]);
+
+    let fields = extract_fields(node, source);           // Campi
+    let methods = extract_methods(node, source);         // Metodi
+    let super_types = extract_super_types(node, source); // Eredità
+    let nested_types = extract_nested_types(node, source); // Tipi annidati
+
+    Some(StructuredType {
+        name,
+        kind: determine_structured_kind(kind_text, &amp;text),
+        fields, methods, super_types, nested_types,
+    })
+}</code></pre>
+    <p>A differenza dei moduli, i tipi strutturati vengono popolati <strong>completamente dal parser</strong> — campi, metodi, super-tipi e tipi annidati sono tutti estratti in questa fase. Non c'è bisogno di ri-attraversare il CST da <code>walk_cst</code>.</p>
+
+    <h3>7.3 <code>try_parse_function</code></h3>
+    <pre><code>pub fn try_parse_function(node: Node, source: &amp;str) -&gt; Option&lt;Function&gt; {
+    if !is_function(node) { return None; }
+
+    let name = extract_identifier(node, source)
+        .unwrap_or_else(|| "unnamed_function".to_string());
+    let parameters = extract_parameters(node, source);
+    let return_type = extract_return_type(node, source);
+
+    // Estrazione strutturata del body
+    let body = if let Some(body_node) = node.child_by_field_name("body") {
+        Some(extract_block(body_node, source))
+    } else {
+        None
+    };
+
+    Some(Function {
+        name: vec![name],
+        signature: Signature { parameters, return_type },
+        body,
+    })
+}</code></pre>
+    <p>Oltre a nome, parametri e tipo di ritorno, il parser estrae il <strong>corpo della funzione</strong> come un <code>Block</code> strutturato tramite <code>extract_block</code>. Il <code>Block</code> risultante contiene dichiarazioni locali, dipendenze comportamentali (chiamate e istanziazioni) e sotto-blocchi annidati (vedi <a href="#body-deps">Sezione 10</a>). Se la funzione non ha un body (es. dichiarazioni in header), il campo è <code>None</code>.</p>
+
+    <h3>7.4 <code>try_parse_impl_block</code></h3>
+    <pre><code>pub fn try_parse_impl_block(node: Node, source: &amp;str) -&gt; Option&lt;ImplBlock&gt; {
+    if !is_impl_block(node) { return None; }
+
+    let name = extract_qualified_name(node, source)
+        .unwrap_or_else(|| vec!["unnamed_impl".to_string()]);
+    let methods = extract_methods(node, source);
+    let impl_for = extract_impl_for(node, source);
+    let implements_trait = extract_implements_trait(node, source);
+    let nested_types = extract_nested_types(node, source);
+
+    Some(ImplBlock { name, methods, impl_for, implements_trait, nested_types })
+}</code></pre>
+
+    <h3>7.5 <code>try_parse_import</code></h3>
+    <pre><code>pub fn try_parse_import(node: Node, source: &amp;str) -&gt; Option&lt;Import&gt; {
+    if !is_import(node) { return None; }
+
+    let text = node_text(node, source);
+
+    // 1. Determina se è un wildcard import
+    let is_wildcard = text.contains('*') || text.contains(".*") || text.contains("::*");
+
+    // 2. Cerca un alias (es. "as Db")
+    let mut alias = None;
+    if let Some(as_pos) = text.find(" as ") {
+        let after_as = text[as_pos + 4..].trim();
+        let alias_part: String = after_as.chars()
+            .take_while(|c| c.is_alphanumeric() || *c == '_').collect();
+        if !alias_part.is_empty() { alias = Some(alias_part); }
+    }
+
+    // 3. Estrai il percorso dell'import
+    let path = /* ... vari tentativi con named fields e fallback ... */;
+
+    if path.is_empty() { return None; }
+    Some(Import { path, alias, is_wildcard })
+}</code></pre>
+    <p>Il parsing degli import combina approcci strutturali (named fields del CST) con fallback testuali (<code>text.find(" as ")</code>) per gestire variazioni tra linguaggi diversi.</p>
+
+    <!-- ============================================================ -->
+    <h2 id="extractors">8. Livello 3 — Estrattori</h3>
+    <p class="ref">Riferimenti: <code>heuristics/text_parsing.rs</code>, <code>heuristics/structural_extraction.rs</code></p>
+
+    <p>Gli estrattori sono le funzioni di più basso livello. Interagiscono direttamente con i nodi CST di Tree-sitter per estrarre dati specifici. Questo livello è stato recentemente fattorizzato in più file per massimizzare la coesione del codice.</p>
+
+    <h3>8.1 <code>node_text</code> — Estrazione del testo grezzo</h3>
+    <pre><code>pub fn node_text(node: Node, source: &amp;str) -&gt; String {
+    node.utf8_text(source.as_bytes()).unwrap_or("").to_string()
+}</code></pre>
+    <p>Funzione fondamentale: estrae il testo del codice sorgente corrispondente a un nodo CST. Tree-sitter memorizza solo le posizioni (byte offset) dei nodi — il testo viene letto dalla stringa sorgente originale.</p>
+
+    <h3>8.2 <code>split_qualified_name</code> — Parsing dei nomi qualificati</h3>
+    <pre><code>pub fn split_qualified_name(text: &amp;str) -&gt; QualifiedName {
+    text.split(&amp;[':', '.', ' '][..])
+        .filter(|s| !s.trim().is_empty())
+        .map(|s| s.trim().to_string())
+        .collect()
+}</code></pre>
+    <p>Divide nomi qualificati come <code>"std::vec::Vec"</code>, <code>"java.util.List"</code> e <code>"A B"</code> in vettori: <code>["std", "vec", "Vec"]</code>. I separatori supportati sono <code>:</code>, <code>.</code> e spazio.</p>
+
+    <h3>8.3 <code>extract_identifier</code> — Estrazione del nome semplice</h3>
+    <pre><code>pub fn extract_identifier(node: Node, source: &amp;str) -&gt; Option&lt;String&gt; {
+    // Tentativo 1: named fields comuni
+    if let Some(n) = node.child_by_field_name("name")
+        .or_else(|| node.child_by_field_name("type_identifier"))
+        .or_else(|| node.child_by_field_name("identifier"))
+    { ... }
+
+    // Tentativo 2: campo "declarator" (tipico di C/C++)
+    if let Some(decl) = node.child_by_field_name("declarator") { ... }
+
+    None
+}</code></pre>
+    <p>Cerca il nome di un componente usando una catena di named fields progressivamente meno specifici. Il fallback al <code>declarator</code> gestisce le dichiarazioni C/C++ dove il nome è annidato dentro il dichiaratore.</p>
+
+    <h3>8.4 <code>extract_qualified_name</code> — Estrazione del nome completo</h3>
+    <pre><code>pub fn extract_qualified_name(node: Node, source: &amp;str) -&gt; Option&lt;QualifiedName&gt; {
+    // Tentativo 1: named fields → split_qualified_name
+    if let Some(n) = node.child_by_field_name("name")... {
+        return Some(split_qualified_name(&amp;node_text(n, source)));
+    }
+
+    // Tentativo 2: raccogli tutti gli identifier figli
+    let mut parts = vec![];
+    for child in node.children(...) {
+        if matches!(child.kind(), "identifier" | "type_identifier" | "name") {
+            parts.push(node_text(child, source));
+        }
+    }
+    if !parts.is_empty() { Some(parts) } else { None }
+}</code></pre>
+    <p>A differenza di <code>extract_identifier</code>, questa funzione supporta nomi multi-parte (es. <code>A::B::C</code>). Il fallback manuale raccoglie tutti i figli "identifier" per ricostruire il nome qualificato.</p>
+
+    <h3>8.5 <code>extract_list_of</code> — Estrattore generico per liste</h3>
+    <pre><code>pub fn extract_list_of&lt;T, F&gt;(node: Node, source: &amp;str, parser: F) -&gt; Vec&lt;T&gt;
+where F: Fn(Node, &amp;str) -&gt; Option&lt;T&gt; + Copy
+{
+    let mut items = vec![];
+    for child in node.children(...) {
+        if let Some(item) = parser(child, source) {
+            items.push(item);
+        } else if child.kind().contains("body") || child.kind().contains("list")
+               || child.kind().contains("block") || child.kind().contains("declaration") {
+            items.extend(extract_list_of(child, source, parser));  // Ricorsione!
+        }
+    }
+    items
+}</code></pre>
+    <p>Funzione generica parametrizzata: riceve una funzione <code>parser</code> e la applica a tutti i figli del nodo. Se un figlio non viene riconosciuto dal parser ma è un nodo "contenitore" (body, list, block, declaration), <strong>scende ricorsivamente</strong> al suo interno. Questo gestisce la variazione nella profondità dell'albero CST tra linguaggi diversi.</p>
+    <p>Viene usata per estrarre:</p>
+    <ul>
+        <li><code>extract_fields(node, source)</code> → usa un parser inline per <code>field_declaration</code></li>
+        <li><code>extract_methods(node, source)</code> → usa <code>try_parse_function</code></li>
+        <li><code>extract_nested_types(node, source)</code> → usa <code>try_parse_structured_type</code></li>
+    </ul>
+
+    <h3>8.6 <code>extract_parameters</code> — Parametri di funzione</h3>
+    <pre><code>pub fn extract_parameters(node: Node, source: &amp;str) -&gt; Vec&lt;Parameter&gt; {
+    if let Some(params_node) = node.child_by_field_name("parameters") {
+        for p in params_node.children(...) {
+            if p.kind().contains("parameter") {
+                let name = extract_identifier(p, source);
+                let ty = extract_type_ref(p, source);
+                let is_variadic = text.contains("...") || text.contains("*args");
+                params.push(Parameter { name, ty, is_variadic });
+            }
+        }
+    }
+}</code></pre>
+    <p>Cerca il nodo <code>"parameters"</code> come named field, poi itera sui figli di tipo "parameter" per estrarre nome, tipo e flag variadico.</p>
+
+    <h3>8.7 <code>extract_return_type</code> — Tipo di ritorno</h3>
+    <pre><code>pub fn extract_return_type(node: Node, source: &amp;str) -&gt; TypeRef {
+    // Tentativo 1: named fields "return_type" o "type"
+    if let Some(type_node) = node.child_by_field_name("return_type")
+        .or_else(|| node.child_by_field_name("type")) { ... }
+
+    // Tentativo 2: fallback testuale — cerca "->" nel testo del nodo
+    if let Some(arrow_pos) = text.find("->") { ... }
+
+    TypeRef::Failed(vec![])  // Nessun tipo di ritorno trovato
+}</code></pre>
+
+    <h3>8.8 <code>extract_super_types</code> — Ereditarietà e implementazione</h3>
+    <p>Questa funzione è la più complessa degli estrattori. Cerca tipi padre/interfacce in una serie di named fields:</p>
+    <ul>
+        <li><code>"super_type"</code>, <code>"extends"</code>, <code>"implements"</code> — Java</li>
+        <li><code>"superclass"</code>, <code>"superclasses"</code> — Python</li>
+        <li><code>"interfaces"</code> — Java</li>
+        <li>Nodi figli di tipo <code>"base_class_clause"</code> — C++</li>
+    </ul>
+    <p>Per ciascun nodo trovato, attraversa i figli cercando <code>type_identifier</code>, <code>identifier</code>, <code>scoped_type_identifier</code> e liste di tipi.</p>
+
+    <h3>8.9 <code>extract_implements_trait</code> — Trait implementato da un impl block</h3>
+    <pre><code>pub fn extract_implements_trait(node: Node, source: &amp;str) -&gt; Option&lt;TypeRef&gt; {
+    let text = node_text(node, source);
+    if let Some(for_pos) = text.find("for ") {
+        let before_for = text[..for_pos].trim();
+        if before_for.contains("impl") &amp;&amp; !before_for.ends_with("impl") {
+            // Es: "impl Trait for Type" → prima di "for" c'è "impl Trait"
+            // Estrae "Trait" come nome
+            ...
+        }
+    }
+    None
+}</code></pre>
+    <p>Usa un approccio <strong>puramente testuale</strong>: cerca la keyword <code>"for "</code> nel testo del nodo e analizza ciò che appare tra <code>"impl"</code> e <code>"for"</code>. Se c'è qualcosa (il nome di un trait), lo restituisce come <code>TypeRef::Unresolved</code>.</p>
+
+    <!-- ============================================================ -->
+    <h2 id="type-extraction">9. Estrazione dei Tipi: <code>extract_type_ref</code></h2>
+    <p class="ref">Riferimento: <code>heuristics/type_extraction.rs</code></p>
+
+    <p>Questa funzione è usata ovunque serva estrarre un riferimento a un tipo (campi, parametri, tipo di ritorno, ecc.). Opera con una cascata di tentativi sempre più generici:</p>
+
+    <div class="step">
+        <h3>Step 0 — Nodi diretti di tipo/identificatore</h3>
+        <pre><code>if matches!(kind, "field_access" | "scoped_identifier" | "qualified_identifier"
+                 | "identifier" | "type_identifier" | "attribute") {
+    let text = node_text(node, source);
+    if !text.is_empty() {
+        return TypeRef::Unresolved(split_qualified_name(&amp;text));
+    }
+}</code></pre>
+        <p>Se il nodo stesso è già un identificatore o un accesso qualificato, estrae direttamente il testo e lo splitta in un nome qualificato.</p>
+    </div>
+
+    <div class="step">
+        <h3>Step 1 — Named fields del CST</h3>
+        <pre><code>if let Some(type_node) = node.child_by_field_name("type")
+    .or_else(|| node.child_by_field_name("return_type"))
+    .or_else(|| node.child_by_field_name("field_type"))
+    .or_else(|| node.child_by_field_name("value_type"))
+{
+    return TypeRef::Unresolved(split_qualified_name(&amp;node_text(type_node, source)));
+}</code></pre>
+        <p>Cerca un figlio con nome semantico relativo al tipo. Questo è il percorso più affidabile — usa i named fields di Tree-sitter che sono specifici per grammatica.</p>
+    </div>
+
+    <div class="step">
+        <h3>Step 2 — Ricerca dei figli identificatore</h3>
+        <pre><code>for child in node.children(...) {
+    if matches!(child_kind, "type_identifier" | "primitive_type" | "identifier" | "type") {
+        let text = node_text(child, source);
+        if !text.is_empty() &amp;&amp; !text.contains(" ") {
+            return TypeRef::Unresolved(split_qualified_name(&amp;text));
+        }
+    }
+}</code></pre>
+        <p>Se i named fields non hanno prodotto risultati, scorre tutti i figli del nodo cercando nodi di tipo identificatore. Il check <code>!text.contains(" ")</code> evita di catturare espressioni complesse scambiate per nomi di tipo.</p>
+    </div>
+
+    <div class="step step-warning">
+        <h3>Step 3 — Fallback testuale puro</h3>
+        <pre><code>let text = node_text(node, source);
+// Cerca dopo ":"  (es. "x: String")
+if let Some(colon_pos) = text.find(':') { ... }
+// Cerca dopo "->" (es. "-> i32")
+if let Some(arrow_pos) = text.find("->") { ... }</code></pre>
+        <p>L'ultimo tentativo è completamente testuale: cerca i caratteri <code>:</code> o <code>-&gt;</code> nel testo del nodo e prende tutto ciò che segue. Questo gestisce i casi in cui Tree-sitter non espone named fields per il tipo.</p>
+    </div>
+
+    <div class="step step-danger">
+        <h3>Fallimento</h3>
+        <pre><code>TypeRef::Failed(vec![])</code></pre>
+        <p>Se nessun tentativo riesce, viene restituito un <code>TypeRef::Failed</code> con nome vuoto.</p>
+    </div>
+
+    <!-- ============================================================ -->
+    <h2 id="body-deps">10. Estrazione Strutturata del Body: <code>extract_block</code></h2>
+    <p class="ref">Riferimento: <code>heuristics/body_extraction.rs</code></p>
+
+    <p>L'analisi del corpo di una funzione è gestita dalla funzione <code>extract_block</code>, che sostituisce la precedente <code>traverse_for_body_deps</code>. Il nuovo approccio produce un <code>Block</code> strutturato che modella la gerarchia degli scope del codice, separando dichiarazioni locali, dipendenze comportamentali e blocchi annidati. Durante la visita, <code>infer_variable_type</code> compensa le variabili omesse tipizzando dal lato destro dell'espressione.</p>
+
+    <h3>10.1 <code>extract_block</code> — Estrazione strutturata</h3>
+    <pre><code>pub fn extract_block(node: Node, source: &amp;str) -&gt; Block {
+    let mut declarations = vec![];
+    let mut calls = vec![];
+    let mut instantiates = vec![];
+    let mut sub_blocks = vec![];
+    let mut cursor = node.walk();
+
+    for child in node.children(&amp;mut cursor) {
+        let kind = child.kind();
+
+        // 1. Dichiarazioni di variabili locali
+        if matches!(kind, "field_declaration" | "property_declaration" | "field"
+            | "member_declaration" | "variable_declarator" | "attribute"
+            | "local_variable_declaration" | "lexical_declaration"
+            | "variable_declaration" | "let_declaration")
+        {
+            if let Some(name) = extract_identifier(child, source) {
+                let ty = extract_type_ref(child, source);
+                declarations.push(Field { name, ty });
+            }
+        }
+        // 2. Blocchi annidati (if/while/scope anonimi)
+        else if kind.contains("body") || kind.contains("block")
+             || kind == "compound_statement"
+        {
+            sub_blocks.push(extract_block(child, source));
+        }
+        // 3. Dipendenze comportamentali (nodi non-blocco)
+        else {
+            let mut inner_calls = vec![];
+            let mut inner_inst = vec![];
+            find_behavioral_deps(child, source, &amp;mut inner_calls, &amp;mut inner_inst);
+            calls.extend(inner_calls);
+            instantiates.extend(inner_inst);
+        }
+    }
+
+    Block { declarations, calls, instantiates, sub_blocks }
+}</code></pre>
+
+    <p>La funzione opera sui figli diretti del nodo body, classificandoli in tre categorie:</p>
+
+    <div class="step">
+        <h3>Categoria 1 — Dichiarazioni di variabili locali</h3>
+        <p>I nodi che rappresentano dichiarazioni di variabili (<code>let_declaration</code>, <code>local_variable_declaration</code>, <code>lexical_declaration</code>, ecc.) vengono estratti come <code>Field { name, ty }</code> e aggiunti a <code>declarations</code>. Questo cattura le variabili locali del blocco con il loro tipo (quando disponibile).</p>
+        <table>
+            <thead><tr><th>Linguaggio</th><th>Esempio</th><th>Node Kind</th></tr></thead>
+            <tbody>
+                <tr><td>Rust</td><td><code>let x: i32 = 5;</code></td><td><code>let_declaration</code></td></tr>
+                <tr><td>Java</td><td><code>String s = "hello";</code></td><td><code>local_variable_declaration</code></td></tr>
+                <tr><td>JavaScript/TS</td><td><code>let x = 10;</code></td><td><code>lexical_declaration</code></td></tr>
+                <tr><td>C/C++</td><td><code>int count = 0;</code></td><td><code>variable_declaration</code></td></tr>
+                <tr><td>Python</td><td><code>self.x = 5</code></td><td><code>attribute</code></td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="step step-purple">
+        <h3>Categoria 2 — Blocchi annidati (ricorsione)</h3>
+        <p>Se un figlio è un blocco (il suo <code>kind()</code> contiene <code>"body"</code> o <code>"block"</code>, oppure è un <code>"compound_statement"</code>), viene processato ricorsivamente con <code>extract_block</code> e il risultato viene aggiunto a <code>sub_blocks</code>. Questo crea la gerarchia di <code>Block</code> annidati.</p>
+        <pre><code>// Esempio: un if con un body annidato
+fn esempio() {
+    let x = 5;               // ← declarations del Block principale
+    if x &gt; 0 {               // ← il body dell'if diventa un sub_block
+        let y = 10;           //   ← declarations del sub_block
+        calcola(y);           //   ← calls del sub_block
+    }
+    stampa(x);                // ← calls del Block principale
+}</code></pre>
+    </div>
+
+    <div class="step step-success">
+        <h3>Categoria 3 — Dipendenze comportamentali</h3>
+        <p>Tutti gli altri nodi (espressioni, statement non-blocco, ecc.) vengono passati a <code>find_behavioral_deps</code> per cercare chiamate e istanziazioni. Questa funzione cerca ricorsivamente nel sottoalbero ma <strong>salta i blocchi annidati</strong> per evitare il double-counting.</p>
+    </div>
+
+    <h3>10.2 <code>find_behavioral_deps</code> — Ricerca dipendenze senza double-counting</h3>
+    <p>La funzione <code>find_behavioral_deps</code> cerca ricorsivamente chiamate a funzione e istanziazioni nel sottoalbero di un nodo, ma <strong>si ferma</strong> quando incontra un nodo di tipo blocco (che sarà processato separatamente da <code>extract_block</code>).</p>
+
+    <h4>Istanziazioni (<code>instantiates</code>)</h4>
+    <pre><code>// Java/C++: new MyClass()
+if matches!(kind, "object_creation_expression" | "new_expression") {
+    if let Some(t_node) = node.child_by_field_name("type") {
+        instantiates.push(extract_type_ref(t_node, source));
+    }
+}
+// Rust: MyStruct { ... }
+else if kind == "struct_expression" {
+    if let Some(name_node) = node.child_by_field_name("name") {
+        instantiates.push(extract_type_ref(name_node, source));
+    }
+}</code></pre>
+
+    <h4>Chiamate a funzione (<code>calls</code>)</h4>
+    <pre><code>// Chiamate generiche: func(), obj.method(), Module::func()
+if matches!(kind, "call_expression" | "call") {
+    if let Some(f) = node.child_by_field_name("function") {
+        // Scoped: Module::func() → estrae "Module"
+        if matches!(f_kind, "qualified_identifier" | "scoped_identifier") {
+            calls.push(extract_type_ref(scope, source));
+        }
+        // Method: obj.method() → estrae "obj"
+        else if matches!(f_kind, "field_expression" | "attribute") {
+            calls.push(extract_type_ref(obj, source));
+        }
+        // Simple: func() → estrae "func"
+        else if matches!(f_kind, "identifier" | "type_identifier") {
+            calls.push(extract_type_ref(f, source));
+        }
+    }
+}
+// Java method invocations: obj.method()
+else if kind == "method_invocation" {
+    calls.push(extract_type_ref(obj_or_name, source));
+}</code></pre>
+
+    <p>Per le chiamate, la logica varia in base alla forma sintattica:</p>
+    <table>
+        <thead><tr><th>Pattern</th><th>Tipo CST</th><th>Cosa viene estratto</th></tr></thead>
+        <tbody>
+            <tr><td><code>Module::func()</code></td><td><code>scoped_identifier</code></td><td>Lo "scope" (es. <code>Module</code>)</td></tr>
+            <tr><td><code>obj.method()</code></td><td><code>field_expression</code></td><td>L'"object" (es. <code>obj</code>)</td></tr>
+            <tr><td><code>func()</code></td><td><code>identifier</code></td><td>L'identificatore (es. <code>func</code>)</td></tr>
+            <tr><td><code>obj.method()</code> (Java)</td><td><code>method_invocation</code></td><td>L'"object" o il "name"</td></tr>
+        </tbody>
+    </table>
+
+    <div class="warn-box">
+        <strong>Differenza chiave rispetto al vecchio <code>traverse_for_body_deps</code>:</strong> La vecchia funzione attraversava ricorsivamente <strong>tutti</strong> i figli senza distinzione, raccogliendo chiamate e istanziazioni in liste piatte. Il nuovo approccio con <code>extract_block</code> + <code>find_behavioral_deps</code> separa le dipendenze per livello di scope: <code>find_behavioral_deps</code> <strong>salta</strong> i nodi blocco (che vengono gestiti da <code>extract_block</code> come <code>sub_blocks</code>), evitando così il double-counting.
+    </div>
+
+    <h3>10.3 Visualizzazione della struttura Block</h3>
+    <p>Per una funzione con blocchi annidati, la struttura risultante è ad albero:</p>
+    <div class="tree-container">
+<span class="node">Block</span> <span class="dim">(body della funzione)</span>
+ <span class="arrow">├──</span> <span class="symbol">declarations:</span> [ x: <span class="dim">Unresolved(i32)</span> ]
+ <span class="arrow">├──</span> <span class="symbol">calls:</span> [ stampa ]
+ <span class="arrow">├──</span> <span class="symbol">instantiates:</span> [ ]
+ <span class="arrow">└──</span> <span class="node">sub_blocks:</span>
+      <span class="arrow">└──</span> <span class="node">Block</span> <span class="dim">(body dell'if)</span>
+           <span class="arrow">├──</span> <span class="symbol">declarations:</span> [ y: <span class="dim">Unresolved(i32)</span> ]
+           <span class="arrow">├──</span> <span class="symbol">calls:</span> [ calcola ]
+           <span class="arrow">├──</span> <span class="symbol">instantiates:</span> [ ]
+           <span class="arrow">└──</span> <span class="symbol">sub_blocks:</span> [ ]</div>
+
+    <!-- ============================================================ -->
+    <h2 id="full-example">11. Esempio Completo End-to-End</h2>
+
+    <p>Seguiamo l'intero processo per il seguente codice Rust:</p>
+    <pre><code>use external::db::Database as Db;
+
+mod core {
+    struct Veicolo {
+        id: String,
+    }
+    struct Auto {
+        base: Veicolo,
+    }
+    fn calcola() -&gt; Auto {
+        let v = Auto { base: Veicolo { id: String::new() } };
+        v
+    }
+}
+
+struct User {
+    name: String,
+}</code></pre>
+
+    <div class="step step-success">
+        <h3>Passo 1 — Parsing Tree-sitter</h3>
+        <p><code>generic_extract(rust(), source)</code> crea il parser Rust e genera il CST. Il nodo radice è <code>source_file</code>.</p>
+    </div>
+
+    <div class="step">
+        <h3>Passo 2 — Prima chiamata <code>walk_cst(source_file, ...)</code></h3>
+        <p>Il dispatcher viene invocato su <code>source_file</code> → restituisce <code>None</code> (non è un componente riconosciuto). Quindi <code>walk_cst</code> scende nei figli del nodo radice. I figli diretti sono:</p>
+        <ol>
+            <li><code>use_declaration</code> — <code>use external::db::Database as Db</code></li>
+            <li><code>mod_item</code> — <code>mod core { ... }</code></li>
+            <li><code>struct_item</code> — <code>struct User { ... }</code></li>
+        </ol>
+    </div>
+
+    <div class="step step-purple">
+        <h3>Passo 3 — Nodo <code>use_declaration</code></h3>
+        <ol>
+            <li><strong>dispatch_node</strong> → chiama <code>try_parse_import</code> → <code>is_import</code> restituisce <strong>true</strong> (matches <code>"use_declaration"</code>).</li>
+            <li><strong>Parsing dell'import:</strong>
+                <ul>
+                    <li><code>is_wildcard</code>: il testo non contiene <code>*</code> → <strong>false</strong></li>
+                    <li><code>alias</code>: trova <code>" as "</code> nel testo → estrae <code>"Db"</code></li>
+                    <li><code>path</code>: cerca named field <code>"argument"</code> → trova il nodo <code>scoped_identifier</code> → testo <code>"external::db::Database"</code> → split → <code>["external", "db", "Database"]</code></li>
+                </ul>
+            </li>
+            <li><strong>Risultato:</strong> <code>Import { path: ["external", "db", "Database"], alias: Some("Db"), is_wildcard: false }</code></li>
+            <li><strong>Inserimento:</strong> <code>modules</code> è vuoto → crea modulo <code>"root"</code> → inserisce l'import in <code>modules[0].imports</code>.</li>
+        </ol>
+    </div>
+
+    <div class="step step-purple">
+        <h3>Passo 4 — Nodo <code>mod_item</code> (mod core)</h3>
+        <ol>
+            <li><strong>dispatch_node</strong> → <code>try_parse_import</code> fallisce → <code>try_parse_module_node</code> → <code>is_module</code> restituisce <strong>true</strong> (kind <code>"mod_item"</code> contiene <code>"mod_item"</code>).</li>
+            <li><strong>Parsing:</strong> <code>extract_identifier</code> → named field <code>"name"</code> → <code>"core"</code>. Crea <code>Module { name: ["core"], ... }</code> (tutto vuoto).</li>
+            <li><strong>walk_cst crea <code>new_modules = [Module("core")]</code></strong> e ri-attraversa i figli del nodo <code>mod_item</code>.</li>
+        </ol>
+
+        <h4 style="margin-left: 1.5rem;">Passo 4a — Figlio: <code>struct_item</code> (struct Veicolo)</h4>
+        <ol style="margin-left: 1.5rem;">
+            <li><strong>dispatch_node</strong> → <code>try_parse_structured_type</code> → <code>is_structured_type</code> true (contiene "struct").</li>
+            <li><strong>Parsing:</strong>
+                <ul>
+                    <li><code>name</code> → <code>["Veicolo"]</code></li>
+                    <li><code>kind</code> → <code>StructuredTypeKind::Struct</code></li>
+                    <li><code>fields</code> → <code>extract_fields</code> trova <code>field_declaration "id: String"</code> → <code>[Field { name: "id", ty: Unresolved(["String"]) }]</code></li>
+                    <li><code>methods</code> → <code>[]</code>, <code>super_types</code> → <code>[]</code>, <code>nested_types</code> → <code>[]</code></li>
+                </ul>
+            </li>
+            <li><strong>Inserimento:</strong> In <code>new_modules[0].structured_types</code> (cioè nel modulo <code>"core"</code>).</li>
+            <li><strong>return</strong> — non scende nei figli della struct.</li>
+        </ol>
+
+        <h4 style="margin-left: 1.5rem;">Passo 4b — Figlio: <code>struct_item</code> (struct Auto)</h4>
+        <ol style="margin-left: 1.5rem;">
+            <li>Stessa logica. <code>fields</code> → <code>[Field { name: "base", ty: Unresolved(["Veicolo"]) }]</code></li>
+            <li>Inserito in <code>new_modules[0].structured_types</code>.</li>
+        </ol>
+
+        <h4 style="margin-left: 1.5rem;">Passo 4c — Figlio: <code>function_item</code> (fn calcola)</h4>
+        <ol style="margin-left: 1.5rem;">
+            <li><strong>dispatch_node</strong> → <code>try_parse_function</code> → <code>is_function</code> true.</li>
+            <li><strong>Parsing:</strong>
+                <ul>
+                    <li><code>name</code> → <code>"calcola"</code></li>
+                    <li><code>parameters</code> → <code>[]</code></li>
+                    <li><code>return_type</code> → named field <code>"return_type"</code> → testo <code>"Auto"</code> → <code>Unresolved(["Auto"])</code></li>
+                    <li><code>body</code> → <code>extract_block</code> sul nodo body produce:
+                        <ul>
+                            <li><code>declarations</code>: <code>[Field { name: "v", ty: Unresolved(["Auto"]) }]</code> — la variabile <code>let v</code></li>
+                            <li><code>instantiates</code>: <code>[Unresolved(["Auto"]), Unresolved(["Veicolo"])]</code> — le <code>struct_expression</code></li>
+                            <li><code>calls</code>: <code>[Unresolved(["String"])]</code> — da <code>String::new()</code></li>
+                            <li><code>sub_blocks</code>: <code>[]</code> — nessun blocco annidato</li>
+                        </ul>
+                    </li>
+                </ul>
+            </li>
+            <li>Inserito in <code>new_modules[0].free_functions</code>.</li>
+        </ol>
+
+        <p><strong>Completamento del Passo 4:</strong> il modulo <code>"core"</code> è ora popolato. Viene inserito in <code>modules[0].sub_modules</code> → il modulo <code>"root"</code> ora contiene il sotto-modulo <code>"core"</code>.</p>
+    </div>
+
+    <div class="step step-purple">
+        <h3>Passo 5 — Nodo <code>struct_item</code> (struct User)</h3>
+        <ol>
+            <li><strong>dispatch_node</strong> → <code>try_parse_structured_type</code> → <strong>true</strong>.</li>
+            <li><code>name</code> → <code>["User"]</code>, <code>fields</code> → <code>[Field { name: "name", ty: Unresolved(["String"]) }]</code>.</li>
+            <li>Inserito in <code>modules[0].structured_types</code> (il modulo <code>"root"</code>).</li>
+        </ol>
+    </div>
+
+    <div class="step step-success">
+        <h3>Risultato Finale dell'IR</h3>
+        <p>L'output di <code>generic_extract</code> è:</p>
+        <div class="tree-container">
+<span class="node">Module "root"</span>
+ <span class="arrow">├──</span> <span class="import">imports:</span> [ external::db::Database <span class="import">as Db</span> ]
+ <span class="arrow">├──</span> <span class="symbol">structured_types:</span> [ User { name: String } ]
+ <span class="arrow">├──</span> <span class="symbol">free_functions:</span> [ ]
+ <span class="arrow">├──</span> <span class="symbol">impl_blocks:</span> [ ]
+ <span class="arrow">└──</span> <span class="node">sub_modules:</span>
+      <span class="arrow">└──</span> <span class="node">Module "core"</span>
+           <span class="arrow">├──</span> <span class="import">imports:</span> [ ]
+           <span class="arrow">├──</span> <span class="symbol">structured_types:</span>
+           <span class="arrow">│</span>    <span class="arrow">├──</span> Veicolo { id: <span class="dim">Unresolved(String)</span> }
+           <span class="arrow">│</span>    <span class="arrow">└──</span> Auto { base: <span class="dim">Unresolved(Veicolo)</span> }
+           <span class="arrow">├──</span> <span class="symbol">free_functions:</span>
+           <span class="arrow">│</span>    <span class="arrow">└──</span> calcola() → <span class="dim">Unresolved(Auto)</span>
+           <span class="arrow">│</span>         <span class="purple">body:</span> <span class="node">Block</span>
+           <span class="arrow">│</span>           <span class="arrow">├──</span> <span class="symbol">declarations:</span> [ v: <span class="dim">Unresolved(Auto)</span> ]
+           <span class="arrow">│</span>           <span class="arrow">├──</span> <span class="symbol">calls:</span> [ <span class="dim">Unresolved(String)</span> ]
+           <span class="arrow">│</span>           <span class="arrow">├──</span> <span class="symbol">instantiates:</span> [ <span class="dim">Unresolved(Auto)</span>, <span class="dim">Unresolved(Veicolo)</span> ]
+           <span class="arrow">│</span>           <span class="arrow">└──</span> <span class="symbol">sub_blocks:</span> [ ]
+           <span class="arrow">├──</span> <span class="symbol">impl_blocks:</span> [ ]
+           <span class="arrow">└──</span> <span class="symbol">sub_modules:</span> [ ]</div>
+        <p>Questa struttura verrà poi passata alla <strong>Fase 2 (Name Resolution)</strong> che trasformerà tutti i <code>TypeRef::Unresolved</code> in <code>Resolved</code>, <code>External</code> o <code>Failed</code>.</p>
+    </div>
+
+</body>
+</html>

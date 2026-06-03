@@ -1,0 +1,1887 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Name Resolution: Deep Dive Tecnico</title>
+    <style>
+        :root {
+            --bg: #fafbfc;
+            --card-bg: #ffffff;
+            --text: #24292f;
+            --text-secondary: #57606a;
+            --border: #d0d7de;
+            --accent: #0969da;
+            --accent-subtle: #ddf4ff;
+            --success: #1a7f37;
+            --success-subtle: #dafbe1;
+            --warning: #9a6700;
+            --warning-subtle: #fff8c5;
+            --danger: #cf222e;
+            --danger-subtle: #ffebe9;
+            --code-bg: #f6f8fa;
+            --pre-bg: #1b1f23;
+            --pre-text: #e6edf3;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif;
+            line-height: 1.7;
+            max-width: 1060px;
+            margin: 0 auto;
+            padding: 2.5rem 2rem;
+            color: var(--text);
+            background: var(--bg);
+        }
+
+        h1 {
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+            color: var(--text);
+            letter-spacing: -0.02em;
+        }
+        h1 + p { color: var(--text-secondary); font-size: 1.1em; margin-bottom: 2rem; }
+
+        h2 {
+            font-size: 1.45rem;
+            font-weight: 600;
+            color: var(--text);
+            margin-top: 2.8rem;
+            margin-bottom: 1rem;
+            padding-bottom: 0.4rem;
+            border-bottom: 1px solid var(--border);
+        }
+        h3 {
+            font-size: 1.15rem;
+            font-weight: 600;
+            color: var(--accent);
+            margin-top: 1.6rem;
+            margin-bottom: 0.6rem;
+        }
+        h4 {
+            font-size: 1.05rem;
+            font-weight: 600;
+            color: var(--text);
+            margin-top: 1.2rem;
+            margin-bottom: 0.4rem;
+        }
+
+        p, li { font-size: 1rem; color: var(--text); }
+        p { margin-bottom: 0.8rem; }
+        li { margin-bottom: 0.3rem; }
+        ol, ul { padding-left: 1.5rem; margin-bottom: 1rem; }
+
+        code {
+            background: var(--code-bg);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+            font-size: 0.88em;
+            color: var(--text);
+            border: 1px solid var(--border);
+        }
+        pre {
+            background: var(--pre-bg);
+            color: var(--pre-text);
+            padding: 1.2rem 1.4rem;
+            border-radius: 8px;
+            overflow-x: auto;
+            font-size: 0.88em;
+            line-height: 1.55;
+            margin: 0.8rem 0 1.2rem 0;
+            border: 1px solid #30363d;
+        }
+        pre code {
+            background: none;
+            border: none;
+            padding: 0;
+            color: inherit;
+        }
+
+        .card {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1.2rem 1.4rem;
+            margin: 1rem 0;
+        }
+
+        .step {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-left: 4px solid var(--accent);
+            padding: 1.2rem 1.4rem;
+            margin-bottom: 1.2rem;
+            border-radius: 0 8px 8px 0;
+        }
+        .step h3 { margin-top: 0; }
+
+        .step-success { border-left-color: var(--success); }
+        .step-success h3 { color: var(--success); }
+        .step-warning { border-left-color: var(--warning); }
+        .step-warning h3 { color: var(--warning); }
+        .step-danger { border-left-color: var(--danger); }
+        .step-danger h3 { color: var(--danger); }
+
+        .info-box {
+            background: var(--accent-subtle);
+            border: 1px solid #84c5f5;
+            padding: 1rem 1.2rem;
+            border-radius: 8px;
+            margin: 1rem 0;
+        }
+        .info-box strong { color: var(--accent); }
+
+        .warn-box {
+            background: var(--warning-subtle);
+            border: 1px solid #d4a72c;
+            padding: 1rem 1.2rem;
+            border-radius: 8px;
+            margin: 1rem 0;
+        }
+        .warn-box strong { color: var(--warning); }
+
+        .danger-box {
+            background: var(--danger-subtle);
+            border: 1px solid #ff8182;
+            padding: 1rem 1.2rem;
+            border-radius: 8px;
+            margin: 1rem 0;
+        }
+        .danger-box strong { color: var(--danger); }
+
+        .tree-container {
+            background: #f0f3f6;
+            border: 1px solid var(--border);
+            padding: 1.4rem 1.6rem;
+            border-radius: 8px;
+            font-family: 'SFMono-Regular', Consolas, monospace;
+            font-size: 0.92em;
+            line-height: 1.65;
+            margin: 1rem 0;
+            white-space: pre;
+            overflow-x: auto;
+        }
+        .node { font-weight: 700; color: #cf222e; }
+        .symbol { color: var(--accent); font-weight: 600; }
+        .import { color: #9a6700; font-style: italic; }
+        .highlight { background: #fff8c5; padding: 1px 5px; border-radius: 3px; color: var(--text); font-weight: 600; border: 1px solid #d4a72c; }
+        .arrow { color: #8b949e; }
+        .dim { color: #8b949e; font-style: italic; }
+        .green { color: var(--success); font-weight: 600; }
+
+        .flowchart {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            align-items: center;
+            margin: 1rem 0;
+            font-family: 'SFMono-Regular', Consolas, monospace;
+            font-size: 0.88em;
+        }
+        .flowchart .box {
+            background: var(--accent-subtle);
+            border: 1px solid #84c5f5;
+            padding: 0.4rem 0.8rem;
+            border-radius: 6px;
+            font-weight: 600;
+            color: var(--accent);
+        }
+        .flowchart .box.active {
+            background: var(--success-subtle);
+            border-color: #4ac26b;
+            color: var(--success);
+        }
+        .flowchart .box.fail {
+            background: var(--danger-subtle);
+            border-color: #ff8182;
+            color: var(--danger);
+        }
+        .flowchart .sep { color: #8b949e; font-size: 1.2em; }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1rem 0;
+            font-size: 0.95em;
+        }
+        th, td {
+            border: 1px solid var(--border);
+            padding: 0.6rem 0.8rem;
+            text-align: left;
+        }
+        th {
+            background: var(--code-bg);
+            font-weight: 600;
+        }
+
+        .toc {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1.2rem 1.6rem;
+            margin: 1.5rem 0 2rem 0;
+        }
+        .toc h3 { margin-top: 0; color: var(--text); font-size: 1rem; }
+        .toc ol { margin-bottom: 0; }
+        .toc li { margin-bottom: 0.15rem; }
+        .toc a { color: var(--accent); text-decoration: none; }
+        .toc a:hover { text-decoration: underline; }
+
+        .ref { font-size: 0.85em; color: var(--text-secondary); font-style: italic; }
+        .wiki-nav {
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+            padding: 0.7rem 1rem;
+            margin-bottom: 2rem;
+            background: var(--code-bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-size: 0.88em;
+            flex-wrap: wrap;
+        }
+        .wiki-nav a {
+            color: var(--accent);
+            text-decoration: none;
+            padding: 0.25rem 0.6rem;
+            border-radius: 4px;
+            transition: background 0.15s;
+        }
+        .wiki-nav a:hover { background: var(--accent-subtle); }
+        .wiki-nav a.active {
+            background: var(--accent);
+            color: #fff;
+            font-weight: 600;
+        }
+        .wiki-nav .sep { color: var(--border); font-size: 1.1em; }
+        .wiki-nav .label { color: var(--text-secondary); font-weight: 600; margin-right: 0.2rem; }
+    </style>
+</head>
+<body>
+
+    <nav class="wiki-nav">
+        <span class="label">📖 Wiki:</span>
+        <a href="extraction_explained.html">Fase 1 — Estrazione</a>
+        <span class="sep">·</span>
+        <a href="name_resolution_explained.html" class="active">Fase 2 — Name Resolution</a>
+        <span class="sep">·</span>
+        <a href="dependency_graph_explained.html">Fase 3 — Dependency Graph</a>
+        <span class="sep">·</span>
+        <a href="features_roadmap.html">Features &amp; Roadmap</a>
+    </nav>
+
+    <h1>Deep Dive: Il Motore di Name Resolution</h1>
+    <p>Documentazione tecnica esaustiva dell'architettura a <strong>Symbol Stack</strong> implementata in <code>src/resolver/</code> (mod.rs, stack.rs, cache.rs), con spiegazione passo-passo di ogni fase della risoluzione dei nomi.</p>
+
+    <div class="toc">
+        <h3>Indice</h3>
+        <ol>
+            <li><a href="#overview">Panoramica e Obiettivo</a></li>
+            <li><a href="#architecture">Architettura: dal Vecchio al Nuovo Approccio</a></li>
+            <li><a href="#global-registry">Pass 1: Global Registry</a></li>
+            <li><a href="#symbol-stack">L'Environment (ρ): Il Symbol Stack</a></li>
+            <li><a href="#resolution-cache">Il Resolution Cache</a></li>
+            <li><a href="#resolution-context">Il ResolutionContext</a></li>
+            <li><a href="#algorithm">L'Algoritmo di Risoluzione: <code>resolve_name_in_context</code></a></li>
+            <li><a href="#recursive-traversal">Attraversamento Ricorsivo dell'IR</a></li>
+            <li><a href="#impl-flattening">Flattening degli Impl Blocks</a></li>
+            <li><a href="#full-example">Esempio Completo End-to-End</a></li>
+            <li><a href="#typeref-lifecycle">Ciclo di Vita di un TypeRef</a></li>
+            <li><a href="#comparison">Confronto: Arena Pattern vs Symbol Stack</a></li>
+        </ol>
+    </div>
+
+    <!-- ============================================================ -->
+    <h2 id="overview">1. Panoramica e Obiettivo</h2>
+
+    <p>La <strong>Name Resolution</strong> è la Fase 2 della pipeline di analisi. Riceve in input una lista di <code>Module</code> con riferimenti di tipo <code>TypeRef::Unresolved</code> (nomi testuali grezzi estratti dal codice sorgente) e produce in output gli stessi moduli con ogni riferimento trasformato in uno dei seguenti stati:</p>
+
+    <table>
+        <thead>
+            <tr><th>Stato TypeRef</th><th>Significato</th><th>Esempio</th></tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><code>Resolved(path)</code></td>
+                <td>Nome trovato nel Global Registry — percorso assoluto calcolato</td>
+                <td><code>["root", "core", "Veicolo"]</code></td>
+            </tr>
+            <tr>
+                <td><code>External(path)</code></td>
+                <td>Nome riconosciuto tramite import ma non presente nel Registry — dipendenza esterna</td>
+                <td><code>["external", "db", "Database"]</code></td>
+            </tr>
+            <tr>
+                <td><code>Failed(path)</code></td>
+                <td>Tutti i tentativi di risoluzione sono falliti — il nome rimane irrisolto</td>
+                <td><code>["UnknownType"]</code></td>
+            </tr>
+            <tr>
+                <td><code>Primitive(type)</code></td>
+                <td>Tipo primitivo (Int, Float, Bool, String, Void) — non viene processato dal resolver</td>
+                <td><code>Primitive(String)</code></td>
+            </tr>
+        </tbody>
+    </table>
+
+    <p>La pipeline completa in <code>analyzer.rs</code> è:</p>
+    <div class="flowchart">
+        <span class="box">1. Estrazione CST→IR</span>
+        <span class="sep">→</span>
+        <span class="box active">2. Name Resolution</span>
+        <span class="sep">→</span>
+        <span class="box">3. Dependency Graph</span>
+        <span class="sep">→</span>
+        <span class="box">4. Summary</span>
+    </div>
+    <p class="ref">Riferimento: <code>analyzer.rs</code> — funzione <code>full_analysis()</code></p>
+
+    <!-- ============================================================ -->
+    <h2 id="architecture">2. Architettura: dal Vecchio al Nuovo Approccio</h2>
+
+    <h3>2.1 Il Problema del Vecchio Approccio (Arena + Flat Symbol Table)</h3>
+    <p>La versione precedente del resolver utilizzava un <strong>Arena-based Scope Tree</strong> (<code>ScopeTree</code> con <code>Vec&lt;ScopeNode&gt;</code>) e una <strong>Symbol Table piatta</strong> Σ : QN → C. Questo approccio presentava due problemi critici formalizzati nella tesi:</p>
+
+    <div class="danger-box">
+        <h4 style="margin-top: 0; margin-bottom: 0.5rem; color: var(--danger);">Problema 1: Complessità O(L) dell'hashing</h4>
+        <p style="margin-bottom: 0;">Con la Symbol Table piatta <code>Σ : QN → C</code>, le chiavi erano <code>QualifiedName</code> (vettori di stringhe). L'operazione di hash richiedeva attraversare l'intero vettore — complessità <strong>O(L)</strong> dove L è la lunghezza del nome qualificato. Per nomi come <code>["root", "core", "models", "entities", "Veicolo"]</code>, ogni lookup pagava il costo di hashare 5 stringhe.</p>
+    </div>
+
+    <div class="danger-box">
+        <h4 style="margin-top: 0; margin-bottom: 0.5rem; color: var(--danger);">Problema 2: Collisioni di nomi (Name Clashing)</h4>
+        <p style="margin-bottom: 0;">La Symbol Table piatta conteneva <code>HashMap&lt;Identifier, Component&gt;</code> dove la chiave era il nome semplice (<code>"Veicolo"</code>). Due componenti con lo stesso nome locale in scope diversi collidevano nella stessa mappa. L'Arena doveva navigare fisicamente i nodi per disambiguare — un'operazione O(profondità dell'albero).</p>
+    </div>
+
+    <h3>2.2 Il Nuovo Approccio: Architettura a 3 Componenti</h3>
+    <p>L'architettura refactored elimina completamente l'Arena Pattern sostituendolo con tre componenti indipendenti e complementari:</p>
+
+    <div class="tree-container">
+<span class="symbol">Architettura del Resolver Refactored</span>
+<span class="dim">Tre componenti indipendenti, ciascuno con una responsabilità precisa:</span>
+
+┌──────────────────────────────────────────────────────────────────┐
+│                                                                  │
+│  <span class="node">① GlobalRegistry</span>  <span class="dim">(src/resolver/registry.rs)</span>                       │
+│  ┌────────────────────────────────────────────────────────────┐  │
+│  │  paths: HashSet&lt;QualifiedName&gt;                            │  │
+│  │  Costruito una sola volta in Pass 1                       │  │
+│  │  Valida: "Questo percorso assoluto esiste nel progetto?"  │  │
+│  └────────────────────────────────────────────────────────────┘  │
+│                                                                  │
+│  <span class="node">② SymbolStack</span>  <span class="dim">(src/resolver/stack.rs)</span>                             │
+│  ┌────────────────────────────────────────────────────────────┐  │
+│  │  frames: Vec&lt;StackFrame&gt;                                  │  │
+│  │  Cresce e si contrae dinamicamente durante il traversal   │  │
+│  │  Ogni frame = {symbols: HashMap, imports: Vec&lt;Import&gt;}    │  │
+│  └────────────────────────────────────────────────────────────┘  │
+│                                                                  │
+│  <span class="node">③ ResolutionCache</span>  <span class="dim">(src/resolver/cache.rs)</span>                        │
+│  ┌────────────────────────────────────────────────────────────┐  │
+│  │  store: HashMap&lt;String, HashMap&lt;QN, ResolutionResult&gt;&gt;    │  │
+│  │  Chiave esterna = ScopePath (es. "root::core")            │  │
+│  │  Memoizzazione O(1) isolata per scope                     │  │
+│  └────────────────────────────────────────────────────────────┘  │
+│                                                                  │
+│  <span class="node">④ PrimitiveRegistry</span>  <span class="dim">(src/resolver/primitives.rs)</span>                 │
+│  ┌────────────────────────────────────────────────────────────┐  │
+│  │  lang_primitives: HashSet&lt;String&gt;                         │  │
+│  │  Caricato via JSON a compile-time (Data-Driven)           │  │
+│  │  Valida: "Questo token è un tipo primitivo?"              │  │
+│  └────────────────────────────────────────────────────────────┘  │
+│                                                                  │
+└──────────────────────────────────────────────────────────────────┘</div>
+
+    <div class="info-box">
+        <strong>Principio chiave:</strong> Il <code>GlobalRegistry</code> è una struttura <strong>statica</strong> (read-only dopo la costruzione); il <code>SymbolStack</code> è <strong>dinamico</strong> (push/pop durante il traversal); il <code>ResolutionCache</code> è <strong>append-only</strong> (cresce ma non viene mai ridotto). Le tre strutture hanno cicli di vita completamente diversi, il che semplifica il reasoning sulla correttezza.
+    </div>
+
+    <div class="flowchart">
+        <span class="box">GlobalRegistry::build()</span>
+        <span class="sep">→</span>
+        <span class="box active">push/pop SymbolStack</span>
+        <span class="sep">→</span>
+        <span class="box">resolve_name_in_context()</span>
+        <span class="sep">→</span>
+        <span class="box">Cache::insert()</span>
+    </div>
+
+    <!-- ============================================================ -->
+    <h2 id="global-registry">3. Pass 1: Global Registry</h2>
+    <p class="ref">Riferimento: <code>src/resolver/registry.rs</code></p>
+
+    <p>Il <code>GlobalRegistry</code> è la prima struttura ad essere costruita. Il suo scopo è semplice ma fondamentale: registrare <strong>tutti i percorsi assoluti</strong> che esistono nel progetto, per poter poi rispondere alla domanda "Questo percorso esiste nell'IR?" in O(1).</p>
+
+    <h3>3.1 Struttura</h3>
+    <pre><code>pub struct GlobalRegistry {
+    pub paths: HashSet&lt;QualifiedName&gt;,   // Insieme di tutti i percorsi assoluti nel progetto
+}</code></pre>
+    <p>A differenza della vecchia <code>HashMap&lt;Identifier, Component&gt;</code>, il Registry usa un <code>HashSet</code> — non ha bisogno di associare valori, solo di verificare l'esistenza.</p>
+
+    <h3>3.2 Costruzione: <code>GlobalRegistry::build</code></h3>
+    <p class="ref">Riferimento: <code>mod.rs:24-30</code></p>
+    <pre><code>pub fn build(modules: &amp;[Module]) -&gt; Self {
+    let mut registry = Self { paths: HashSet::new() };
+    for m in modules {
+        registry.register_module(m, vec![]);  // Prefisso iniziale vuoto
+    }
+    registry
+}</code></pre>
+    <p>La funzione itera su tutti i moduli top-level e chiama <code>register_module</code> ricorsivamente con un prefisso inizialmente vuoto.</p>
+
+    <h3>3.3 Registrazione ricorsiva: <code>register_module</code></h3>
+    <p class="ref">Riferimento: <code>mod.rs:32-72</code></p>
+    <p>Per ogni modulo, la funzione registra:</p>
+
+    <div class="step">
+        <h3>Passo 1 — Il modulo stesso</h3>
+        <pre><code>prefix.extend(m.name.clone());       // es. [] + ["root"] = ["root"]
+self.paths.insert(prefix.clone());   // Registra ["root"]</code></pre>
+    </div>
+
+    <div class="step">
+        <h3>Passo 2 — Tipi strutturati e loro metodi</h3>
+        <pre><code>for st in &amp;m.structured_types {
+    let mut st_prefix = prefix.clone();
+    st_prefix.extend(st.name.clone());   // ["root"] + ["Veicolo"] = ["root", "Veicolo"]
+    self.paths.insert(st_prefix.clone());
+    for method in &amp;st.methods {
+        let mut m_prefix = st_prefix.clone();
+        m_prefix.extend(method.name.clone());
+        self.paths.insert(m_prefix);     // ["root", "Veicolo", "accelera"]
+    }
+}</code></pre>
+    </div>
+
+    <div class="step">
+        <h3>Passo 3 — Funzioni libere</h3>
+        <pre><code>for ff in &amp;m.free_functions {
+    let mut ff_prefix = prefix.clone();
+    ff_prefix.extend(ff.name.clone());   // ["root", "core"] + ["calcola"] = ["root", "core", "calcola"]
+    self.paths.insert(ff_prefix);
+}</code></pre>
+    </div>
+
+    <div class="step">
+        <h3>Passo 4 — Metodi degli Impl Blocks</h3>
+        <pre><code>for ib in &amp;m.impl_blocks {
+    let target_name = match &amp;ib.impl_for {
+        TypeRef::Unresolved(qn) | TypeRef::Resolved(qn) =&gt; qn.last().cloned().unwrap_or_default(),
+        _ =&gt; "".to_string(),
+    };
+    if !target_name.is_empty() {
+        let mut target_prefix = prefix.clone();
+        target_prefix.push(target_name);       // ["root", "Veicolo"]
+        for method in &amp;ib.methods {
+            let mut m_prefix = target_prefix.clone();
+            m_prefix.extend(method.name.clone());
+            self.paths.insert(m_prefix);       // ["root", "Veicolo", "new"]
+        }
+    }
+}</code></pre>
+        <p>I metodi degli impl blocks vengono registrati sotto il tipo target — come se il metodo fosse definito direttamente nella struct.</p>
+    </div>
+
+    <div class="step">
+        <h3>Passo 5 — Ricorsione nei sotto-moduli</h3>
+        <pre><code>for sub in &amp;m.sub_modules {
+    self.register_module(sub, prefix.clone());  // Ricorsione con prefisso accumulato
+}</code></pre>
+    </div>
+
+    <h3>3.4 Validazione: <code>exists</code></h3>
+    <p class="ref">Riferimento: <code>mod.rs:74-76</code></p>
+    <pre><code>pub fn exists(&amp;self, path: &amp;QualifiedName) -&gt; bool {
+    self.paths.contains(path)   // O(1) amortizzato
+}</code></pre>
+    <p>Questa è l'unica operazione di lettura del Registry, usata centinaia di volte durante la risoluzione.</p>
+
+    <!-- ============================================================ -->
+    <h2 id="symbol-stack">4. L'Environment (ρ): Il Symbol Stack</h2>
+    <p class="ref">Riferimento: <code>src/resolver/stack.rs:1-67</code></p>
+
+    <p>Dalla formalizzazione LaTeX, l'Environment è definito come:</p>
+    <div class="info-box">
+        <strong>Definizione formale:</strong> ρ = ⟨Σ₀, Σ₁, ..., Σₙ⟩ dove ogni frame Σₖ = ⟨Symbols, I<sub>imports</sub>⟩. Lo stack cresce verso l'alto — Σₙ è il frame corrente (top), Σ₀ è il frame globale (bottom).
+    </div>
+
+    <h3>4.1 StackFrame — Il singolo frame lessicale</h3>
+    <pre><code>pub struct StackFrame {
+    /// Simboli locali: nome semplice → percorso assoluto QualifiedName
+    pub symbols: HashMap&lt;String, QualifiedName&gt;,
+    /// Jump points (import/use statements) disponibili in questo scope
+    pub imports: Vec&lt;Import&gt;,
+}</code></pre>
+
+    <div class="warn-box">
+        <strong>Differenza fondamentale dal vecchio approccio:</strong> Nel vecchio <code>ScopeNode</code>, la mappa <code>symbols</code> era <code>HashMap&lt;Identifier, Component&gt;</code> — associava il nome a un intero componente IR. Nel nuovo <code>StackFrame</code>, la mappa è <code>HashMap&lt;String, QualifiedName&gt;</code> — associa il nome locale al suo <strong>percorso assoluto</strong>. Il frame non possiede i componenti, conosce solo dove trovarli.
+    </div>
+
+    <h3>4.2 SymbolStack — Lo stack dinamico</h3>
+    <pre><code>pub struct SymbolStack {
+    pub frames: Vec&lt;StackFrame&gt;,   // Lo stack: frames[0] = bottom, frames[last] = top
+}</code></pre>
+
+    <h3>4.3 API del SymbolStack</h3>
+    <table>
+        <thead><tr><th>Metodo</th><th>Funzione</th><th>Riferimento</th></tr></thead>
+        <tbody>
+            <tr>
+                <td><code>push_scope()</code></td>
+                <td>Aggiunge un nuovo <code>StackFrame</code> vuoto in cima allo stack. Chiamato quando il traversal entra in un nuovo scope (modulo, struct, funzione).</td>
+                <td><code>stack.rs:34-36</code></td>
+            </tr>
+            <tr>
+                <td><code>pop_scope()</code></td>
+                <td>Rimuove e <strong>distrugge</strong> il frame in cima allo stack. Chiamato quando il traversal esce da uno scope. Tutti i simboli e import del frame vengono persi.</td>
+                <td><code>stack.rs:39-41</code></td>
+            </tr>
+            <tr>
+                <td><code>define_symbol(name, path)</code></td>
+                <td>Registra un simbolo locale nel frame corrente, associando il nome semplice al percorso assoluto. Es: <code>define_symbol("Veicolo", ["root","core","Veicolo"])</code>.</td>
+                <td><code>stack.rs:49-53</code></td>
+            </tr>
+            <tr>
+                <td><code>add_import(import)</code></td>
+                <td>Aggiunge un import (jump point) al frame corrente.</td>
+                <td><code>stack.rs:56-60</code></td>
+            </tr>
+            <tr>
+                <td><code>iter_frames_top_down()</code></td>
+                <td>Restituisce un iteratore che percorre i frame <strong>dall'alto verso il basso</strong> (dal frame corrente verso il frame globale). Usato dal Lexical Climb.</td>
+                <td><code>stack.rs:63-65</code></td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h3>4.4 Ciclo di vita: crescita e contrazione durante il traversal</h3>
+    <p>Lo stack si espande quando il resolver entra in uno scope e si contrae quando ne esce. Ogni <code>push_scope</code> è bilanciato da un <code>pop_scope</code>:</p>
+
+    <div class="tree-container">
+<span class="green">Fase 1:</span> resolve_type_refs() → push_scope()
+  Stack: [ <span class="node">Frame₀</span> (GLOBAL ROOT) ]
+
+<span class="green">Fase 2:</span> resolve_module_in_context("root") → push_scope()
+  Stack: [ <span class="node">Frame₀</span>, <span class="node">Frame₁</span> (root — imports + symbols) ]
+
+<span class="green">Fase 3:</span> resolve_module_in_context("core") → push_scope()
+  Stack: [ <span class="node">Frame₀</span>, <span class="node">Frame₁</span>, <span class="node">Frame₂</span> (core — symbols) ]
+
+<span class="green">Fase 4:</span> resolve_structured_type("Veicolo") → push_scope()
+  Stack: [ <span class="node">Frame₀</span>, <span class="node">Frame₁</span>, <span class="node">Frame₂</span>, <span class="node">Frame₃</span> (Veicolo) ]
+
+<span class="dim">... risoluzioni dei TypeRef dentro Veicolo ...</span>
+
+<span class="green">Fase 5:</span> pop_scope() <span class="dim">← esce da Veicolo</span>
+  Stack: [ <span class="node">Frame₀</span>, <span class="node">Frame₁</span>, <span class="node">Frame₂</span> ]  <span class="dim">Frame₃ distrutto</span>
+
+<span class="green">Fase 6:</span> resolve_structured_type("Auto") → push_scope()
+  Stack: [ <span class="node">Frame₀</span>, <span class="node">Frame₁</span>, <span class="node">Frame₂</span>, <span class="node">Frame₃'</span> (Auto) ]  <span class="dim">Nuovo frame!</span>
+
+<span class="dim">... e così via ...</span></div>
+
+    <div class="info-box">
+        <strong>Vantaggi rispetto all'Arena:</strong> Lo stack non alloca mai nodi permanenti — i frame vivono solo per la durata del traversal del loro scope. L'Arena vecchia manteneva tutti i nodi in memoria per l'intera durata dell'analisi, anche dopo che lo scope era stato completamente processato. Lo stack usa <strong>meno memoria</strong> in ogni istante: la sua dimensione massima è pari alla profondità massima dell'albero dei moduli, non al numero totale di nodi.
+    </div>
+
+    <!-- ============================================================ -->
+    <h2 id="resolution-cache">5. Il Resolution Cache</h2>
+    <p class="ref">Riferimento: <code>src/resolver/cache.rs:1-45</code></p>
+
+    <h3>5.1 Struttura</h3>
+    <pre><code>pub struct ResolutionCache {
+    /// Maps Scope Path → (Name Searched → Resolution Result)
+    store: HashMap&lt;String, HashMap&lt;QualifiedName, ResolutionResult&gt;&gt;,
+}</code></pre>
+
+    <p>La cache ha una struttura <strong>a due livelli</strong>:</p>
+    <ol>
+        <li><strong>Livello esterno:</strong> la chiave è una stringa che rappresenta il percorso dello scope corrente (es. <code>"root::core"</code>).</li>
+        <li><strong>Livello interno:</strong> la chiave è il nome cercato (<code>QualifiedName</code>), il valore è il <code>ResolutionResult</code>.</li>
+    </ol>
+
+    <h3>5.2 La funzione <code>scope_key</code></h3>
+    <p class="ref">Riferimento: <code>cache.rs:22-28</code></p>
+    <pre><code>fn scope_key(prefix: &amp;[String]) -&gt; String {
+    if prefix.is_empty() {
+        "GLOBAL_ROOT".to_string()    // Lo scope radice senza prefisso
+    } else {
+        prefix.join("::")            // Es: ["root", "core"] → "root::core"
+    }
+}</code></pre>
+
+    <div class="info-box">
+        <strong>Il concetto di Cache Tree dalla tesi LaTeX:</strong> La formalizzazione definisce il Cache Tree come C<sub>tree</sub> : (ScopePath) → (QN → ResolutionResult). Nella vecchia implementazione, la chiave era una tupla <code>(usize, QualifiedName)</code> dove <code>usize</code> era l'indice dell'Arena. Nella nuova implementazione, si usa il <strong>percorso dello scope</strong> come stringa — questo elimina la dipendenza dall'Arena e isola la memoizzazione per scope path, garantendo che lo stesso nome risolto da scope diversi produce entry separate.
+    </div>
+
+    <h3>5.3 Operazioni</h3>
+    <pre><code>// Lettura — O(1) amortizzato
+pub fn get(&amp;self, current_prefix: &amp;[String], name: &amp;QualifiedName) -&gt; Option&lt;ResolutionResult&gt; {
+    let key = Self::scope_key(current_prefix);
+    self.store.get(&amp;key).and_then(|scope_cache| scope_cache.get(name).cloned())
+}
+
+// Scrittura — O(1) amortizzato
+pub fn insert(&amp;mut self, current_prefix: &amp;[String], name: QualifiedName, res: ResolutionResult) {
+    let key = Self::scope_key(current_prefix);
+    self.store.entry(key).or_insert_with(HashMap::new).insert(name, res);
+}</code></pre>
+
+    <div class="tree-container">
+<span class="symbol">Esempio di struttura della cache a runtime:</span>
+
+store = {
+  "GLOBAL_ROOT" → { },   <span class="dim">← scope radice, solitamente vuoto</span>
+  "root" → {
+    ["User"] → Local(["root", "User"]),
+  },
+  "root::core" → {
+    ["Veicolo"] → Local(["root", "core", "Veicolo"]),
+    ["Auto"]    → Local(["root", "core", "Auto"]),
+  },
+  "root::core::Auto" → {
+    ["Veicolo"] → Local(["root", "core", "Veicolo"]),
+    ["Db"]      → External(["external", "db", "Database"]),
+  },
+}</div>
+
+    <div class="warn-box">
+        <strong>Nota:</strong> Solo i risultati <strong>con successo</strong> (<code>Local</code> o <code>External</code>) vengono inseriti nella cache. Se <code>resolve_name_in_context</code> restituisce <code>None</code>, il risultato non viene cachato — la risoluzione <code>Failed</code> viene assegnata dal wrapper <code>resolve_type_ref</code>, non dall'algoritmo di risoluzione.
+    </div>
+
+    <!-- ============================================================ -->
+    <h2 id="resolution-context">6. Il ResolutionContext</h2>
+    <p class="ref">Riferimento: <code>src/resolver/mod.rs:80-85</code></p>
+
+    <pre><code>pub struct ResolutionContext&lt;'a&gt; {
+    pub current_prefix: QualifiedName,          // Prefisso accumulato (es. ["root", "core"])
+    pub stack: &amp;'a RefCell&lt;SymbolStack&gt;,        // Riferimento allo stack condiviso
+    pub cache: &amp;'a RefCell&lt;ResolutionCache&gt;,    // Riferimento alla cache condivisa
+    pub registry: &amp;'a GlobalRegistry,           // Riferimento al registry (read-only)
+}</code></pre>
+
+    <p>Il <code>ResolutionContext</code> è il "collante" che unisce i tre componenti dell'architettura. Viene passato a ogni funzione di risoluzione e viene <strong>ricreato</strong> ad ogni livello di discesa (con un nuovo <code>current_prefix</code>), mantenendo gli stessi riferimenti allo stack, cache e registry.</p>
+
+    <div class="info-box">
+        <strong>Perché <code>RefCell</code>?</strong> Lo stack e la cache devono essere mutati durante la risoluzione, ma il contesto viene condiviso tra più risoluzioni (es. tutti i campi di una struct vengono risolti con lo stesso contesto). <code>RefCell</code> permette la <strong>mutazione interiore</strong> — il contesto è passato come riferimento immutabile <code>&amp;ctx</code>, ma lo stack e la cache possono essere modificati tramite <code>borrow_mut()</code>. Il Registry, essendo read-only, usa un riferimento normale <code>&amp;'a GlobalRegistry</code>.
+    </div>
+
+    <h3>6.1 ResolutionResult — L'esito della risoluzione</h3>
+    <p class="ref">Riferimento: <code>mod.rs:10-14</code></p>
+    <pre><code>pub enum ResolutionResult {
+    Local(QualifiedName),     // Trovato nel GlobalRegistry → componente interno al progetto
+    External(QualifiedName),  // Import verificato ma non presente nel Registry → dipendenza esterna
+}</code></pre>
+    <p>Se nessuna delle due varianti viene prodotta, il <code>TypeRef</code> verrà marcato come <code>Failed</code>.</p>
+
+    <!-- ============================================================ -->
+    <h2 id="algorithm">7. L'Algoritmo di Risoluzione: <code>resolve_name_in_context</code></h2>
+    <p class="ref">Riferimento: <code>src/resolver/mod.rs:114-212</code></p>
+
+    <p>Questa è la funzione cuore dell'intero sistema. Riceve un contesto e un nome da risolvere (es. <code>["Veicolo"]</code> o <code>["db", "Config"]</code>) e restituisce <code>Option&lt;ResolutionResult&gt;</code>.</p>
+
+    <p>L'algoritmo segue una <strong>catena di priorità</strong> precisa:</p>
+
+    <div class="flowchart">
+        <span class="box">0. Cache</span>
+        <span class="sep">→</span>
+        <span class="box">1. Lexical Climb</span>
+        <span class="sep">→</span>
+        <span class="box">1A. Local Symbols</span>
+        <span class="sep">→</span>
+        <span class="box">1B. Imports (alias/name/wildcard)</span>
+        <span class="sep">→</span>
+        <span class="box">2. Absolute Fallbacks</span>
+        <span class="sep">→</span>
+        <span class="box fail">None (Failed)</span>
+    </div>
+
+    <p>Il passaggio <strong>1</strong> è un <strong>loop</strong> che itera i frame dello stack dall'alto verso il basso (Lexical Climb). Per ogni frame, controlla prima i simboli locali (1A), poi gli import (1B). Il passaggio <strong>2</strong> viene eseguito solo se il loop termina senza successo.</p>
+
+    <!-- Step 0 -->
+    <div class="step step-success">
+        <h3>Step 0 — Memoization (Cache Lookup)</h3>
+        <p class="ref">Righe 121-124</p>
+        <pre><code>if let Some(res) = ctx.cache.borrow().get(&amp;ctx.current_prefix, name) {
+    return Some(res);
+}</code></pre>
+        <p>Prima di qualsiasi calcolo, controlla se il nome è già stato risolto <strong>dallo stesso scope</strong> in precedenza. La chiave della cache è il <code>current_prefix</code> (percorso dello scope) + il nome da risolvere. Se trova un risultato, lo restituisce immediatamente — <strong>O(1)</strong>.</p>
+    </div>
+
+    <!-- validate_import closure -->
+    <div class="step step-warning">
+        <h3>La closure <code>validate_import</code></h3>
+        <p class="ref">Righe 126-147</p>
+        <p>Prima del loop, viene definita una closure riutilizzabile che valida un candidato risolto tramite import:</p>
+        <pre><code>let validate_import = |candidate: &amp;QualifiedName| -&gt; ResolutionResult {
+    if ctx.registry.exists(candidate) {
+        ResolutionResult::Local(candidate.clone())         // 1. Esiste direttamente
+    } else {
+        let mut root_cand = vec!["root".to_string()];
+        root_cand.extend(candidate.clone());
+        if ctx.registry.exists(&amp;root_cand) {
+            ResolutionResult::Local(root_cand)             // 2. Esiste con "root" preposto
+        } else if candidate.first() == Some(&amp;"crate".to_string()) {
+            let mut crate_cand = vec!["root".to_string()];
+            crate_cand.extend(candidate.iter().skip(1).cloned());
+            if ctx.registry.exists(&amp;crate_cand) {
+                ResolutionResult::Local(crate_cand)        // 3. "crate" → "root"
+            } else {
+                ResolutionResult::External(candidate.clone())  // 4. External
+            }
+        } else {
+            ResolutionResult::External(candidate.clone())  // 4. External
+        }
+    }
+};</code></pre>
+        <p>La catena di validazione per gli import segue 4 livelli di fallback:</p>
+        <div class="flowchart">
+            <span class="box">Lookup diretto</span>
+            <span class="sep">→</span>
+            <span class="box">Preponi "root"</span>
+            <span class="sep">→</span>
+            <span class="box">Sostituisci "crate" → "root"</span>
+            <span class="sep">→</span>
+            <span class="box" style="background: var(--warning-subtle); border-color: #d4a72c; color: var(--warning);">External</span>
+        </div>
+    </div>
+
+    <!-- Step 1 -->
+    <div class="step">
+        <h3>Step 1 — Lexical Climb (iterazione dei frame top-down)</h3>
+        <p class="ref">Righe 149-194</p>
+        <pre><code>for frame in ctx.stack.borrow().iter_frames_top_down() {
+    // Per ogni frame, dal più interno al più esterno...
+}</code></pre>
+        <p>Questo loop implementa il <strong>Lexical Climb</strong>: itera i frame dello stack dal top (scope più interno) verso il bottom (scope globale). Per ogni frame, prova due strategie:</p>
+
+        <h4>1A — Simboli Locali nel frame</h4>
+        <p class="ref">Righe 151-161</p>
+        <pre><code>if let Some(abs_path) = frame.symbols.get(first_part) {
+    let mut full_path = abs_path.clone();
+    full_path.extend(name.iter().skip(1).cloned());   // Aggiunge segmenti rimanenti
+
+    if ctx.registry.exists(&amp;full_path) {
+        let res = ResolutionResult::Local(full_path);
+        ctx.cache.borrow_mut().insert(&amp;ctx.current_prefix, name.clone(), res.clone());
+        return Some(res);    // ✓ Trovato!
+    }
+}</code></pre>
+        <p>Se il primo segmento del nome (es. <code>"Veicolo"</code>) corrisponde a un simbolo locale del frame, costruisce il percorso assoluto concatenando il percorso registrato nel frame con eventuali segmenti rimanenti del nome, e valida il risultato con il <code>GlobalRegistry</code>.</p>
+
+        <h4>1B — Import (Jump Points) nel frame</h4>
+        <p class="ref">Righe 163-193</p>
+        <p>Se i simboli locali non producono un match, il sistema scorre gli <code>imports</code> del frame. Ci sono tre sotto-casi:</p>
+
+        <h4>Import con Alias</h4>
+        <pre><code>if let Some(alias) = &amp;imp.alias {
+    if alias == first_part {
+        let mut candidate = imp.path.clone();           // ["external", "db", "Database"]
+        candidate.extend(name.iter().skip(1).cloned()); // + segmenti dopo l'alias
+        let res = validate_import(&amp;candidate);
+        // Cache insert + return
+    }
+}</code></pre>
+
+        <h4>Import senza Alias (match sull'ultimo segmento)</h4>
+        <pre><code>if let Some(last_part) = imp.path.last() {
+    if last_part == first_part {
+        let mut candidate = imp.path.clone();           // ["std", "vec", "Vec"]
+        candidate.extend(name.iter().skip(1).cloned()); // + segmenti dopo "Vec"
+        let res = validate_import(&amp;candidate);
+        // Cache insert + return
+    }
+}</code></pre>
+
+        <h4>Import Wildcard</h4>
+        <pre><code>// Wildcard import: preponi il path dell'import all'INTERO nome
+let mut candidate = imp.path.clone();   // Es: ["java", "util"]
+candidate.extend(name.clone());         // + ["ArrayList"] → ["java", "util", "ArrayList"]
+let res = validate_import(&amp;candidate);
+if let ResolutionResult::Local(_) = res {
+    // Cache insert + return SOLO se Local
+}</code></pre>
+
+        <div class="warn-box">
+            <strong>Differenza critica per i wildcard:</strong> A differenza degli import normali, i wildcard restituiscono solo se il risultato è <code>Local</code>. Se il candidato è <code>External</code>, l'algoritmo <strong>continua</strong> a cercare nei frame successivi. Questo evita che un wildcard import esterno "catturi" nomi che potrebbero essere risolti localmente in un frame più esterno.
+        </div>
+    </div>
+
+    <!-- Step 2 -->
+    <div class="step step-danger">
+        <h3>Step 2 — Fallback Assoluti (Post-Loop)</h3>
+        <p class="ref">Righe 196-211</p>
+        <p>Se il Lexical Climb è terminato senza successo (nessun frame contiene il nome), l'algoritmo tenta due ultime strategie:</p>
+
+        <h4>2a — Ricerca assoluta diretta</h4>
+        <pre><code>if ctx.registry.exists(name) {
+    let res = ResolutionResult::Local(name.clone());
+    ctx.cache.borrow_mut().insert(&amp;ctx.current_prefix, name.clone(), res.clone());
+    return Some(res);
+}</code></pre>
+        <p>Interpreta il nome come un percorso assoluto che esiste già nel Registry. Gestisce casi come <code>["root", "core", "Veicolo"]</code> dove il nome passato è già completo.</p>
+
+        <h4>2b — Preponi "root" al percorso</h4>
+        <pre><code>let mut root_cand = vec!["root".to_string()];
+root_cand.extend(name.clone());
+if ctx.registry.exists(&amp;root_cand) {
+    let res = ResolutionResult::Local(root_cand);
+    ctx.cache.borrow_mut().insert(&amp;ctx.current_prefix, name.clone(), res.clone());
+    return Some(res);
+}</code></pre>
+        <p>Se il nome non inizia con "root" ma potrebbe essere relativo alla radice del progetto, prova ad aggiungere <code>"root"</code> come prefisso. Es: <code>["core", "Veicolo"]</code> diventa <code>["root", "core", "Veicolo"]</code>.</p>
+
+        <h4>Fallimento finale</h4>
+        <pre><code>None   // Nessun candidato trovato → verrà marcato TypeRef::Failed</code></pre>
+    </div>
+
+    <h3>7.1 Applicazione ai TypeRef: <code>resolve_type_ref</code></h3>
+    <p class="ref">Riferimento: <code>mod.rs:214-228</code></p>
+    <pre><code>fn resolve_type_ref(ctx: &amp;ResolutionContext, tr: TypeRef) -&gt; TypeRef {
+    match tr {
+        TypeRef::Unresolved(qn) =&gt; {
+            if let Some(res) = resolve_name_in_context(ctx, &amp;qn) {
+                match res {
+                    ResolutionResult::Local(abs_qn)  =&gt; TypeRef::Resolved(abs_qn),  // ✓
+                    ResolutionResult::External(ext_qn) =&gt; TypeRef::External(ext_qn), // ⬡
+                }
+            } else {
+                if qn.len() == 1 &amp;&amp; ctx.primitives.is_primitive(&amp;qn[0]) {
+                    TypeRef::Primitive(PrimitiveType::Other(qn[0].clone())) // ⚙
+                } else {
+                    TypeRef::Failed(qn)   // ✗ Irrisolto
+                }
+            }
+        }
+        _ =&gt; tr,   // Primitive, già Resolved, già External → non toccare
+    }
+}</code></pre>
+    <p>Solo i <code>TypeRef::Unresolved</code> vengono processati. Tutti gli altri stati passano inalterati — la risoluzione è <strong>idempotente</strong>. Inoltre, grazie all'uso del <code>PrimitiveRegistry</code> caricato a compile-time (Data-Driven JSON), l'analizzatore identifica correttamente tipi come <code>String</code>, <code>int</code> o <code>size_t</code> senza produrre finti fallimenti.</p>
+
+    <!-- ============================================================ -->
+    <h2 id="recursive-traversal">8. Attraversamento Ricorsivo dell'IR</h2>
+
+    <p>L'attraversamento dell'IR segue un pattern comune: per ogni componente (modulo, struct, funzione, impl block), il resolver <strong>crea un nuovo contesto</strong>, <strong>push</strong> un nuovo frame sullo stack, <strong>hoista</strong> i componenti locali nel frame, <strong>risolve</strong> i TypeRef, e infine <strong>pop</strong> il frame.</p>
+
+    <h3>8.1 <code>resolve_module_in_context</code></h3>
+    <p class="ref">Riferimento: <code>mod.rs:232-323</code></p>
+    <p>Per ogni modulo, il resolver:</p>
+    <ol>
+        <li><strong>Estende il prefisso</strong>: <code>new_prefix = ctx.current_prefix + module.name</code></li>
+        <li><strong>Crea un nuovo contesto</strong> con il prefisso aggiornato (stesso stack, cache, registry).</li>
+        <li><strong>PUSH scope</strong>: aggiunge un nuovo frame allo stack.</li>
+        <li><strong>Hoista gli import</strong>: registra tutti gli <code>imports</code> del modulo nel frame corrente.</li>
+        <li><strong>Hoista i simboli locali</strong>:
+            <ul>
+                <li>Per ogni <code>StructuredType</code>: <code>define_symbol(nome, percorso_assoluto)</code></li>
+                <li>Per ogni <code>Function</code> libera: <code>define_symbol(nome, percorso_assoluto)</code></li>
+                <li>Per ogni sotto-modulo: <code>define_symbol(nome, percorso_assoluto)</code></li>
+            </ul>
+        </li>
+        <li><strong>Risolve ricorsivamente</strong> tutti i componenti.</li>
+        <li><strong>Flatten degli impl blocks</strong> (vedi <a href="#impl-flattening">Sezione 9</a>).</li>
+        <li><strong>POP scope</strong>: rimuove il frame dallo stack.</li>
+    </ol>
+
+    <pre><code>// Pattern di hoisting (mod.rs:252-267)
+for st in &amp;module.structured_types {
+    let mut st_path = new_prefix.clone();
+    st_path.extend(st.name.clone());
+    new_ctx.stack.borrow_mut().define_symbol(st.name.last().unwrap().clone(), st_path);
+}
+for ff in &amp;module.free_functions {
+    let mut ff_path = new_prefix.clone();
+    ff_path.extend(ff.name.clone());
+    new_ctx.stack.borrow_mut().define_symbol(ff.name.last().unwrap().clone(), ff_path);
+}
+for sub in &amp;module.sub_modules {
+    let mut sub_path = new_prefix.clone();
+    sub_path.extend(sub.name.clone());
+    new_ctx.stack.borrow_mut().define_symbol(sub.name.last().unwrap().clone(), sub_path);
+}</code></pre>
+
+    <div class="info-box">
+        <strong>Perché l'hoisting?</strong> L'hoisting è il processo di registrare <em>tutti</em> i componenti di uno scope <strong>prima</strong> di iniziare a risolvere i TypeRef. Questo garantisce che i riferimenti "forward" funzionino: se <code>Auto</code> ha un campo di tipo <code>Veicolo</code>, e <code>Veicolo</code> è definito dopo <code>Auto</code> nel sorgente, l'hoisting assicura che <code>"Veicolo"</code> sia già nel frame quando <code>Auto</code> viene risolto.
+    </div>
+
+    <h3>8.2 <code>resolve_structured_type</code></h3>
+    <p class="ref">Riferimento: <code>mod.rs:325-384</code></p>
+    <p>Per ogni tipo strutturato (struct, class, interface, trait):</p>
+    <ol>
+        <li><strong>Estende il nome</strong> con il prefisso corrente.</li>
+        <li><strong>PUSH scope</strong> per il tipo strutturato.</li>
+        <li><strong>Auto-registra</strong> <code>self</code> e <code>this</code> nello scope corrente puntandoli alla struct stessa (tramite <code>register_self_keywords</code>).</li>
+        <li><strong>Hoista</strong> i tipi annidati e i metodi nel frame.</li>
+        <li>Risolve ogni <code>TypeRef</code> in:
+            <ul>
+                <li><code>super_types</code> — i tipi da cui eredita o che implementa</li>
+                <li><code>fields</code> — il tipo di ogni campo</li>
+                <li><code>methods</code> — parametri, return type e body (tramite <code>resolve_function</code> → <code>resolve_block</code>) di ogni metodo</li>
+                <li><code>nested_types</code> — tipi annidati (ricorsione)</li>
+            </ul>
+        </li>
+        <li><strong>POP scope</strong>.</li>
+    </ol>
+
+    <h3>8.3 <code>resolve_function</code></h3>
+    <p class="ref">Riferimento: <code>mod.rs:386-424</code></p>
+    <p>Per ogni funzione (sia libera che metodo), la nuova implementazione crea uno scope lessicale, registra i parametri come simboli e delega la risoluzione del body a <code>resolve_block</code>:</p>
+    <ol>
+        <li><strong>Estende il nome</strong> con il prefisso corrente.</li>
+        <li><strong>PUSH scope</strong> per la funzione.</li>
+        <li><strong>Risolve i parametri e li registra come simboli:</strong> per ogni parametro, risolve il suo <code>TypeRef</code> e, se il parametro ha un nome e il tipo è stato risolto con successo (<code>TypeRef::Resolved</code>), chiama <code>define_symbol(nome_parametro, percorso_assoluto_tipo)</code> nel frame corrente. Questo permette di risolvere variabili locali il cui tipo dipende da un parametro.</li>
+        <li>Risolve <code>signature.return_type</code> — il tipo di ritorno.</li>
+        <li><strong>Delega al body:</strong> se la funzione ha un body (<code>Option&lt;Block&gt;</code>), chiama <code>resolve_block(ctx, block)</code> per risolvere le dichiarazioni locali, le chiamate e le istanziazioni.</li>
+        <li><strong>POP scope</strong>.</li>
+    </ol>
+
+    <pre><code>fn resolve_function(ctx: &amp;ResolutionContext, mut ff: Function) -&gt; Function {
+    let mut new_prefix = ctx.current_prefix.clone();
+    new_prefix.extend(ff.name.clone());
+    ff.name = new_prefix.clone();
+
+    ctx.stack.borrow_mut().push_scope();
+
+    // Risolve parametri E li definisce come simboli nello scope
+    ff.signature.parameters = ff.signature.parameters.into_iter().map(|mut p| {
+        p.ty = resolve_type_ref(ctx, p.ty);
+        if let Some(name) = &p.name {
+            if let TypeRef::Resolved(abs_path) | TypeRef::External(abs_path) = &p.ty {
+                ctx.stack.borrow_mut().define_symbol(name.clone(), abs_path.clone());
+            }
+        }
+        p
+    }).collect();
+
+    ff.signature.return_type = resolve_type_ref(ctx, ff.signature.return_type);
+
+    // Delega la risoluzione del body a resolve_block
+    ff.body = ff.body.map(|b| resolve_block(ctx, b));
+
+    ctx.stack.borrow_mut().pop_scope();
+    ff
+}</code></pre>
+
+    <div class="info-box">
+        <strong>Formalizzazione LaTeX:</strong> La funzione è ora formalizzata come 𝓕 = ⟨id ∈ 𝒬𝒩, σ, 𝓑<sup>?</sup>⟩ dove 𝓑<sup>?</sup> è il body opzionale di tipo <code>Block</code>. La vecchia definizione aveva <code>calls</code> e <code>instantiates</code> direttamente nella <code>Function</code>; ora sono incapsulati nel <code>Block</code>.
+    </div>
+
+    <div class="warn-box">
+        <strong>Registrazione dei parametri:</strong> La registrazione dei parametri come simboli nello scope è un'aggiunta importante rispetto alla versione precedente. Nel vecchio approccio, le funzioni <em>non</em> registravano i parametri — creavano solo uno scope vuoto. Ora, se una funzione ha un parametro <code>v: Veicolo</code>, il nome <code>"v"</code> viene associato al percorso assoluto di <code>Veicolo</code> nello scope della funzione. Questo permette al body di risolvere variabili locali il cui tipo è stato derivato dai parametri.
+    </div>
+
+    <h3>8.3b <code>resolve_block</code> — Blocchi lessicali annidati</h3>
+    <p>La nuova struttura <code>Block</code> nell'IR rappresenta un blocco lessicale all'interno di una funzione. La struct <code>Function</code> non ha più campi <code>calls</code> e <code>instantiates</code> diretti — questi sono ora incapsulati nel <code>Block</code>:</p>
+
+    <pre><code>pub struct Block {
+    pub declarations: Vec&lt;Field&gt;,    // Variabili locali (riusa Field: nome + tipo)
+    pub calls: Vec&lt;TypeRef&gt;,          // Tipi i cui metodi vengono invocati
+    pub instantiates: Vec&lt;TypeRef&gt;,   // Tipi istanziati
+    pub sub_blocks: Vec&lt;Block&gt;,       // Blocchi annidati (if, while, scope anonimi)
+}
+
+pub struct Function {
+    pub name: QualifiedName,
+    pub signature: Signature,
+    pub body: Option&lt;Block&gt;,          // Sostituisce i vecchi calls/instantiates
+}</code></pre>
+
+    <div class="info-box">
+        <strong>Formalizzazione LaTeX:</strong> Il Block è formalizzato come 𝓑 = ⟨F⃗<sub>local</sub>, τ⃗<sub>calls</sub>, τ⃗<sub>inst</sub>, 𝓑⃗<sub>sub</sub>⟩ — un vettore di dichiarazioni locali, un vettore di tipi chiamati, un vettore di tipi istanziati e un vettore di sotto-blocchi ricorsivi.
+    </div>
+
+    <p>La funzione <code>resolve_block</code> crea uno scope lessicale per ogni blocco:</p>
+
+    <pre><code>fn resolve_block(ctx: &amp;ResolutionContext, mut block: Block) -&gt; Block {
+    ctx.stack.borrow_mut().push_scope();
+
+    // 1. Risolve le dichiarazioni locali e le registra nello stack
+    block.declarations = block.declarations.into_iter().map(|mut decl| {
+        decl.ty = resolve_type_ref(ctx, decl.ty);
+        if let TypeRef::Resolved(abs_path) | TypeRef::External(abs_path) = &decl.ty {
+            ctx.stack.borrow_mut().define_symbol(decl.name.clone(), abs_path.clone());
+        }
+        decl
+    }).collect();
+
+    // 2. Risolve le dipendenze comportamentali
+    block.calls = block.calls.into_iter()
+        .map(|c| resolve_type_ref(ctx, c)).collect();
+    block.instantiates = block.instantiates.into_iter()
+        .map(|i| resolve_type_ref(ctx, i)).collect();
+
+    // 3. Ricorsione nei sotto-blocchi
+    block.sub_blocks = block.sub_blocks.into_iter()
+        .map(|b| resolve_block(ctx, b)).collect();
+
+    ctx.stack.borrow_mut().pop_scope();
+    block
+}</code></pre>
+
+    <p>Il pattern è analogo a <code>resolve_module_in_context</code>: push dello scope, registrazione dei simboli locali (dichiarazioni), risoluzione dei TypeRef, ricorsione nei sotto-blocchi, e infine pop dello scope. Ogni blocco annidato (es. un <code>if</code>, <code>while</code> o uno scope anonimo <code>{}</code>) crea un proprio scope lessicale, garantendo che le variabili dichiarate all'interno non "fuoriescano" dal blocco.</p>
+
+    <div class="warn-box">
+        <strong>Dichiarazioni come simboli:</strong> Quando una dichiarazione locale come <code>let a: Auto = ...</code> viene risolta, il nome <code>"a"</code> viene registrato nello scope del blocco con il percorso assoluto del tipo (<code>["root","core","Auto"]</code>). Questo consente ai blocchi successivi o alle espressioni nello stesso blocco di risolvere riferimenti a <code>"a"</code> tramite il Lexical Climb. Notare che vengono registrati non solo i tipi <code>Resolved</code>, ma anche quelli <code>External</code>, per garantire la visibilità di variabili locali che fanno uso di dipendenze esterne al progetto.
+    </div>
+
+    <h3>8.4 <code>resolve_impl_block</code></h3>
+    <p class="ref">Riferimento: <code>mod.rs:426-452</code></p>
+    <p>Per ogni blocco impl:</p>
+    <ol>
+        <li><strong>Estende il nome</strong> con il prefisso corrente.</li>
+        <li><strong>PUSH scope</strong> temporaneo.</li>
+        <li>Risolve <code>impl_for</code> — il tipo per cui si implementa.</li>
+        <li>Risolve <code>implements_trait</code> — l'eventuale trait implementato.</li>
+        <li>Risolve tutti i <code>methods</code> e i <code>nested_types</code>.</li>
+        <li><strong>POP scope</strong>.</li>
+    </ol>
+
+    <!-- ============================================================ -->
+    <h2 id="impl-flattening">9. Flattening degli Impl Blocks</h2>
+    <p class="ref">Riferimento: <code>mod.rs:290-311</code></p>
+
+    <p>Dopo che tutti gli impl blocks di un modulo sono stati risolti, avviene una fase cruciale di <strong>fusione</strong>: i metodi e i tipi annidati definiti negli impl blocks vengono trasferiti direttamente nel <code>StructuredType</code> target.</p>
+
+    <pre><code>let mut unfused_impls = vec![];
+for ib in resolved_impls {
+    let mut fused = false;
+    if let TypeRef::Resolved(target_name) = &amp;ib.impl_for {
+        if let Some(target_st) = module.structured_types.iter_mut()
+            .find(|st| &amp;st.name == target_name)
+        {
+            target_st.methods.extend(ib.methods.clone());        // Fonde i metodi
+            target_st.nested_types.extend(ib.nested_types.clone()); // Fonde i tipi annidati
+            if let Some(trait_ref) = ib.implements_trait.clone() {
+                target_st.super_types.push(trait_ref);           // Aggiunge il trait ai supertypes
+            }
+            fused = true;
+        }
+    }
+    if !fused { unfused_impls.push(ib); }
+}
+module.impl_blocks = unfused_impls;  // Solo gli impl non fusi rimangono</code></pre>
+
+    <p>Questo passo è fondamentale perché linguaggi come Rust separano la dichiarazione di una struct dalla definizione dei suoi metodi (tramite <code>impl</code>). Dopo il flattening, il <code>StructuredType</code> contiene tutto ciò che gli appartiene.</p>
+
+    <div class="warn-box">
+        <strong>Differenza dal vecchio approccio:</strong> Nella vecchia implementazione, <code>module.impl_blocks</code> veniva svuotato completamente (<code>= vec![]</code>). Nella nuova versione, gli impl blocks <strong>non fusi</strong> (quelli il cui <code>impl_for</code> è <code>External</code> o <code>Failed</code>, oppure il target non è trovato nel modulo corrente) vengono preservati in <code>unfused_impls</code>. Questo è più corretto — non perde informazione.
+    </div>
+
+    <!-- ============================================================ -->
+    <h2 id="full-example">10. Esempio Completo End-to-End</h2>
+
+    <p>Seguiamo l'intera pipeline di risoluzione sul seguente codice di esempio:</p>
+    <pre><code>use external::db::Database as Db;
+
+mod core {
+    struct Veicolo { id: String }
+    struct Auto { base: Veicolo, storage: Db }
+    fn calcola() -&gt; Auto {
+        let a = Auto { base: Veicolo { id: String::new() } };
+        a
+    }
+}
+
+struct User { name: String }</code></pre>
+
+    <!-- 10.1 -->
+    <h3>10.1 — Stato Iniziale dopo la Fase 1 (IR non risolta)</h3>
+    <p>La Fase 1 (Estrazione) ha prodotto la seguente IR con tutti i <code>TypeRef</code> ancora <code>Unresolved</code>:</p>
+    <div class="tree-container">
+<span class="node">Module ["root"]</span>
+ <span class="arrow">├──</span> <span class="import">imports:</span> [ external::db::Database <span class="import">as Db</span> ]
+ <span class="arrow">├──</span> <span class="symbol">structured_types:</span> [ User { name: <span class="dim">Unresolved(["String"])</span> } ]
+ <span class="arrow">├──</span> <span class="symbol">free_functions:</span> [ ]
+ <span class="arrow">└──</span> <span class="node">sub_modules:</span>
+      <span class="arrow">└──</span> <span class="node">Module ["core"]</span>
+           <span class="arrow">├──</span> <span class="symbol">structured_types:</span>
+           <span class="arrow">│</span>    <span class="arrow">├──</span> Veicolo { id: <span class="dim">Unresolved(["String"])</span> }
+           <span class="arrow">│</span>    <span class="arrow">└──</span> Auto    { base: <span class="dim">Unresolved(["Veicolo"])</span>,
+           <span class="arrow">│</span>                  storage: <span class="dim">Unresolved(["Db"])</span> }
+           <span class="arrow">└──</span> <span class="symbol">free_functions:</span>
+                <span class="arrow">└──</span> calcola() → <span class="dim">Unresolved(["Auto"])</span>
+                     calls: [<span class="dim">Unresolved(["String"])</span>]
+                     instantiates: [<span class="dim">Unresolved(["Auto"])</span>, <span class="dim">Unresolved(["Veicolo"])</span>]</div>
+
+    <!-- 10.2 -->
+    <h3>10.2 — Costruzione del Global Registry (Pass 1)</h3>
+    <p><code>GlobalRegistry::build(&amp;modules)</code> attraversa ricorsivamente l'IR e registra tutti i percorsi assoluti:</p>
+
+    <div class="step step-success">
+        <h3>Esecuzione di register_module</h3>
+        <div class="tree-container">
+<span class="green">Chiamata 1:</span> register_module(root, prefix=[])
+  prefix = [] + ["root"] = <span class="symbol">["root"]</span>
+  paths.insert(<span class="symbol">["root"]</span>)
+
+  <span class="dim">// structured_types del modulo root:</span>
+  st = User  →  st_prefix = ["root"] + ["User"] = <span class="symbol">["root", "User"]</span>
+  paths.insert(<span class="symbol">["root", "User"]</span>)
+
+  <span class="dim">// free_functions del modulo root: nessuna</span>
+  <span class="dim">// impl_blocks del modulo root: nessuno</span>
+
+  <span class="dim">// sub_modules: "core"</span>
+
+<span class="green">Chiamata 2:</span> register_module(core, prefix=["root"])
+  prefix = ["root"] + ["core"] = <span class="symbol">["root", "core"]</span>
+  paths.insert(<span class="symbol">["root", "core"]</span>)
+
+  <span class="dim">// structured_types di core:</span>
+  st = Veicolo  →  st_prefix = ["root", "core"] + ["Veicolo"] = <span class="symbol">["root", "core", "Veicolo"]</span>
+  paths.insert(<span class="symbol">["root", "core", "Veicolo"]</span>)
+
+  st = Auto     →  st_prefix = ["root", "core"] + ["Auto"] = <span class="symbol">["root", "core", "Auto"]</span>
+  paths.insert(<span class="symbol">["root", "core", "Auto"]</span>)
+
+  <span class="dim">// free_functions di core:</span>
+  ff = calcola  →  ff_prefix = ["root", "core"] + ["calcola"] = <span class="symbol">["root", "core", "calcola"]</span>
+  paths.insert(<span class="symbol">["root", "core", "calcola"]</span>)</div>
+    </div>
+
+    <div class="tree-container">
+<span class="symbol">GlobalRegistry.paths (contenuto finale):</span>
+
+  <span class="green">✓</span> ["root"]
+  <span class="green">✓</span> ["root", "User"]
+  <span class="green">✓</span> ["root", "core"]
+  <span class="green">✓</span> ["root", "core", "Veicolo"]
+  <span class="green">✓</span> ["root", "core", "Auto"]
+  <span class="green">✓</span> ["root", "core", "calcola"]
+
+<span class="dim">Totale: 6 percorsi registrati.</span></div>
+
+    <!-- 10.3 -->
+    <h3>10.3 — Inizializzazione di Stack, Cache e Contesto</h3>
+    <p class="ref">Riferimento: <code>mod.rs:88-111</code></p>
+    <pre><code>let registry = GlobalRegistry::build(&amp;modules);    // → 6 percorsi
+let stack = RefCell::new(SymbolStack::new());       // → frames: []
+let cache = RefCell::new(ResolutionCache::new());   // → store: {}
+
+// Push del frame GLOBAL ROOT
+stack.borrow_mut().push_scope();                    // → frames: [Frame₀]
+
+let ctx = ResolutionContext {
+    current_prefix: vec![],                         // Nessun prefisso
+    stack: &amp;stack,
+    cache: &amp;cache,
+    registry: &amp;registry,
+};</code></pre>
+
+    <div class="tree-container">
+<span class="symbol">Stato iniziale dello SymbolStack:</span>
+
+  ┌─────────────────────────────────────────────────┐
+  │ <span class="node">Frame₀</span> (GLOBAL ROOT)                            │
+  │   symbols: { }                                  │
+  │   imports: [ ]                                  │
+  └─────────────────────────────────────────────────┘
+  <span class="dim">↑ TOP (e anche BOTTOM)</span>
+
+<span class="symbol">Stato iniziale del ResolutionCache:</span>
+  store = { }  <span class="dim">← vuota</span></div>
+
+    <!-- 10.4 -->
+    <h3>10.4 — Discesa nel modulo "root"</h3>
+    <p><code>resolve_module_in_context(&amp;ctx, module_root)</code> viene chiamato sul modulo "root".</p>
+
+    <div class="step">
+        <h3>Creazione contesto + PUSH scope + Hoisting</h3>
+        <pre><code>// 1. Estendi prefisso
+new_prefix = [] + ["root"] = ["root"]
+
+// 2. Crea nuovo contesto
+new_ctx = ResolutionContext {
+    current_prefix: ["root"],
+    stack: &amp;stack,    // stesso stack condiviso
+    cache: &amp;cache,    // stessa cache condivisa
+    registry: &amp;registry,
+}
+
+// 3. PUSH scope per il modulo "root"
+new_ctx.stack.borrow_mut().push_scope();
+
+// 4. Hoist imports
+new_ctx.stack.borrow_mut().add_import(
+    Import { path: ["external","db","Database"], alias: Some("Db"), is_wildcard: false }
+);
+
+// 5. Hoist simboli locali
+//    structured_types: User
+new_ctx.stack.borrow_mut().define_symbol("User", ["root", "User"]);
+//    free_functions: nessuna
+//    sub_modules: core
+new_ctx.stack.borrow_mut().define_symbol("core", ["root", "core"]);
+
+// 6. Aggiorna il nome del modulo
+module.name = ["root"];</code></pre>
+    </div>
+
+    <div class="tree-container">
+<span class="symbol">SymbolStack dopo hoisting del modulo "root":</span>
+
+  ┌─────────────────────────────────────────────────────────────────┐
+  │ <span class="node">Frame₁</span> (modulo "root")                                          │
+  │   symbols: { <span class="symbol">"User"</span> → ["root", "User"],                         │
+  │              <span class="symbol">"core"</span> → ["root", "core"] }                        │
+  │   imports: [ <span class="import">external::db::Database as Db</span> ]                      │
+  ├─────────────────────────────────────────────────────────────────┤
+  │ <span class="node">Frame₀</span> (GLOBAL ROOT)                                            │
+  │   symbols: { }                                                  │
+  │   imports: [ ]                                                  │
+  └─────────────────────────────────────────────────────────────────┘
+  <span class="dim">↓ BOTTOM                                                  ↑ TOP</span></div>
+
+    <!-- 10.5 -->
+    <h3>10.5 — Discesa nel sotto-modulo "core"</h3>
+    <p>Il resolver processa prima i <code>structured_types</code> e le <code>free_functions</code>, poi i sotto-moduli. Ma poiché il modulo "root" contiene il sotto-modulo "core" dove risiedono i tipi principali, vediamo prima la risoluzione di "core".</p>
+
+    <div class="step">
+        <h3>Creazione contesto + PUSH scope + Hoisting per "core"</h3>
+        <pre><code>// 1. Estendi prefisso
+new_prefix = ["root"] + ["core"] = ["root", "core"]
+
+// 2. PUSH scope
+new_ctx.stack.borrow_mut().push_scope();
+
+// 3. Hoist imports di "core": nessuno
+
+// 4. Hoist simboli locali di "core"
+//    structured_types: Veicolo, Auto
+new_ctx.stack.borrow_mut().define_symbol("Veicolo", ["root", "core", "Veicolo"]);
+new_ctx.stack.borrow_mut().define_symbol("Auto",    ["root", "core", "Auto"]);
+//    free_functions: calcola
+new_ctx.stack.borrow_mut().define_symbol("calcola", ["root", "core", "calcola"]);
+//    sub_modules: nessuno
+
+// 5. Aggiorna il nome del modulo
+module.name = ["root", "core"];</code></pre>
+    </div>
+
+    <div class="tree-container">
+<span class="symbol">SymbolStack dopo hoisting del modulo "core":</span>
+
+  ┌─────────────────────────────────────────────────────────────────┐
+  │ <span class="node">Frame₂</span> (modulo "core")                          <span class="dim">← TOP</span>          │
+  │   symbols: { <span class="symbol">"Veicolo"</span> → ["root", "core", "Veicolo"],           │
+  │              <span class="symbol">"Auto"</span>    → ["root", "core", "Auto"],              │
+  │              <span class="symbol">"calcola"</span> → ["root", "core", "calcola"] }          │
+  │   imports: [ ]                                                  │
+  ├─────────────────────────────────────────────────────────────────┤
+  │ <span class="node">Frame₁</span> (modulo "root")                                          │
+  │   symbols: { "User" → ["root", "User"],                         │
+  │              "core" → ["root", "core"] }                        │
+  │   imports: [ <span class="import">external::db::Database as Db</span> ]                      │
+  ├─────────────────────────────────────────────────────────────────┤
+  │ <span class="node">Frame₀</span> (GLOBAL ROOT)                                            │
+  │   symbols: { }                                                  │
+  │   imports: [ ]                                                  │
+  └─────────────────────────────────────────────────────────────────┘</div>
+
+    <!-- 10.6 -->
+    <h3>10.6 — Risoluzione della struct <code>Veicolo</code></h3>
+
+    <div class="step step-success">
+        <h3>PUSH scope + Hoisting per Veicolo</h3>
+        <pre><code>new_prefix = ["root", "core"] + ["Veicolo"] = ["root", "core", "Veicolo"]
+st.name = ["root", "core", "Veicolo"]
+
+// PUSH scope per Veicolo
+new_ctx.stack.borrow_mut().push_scope();
+// Hoist nested_types e methods: nessuno (Veicolo è vuota, no metodi, no tipi annidati)</code></pre>
+
+        <div class="tree-container">
+<span class="symbol">SymbolStack dopo PUSH per Veicolo:</span>
+
+  ┌─────────────────────────────────────────────────────────────────┐
+  │ <span class="node">Frame₃</span> (struct Veicolo)                        <span class="dim">← TOP</span>          │
+  │   symbols: { }                                                  │
+  │   imports: [ ]                                                  │
+  ├─────────────────────────────────────────────────────────────────┤
+  │ <span class="node">Frame₂</span> (modulo "core")                                          │
+  │   symbols: { "Veicolo" → [...], "Auto" → [...], "calcola" → [...] }│
+  │   imports: [ ]                                                  │
+  ├─────────────────────────────────────────────────────────────────┤
+  │ <span class="node">Frame₁</span> (modulo "root")                                          │
+  │   symbols: { "User" → [...], "core" → [...] }                   │
+  │   imports: [ <span class="import">external::db::Database as Db</span> ]                      │
+  ├─────────────────────────────────────────────────────────────────┤
+  │ <span class="node">Frame₀</span> (GLOBAL ROOT)                                            │
+  │   symbols: { }   imports: [ ]                                   │
+  └─────────────────────────────────────────────────────────────────┘</div>
+
+        <h4>Campo <code>id: Unresolved(["String"])</code></h4>
+        <p>Il resolver chiama <code>resolve_type_ref(ctx, Unresolved(["String"]))</code> con <code>current_prefix = ["root","core","Veicolo"]</code>:</p>
+        <ol>
+            <li><strong>Step 0 (Cache):</strong> <code>cache.get(["root","core","Veicolo"], ["String"])</code> → scope_key = <code>"root::core::Veicolo"</code> → miss. Cache vuota.</li>
+            <li><strong>Step 1 — Lexical Climb:</strong>
+                <ul>
+                    <li><strong>Frame₃ (Veicolo):</strong> <code>frame.symbols.get("String")</code> → non trovato. Nessun import. → Passa al frame successivo.</li>
+                    <li><strong>Frame₂ (core):</strong> <code>frame.symbols</code> = {"Veicolo", "Auto", "calcola"} → non contiene "String". Nessun import. → Passa al frame successivo.</li>
+                    <li><strong>Frame₁ (root):</strong> <code>frame.symbols</code> = {"User", "core"} → non contiene "String". Imports: [external::db::Database as Db] → alias "Db" ≠ "String". → Passa al frame successivo.</li>
+                    <li><strong>Frame₀ (GLOBAL):</strong> <code>frame.symbols</code> = {} → vuoto. Nessun import. → Fine del Lexical Climb.</li>
+                </ul>
+            </li>
+            <li><strong>Step 2a (Assoluto diretto):</strong> <code>registry.exists(["String"])</code> → <strong>false</strong>.</li>
+            <li><strong>Step 2b (Preponi "root"):</strong> <code>registry.exists(["root", "String"])</code> → <strong>false</strong>.</li>
+            <li><strong>Risultato:</strong> <code>None</code> → <code class="highlight">TypeRef::Failed(["String"])</code></li>
+        </ol>
+        <div class="tree-container">
+<span class="symbol">Stato Cache:</span>
+  store = { }  <span class="dim">← Nulla inserito: Failed = None = non cachato.</span></div>
+
+        <p><strong>POP scope</strong> per Veicolo: <code>Frame₃</code> distrutto.</p>
+    </div>
+
+    <div class="tree-container">
+<span class="symbol">SymbolStack dopo POP di Veicolo:</span>
+
+  ┌─────────────────────────────────────────────────────────────────┐
+  │ <span class="node">Frame₂</span> (modulo "core")                          <span class="dim">← TOP</span>          │
+  │   symbols: { "Veicolo" → [...], "Auto" → [...], "calcola" → [...] }│
+  │   imports: [ ]                                                  │
+  ├─────────────────────────────────────────────────────────────────┤
+  │ <span class="node">Frame₁</span> (modulo "root")                                          │
+  │   symbols: { "User" → [...], "core" → [...] }                   │
+  │   imports: [ <span class="import">external::db::Database as Db</span> ]                      │
+  ├─────────────────────────────────────────────────────────────────┤
+  │ <span class="node">Frame₀</span> (GLOBAL ROOT)                                            │
+  │   symbols: { }   imports: [ ]                                   │
+  └─────────────────────────────────────────────────────────────────┘
+<span class="dim">Frame₃ (Veicolo) è stato distrutto dal pop_scope().</span></div>
+
+    <!-- 10.7 -->
+    <h3>10.7 — Risoluzione della struct <code>Auto</code></h3>
+
+    <div class="step step-success">
+        <h3>PUSH scope + Hoisting per Auto</h3>
+        <pre><code>new_prefix = ["root", "core"] + ["Auto"] = ["root", "core", "Auto"]
+st.name = ["root", "core", "Auto"]
+
+// PUSH scope per Auto
+new_ctx.stack.borrow_mut().push_scope();
+// Hoist: nessun nested_type né metodo</code></pre>
+
+        <div class="tree-container">
+<span class="symbol">SymbolStack dopo PUSH per Auto:</span>
+
+  ┌─────────────────────────────────────────────────────────────────┐
+  │ <span class="node">Frame₃'</span> (struct Auto)                          <span class="dim">← TOP</span>          │
+  │   symbols: { }                                                  │
+  │   imports: [ ]                                                  │
+  ├─────────────────────────────────────────────────────────────────┤
+  │ <span class="node">Frame₂</span> (modulo "core")                                          │
+  │   symbols: { "Veicolo" → ["root","core","Veicolo"],              │
+  │              "Auto"    → ["root","core","Auto"],                 │
+  │              "calcola" → ["root","core","calcola"] }             │
+  │   imports: [ ]                                                  │
+  ├─────────────────────────────────────────────────────────────────┤
+  │ <span class="node">Frame₁</span> (modulo "root")                                          │
+  │   symbols: { "User" → ["root","User"], "core" → ["root","core"] }│
+  │   imports: [ <span class="import">external::db::Database as Db</span> ]                      │
+  ├─────────────────────────────────────────────────────────────────┤
+  │ <span class="node">Frame₀</span> (GLOBAL ROOT) — symbols: { } — imports: [ ]               │
+  └─────────────────────────────────────────────────────────────────┘</div>
+
+        <h4>Campo <code>base: Unresolved(["Veicolo"])</code></h4>
+        <p>Risoluzione con <code>current_prefix = ["root","core","Auto"]</code> → scope_key = <code>"root::core::Auto"</code>:</p>
+        <ol>
+            <li><strong>Step 0 (Cache):</strong> <code>cache.get("root::core::Auto", ["Veicolo"])</code> → miss.</li>
+            <li><strong>Step 1 — Lexical Climb:</strong>
+                <ul>
+                    <li><strong>Frame₃' (Auto):</strong> <code>symbols.get("Veicolo")</code> → non trovato. Nessun import. → Prosegue.</li>
+                    <li><strong>Frame₂ (core):</strong> <code>symbols.get("Veicolo")</code> → <strong>Trovato!</strong> <code>abs_path = ["root","core","Veicolo"]</code>.
+                        <ul>
+                            <li><code>full_path = ["root","core","Veicolo"]</code> (nessun segmento aggiuntivo, il nome è singolo).</li>
+                            <li><code>registry.exists(["root","core","Veicolo"])</code> → <strong>true!</strong></li>
+                            <li><code>res = ResolutionResult::Local(["root","core","Veicolo"])</code></li>
+                            <li><strong>Cache insert:</strong> <code>cache.insert("root::core::Auto", ["Veicolo"], Local(["root","core","Veicolo"]))</code></li>
+                        </ul>
+                    </li>
+                </ul>
+            </li>
+            <li><strong>Risultato:</strong> <code class="highlight">TypeRef::Resolved(["root", "core", "Veicolo"])</code></li>
+        </ol>
+
+        <div class="tree-container">
+<span class="symbol">Stato Cache:</span>
+  store = {
+    "root::core::Auto" → {
+      ["Veicolo"] → Local(["root", "core", "Veicolo"])    <span class="green">✓ NUOVO</span>
+    }
+  }</div>
+
+        <h4>Campo <code>storage: Unresolved(["Db"])</code></h4>
+        <p>Risoluzione con <code>current_prefix = ["root","core","Auto"]</code>:</p>
+        <ol>
+            <li><strong>Step 0 (Cache):</strong> <code>cache.get("root::core::Auto", ["Db"])</code> → miss.</li>
+            <li><strong>Step 1 — Lexical Climb:</strong>
+                <ul>
+                    <li><strong>Frame₃' (Auto):</strong> <code>symbols.get("Db")</code> → non trovato. Nessun import. → Prosegue.</li>
+                    <li><strong>Frame₂ (core):</strong> <code>symbols</code> = {"Veicolo", "Auto", "calcola"} → non contiene "Db". Nessun import. → Prosegue.</li>
+                    <li><strong>Frame₁ (root):</strong> <code>symbols</code> = {"User", "core"} → non contiene "Db".
+                        <ul>
+                            <li><strong>Imports:</strong> scorre gli import del frame.</li>
+                            <li>Import: <code>external::db::Database as Db</code> → alias = <code>"Db"</code>.</li>
+                            <li><code>"Db" == "Db"</code>? <strong>Sì!</strong></li>
+                            <li>Costruisce candidato: <code>candidate = imp.path = ["external","db","Database"]</code>, nessun segmento dopo "Db".</li>
+                            <li>Chiama <code>validate_import(["external","db","Database"])</code>:
+                                <ol>
+                                    <li><code>registry.exists(["external","db","Database"])</code> → <strong>false</strong> (non è nel progetto).</li>
+                                    <li>Preponi "root": <code>registry.exists(["root","external","db","Database"])</code> → <strong>false</strong>.</li>
+                                    <li>Il primo segmento "external" ≠ "crate" → <strong>External!</strong></li>
+                                </ol>
+                            </li>
+                            <li><code>res = ResolutionResult::External(["external","db","Database"])</code></li>
+                            <li><strong>Cache insert:</strong> <code>cache.insert("root::core::Auto", ["Db"], External([...]))</code></li>
+                        </ul>
+                    </li>
+                </ul>
+            </li>
+            <li><strong>Risultato:</strong> <code class="highlight">TypeRef::External(["external", "db", "Database"])</code></li>
+        </ol>
+
+        <div class="tree-container">
+<span class="symbol">Stato Cache:</span>
+  store = {
+    "root::core::Auto" → {
+      ["Veicolo"] → Local(["root", "core", "Veicolo"]),
+      ["Db"]      → External(["external", "db", "Database"])    <span class="green">✓ NUOVO</span>
+    }
+  }</div>
+
+        <p><strong>POP scope</strong> per Auto: <code>Frame₃'</code> distrutto.</p>
+    </div>
+
+    <!-- 10.8 -->
+    <h3>10.8 — Risoluzione della funzione <code>calcola</code></h3>
+
+    <div class="step">
+        <h3>PUSH scope per la funzione calcola + risoluzione parametri</h3>
+        <pre><code>new_prefix = ["root", "core"] + ["calcola"] = ["root", "core", "calcola"]
+ff.name = ["root", "core", "calcola"]
+
+// PUSH scope per la funzione calcola
+ctx.stack.borrow_mut().push_scope();
+
+// Risolve parametri e li registra come simboli
+// calcola() non ha parametri → nessun simbolo registrato
+
+// Risolve return type
+ff.signature.return_type = resolve_type_ref(ctx, Unresolved(["Auto"]));</code></pre>
+
+        <p>Nota: <code>resolve_function</code> usa <code>ctx</code> (il contesto del modulo "core"), non crea un <code>new_ctx</code> con il proprio prefisso per la risoluzione dei TypeRef. Questo significa che il <code>current_prefix</code> durante la risoluzione dei tipi della funzione rimane quello del <strong>contesto genitore</strong> ("root::core"), non "root::core::calcola".</p>
+
+        <div class="tree-container">
+<span class="symbol">SymbolStack dopo PUSH per calcola() (scope funzione):</span>
+
+  ┌─────────────────────────────────────────────────────────────────┐
+  │ <span class="node">Frame₃''</span> (funzione calcola — parametri)        <span class="dim">← TOP</span>          │
+  │   symbols: { }  <span class="dim">← nessun parametro in questo caso</span>              │
+  │   imports: [ ]                                                  │
+  ├─────────────────────────────────────────────────────────────────┤
+  │ <span class="node">Frame₂</span> (modulo "core")                                          │
+  │   symbols: { "Veicolo" → [...], "Auto" → [...], "calcola" → [...] }│
+  │   imports: [ ]                                                  │
+  ├─────────────────────────────────────────────────────────────────┤
+  │ <span class="node">Frame₁</span> (modulo "root")                                          │
+  │   symbols: { "User" → [...], "core" → [...] }                   │
+  │   imports: [ <span class="import">external::db::Database as Db</span> ]                      │
+  ├─────────────────────────────────────────────────────────────────┤
+  │ <span class="node">Frame₀</span> (GLOBAL ROOT) — symbols: { } — imports: [ ]               │
+  └─────────────────────────────────────────────────────────────────┘
+<span class="dim">current_prefix per le risoluzioni = ["root", "core"] (contesto del modulo genitore)</span></div>
+
+        <h4>Return type: <code>Unresolved(["Auto"])</code></h4>
+        <p>Con <code>current_prefix = ["root", "core"]</code> → scope_key = <code>"root::core"</code>:</p>
+        <ol>
+            <li><strong>Step 0 (Cache):</strong> <code>cache.get("root::core", ["Auto"])</code> → miss (la cache ha "Auto" sotto la chiave "root::core::Auto", non "root::core").</li>
+            <li><strong>Step 1 — Lexical Climb:</strong>
+                <ul>
+                    <li><strong>Frame₃'' (calcola):</strong> <code>symbols</code> = {} → vuoto. → Prosegue.</li>
+                    <li><strong>Frame₂ (core):</strong> <code>symbols.get("Auto")</code> → <strong>Trovato!</strong> <code>abs_path = ["root","core","Auto"]</code>.
+                        <ul>
+                            <li><code>full_path = ["root","core","Auto"]</code>.</li>
+                            <li><code>registry.exists(["root","core","Auto"])</code> → <strong>true!</strong></li>
+                        </ul>
+                    </li>
+                </ul>
+            </li>
+            <li><strong>Cache insert:</strong> <code>cache.insert("root::core", ["Auto"], Local(["root","core","Auto"]))</code></li>
+            <li><strong>Risultato:</strong> <code class="highlight">TypeRef::Resolved(["root", "core", "Auto"])</code></li>
+        </ol>
+    </div>
+
+    <div class="step step-success">
+        <h3>resolve_block: risoluzione del body di calcola()</h3>
+        <p>Dopo aver risolto la firma, <code>resolve_function</code> chiama <code>resolve_block(ctx, block)</code> sul body della funzione. <code>resolve_block</code> crea un <strong>nuovo scope lessicale</strong> interno per il blocco:</p>
+        <pre><code>// resolve_block: PUSH scope per il blocco del body
+ctx.stack.borrow_mut().push_scope();
+
+// 1. Risolve dichiarazioni locali e le registra come simboli
+//    Dichiarazione: a: Unresolved(["Auto"])
+//    → resolve_type_ref → Resolved(["root","core","Auto"])
+//    → define_symbol("a", ["root","core","Auto"])
+
+// 2. Risolve calls e instantiates
+// 3. Ricorsione nei sub_blocks (nessuno in questo caso)</code></pre>
+
+        <div class="tree-container">
+<span class="symbol">SymbolStack durante resolve_block del body di calcola():</span>
+
+  ┌─────────────────────────────────────────────────────────────────┐
+  │ <span class="node">Frame₄</span> (blocco body di calcola)                <span class="dim">← TOP</span>          │
+  │   symbols: { <span class="symbol">"a"</span> → ["root", "core", "Auto"] }                  │
+  │   imports: [ ]                                                  │
+  ├─────────────────────────────────────────────────────────────────┤
+  │ <span class="node">Frame₃''</span> (funzione calcola — parametri)                          │
+  │   symbols: { }                                                  │
+  │   imports: [ ]                                                  │
+  ├─────────────────────────────────────────────────────────────────┤
+  │ <span class="node">Frame₂</span> (modulo "core")                                          │
+  │   symbols: { "Veicolo" → [...], "Auto" → [...], "calcola" → [...] }│
+  │   imports: [ ]                                                  │
+  ├─────────────────────────────────────────────────────────────────┤
+  │ <span class="node">Frame₁</span> (modulo "root")                                          │
+  │   symbols: { "User" → [...], "core" → [...] }                   │
+  │   imports: [ <span class="import">external::db::Database as Db</span> ]                      │
+  ├─────────────────────────────────────────────────────────────────┤
+  │ <span class="node">Frame₀</span> (GLOBAL ROOT) — symbols: { } — imports: [ ]               │
+  └─────────────────────────────────────────────────────────────────┘
+<span class="dim">Nota: 5 frame attivi! Il Frame₄ contiene la variabile locale "a" registrata come simbolo.</span></div>
+
+        <h4>Dichiarazione: <code>a: Unresolved(["Auto"])</code></h4>
+        <p>Con <code>current_prefix = ["root", "core"]</code>:</p>
+        <ol>
+            <li><strong>Step 0 (Cache):</strong> <code>cache.get("root::core", ["Auto"])</code> → miss.</li>
+            <li><strong>Step 1 — Lexical Climb:</strong>
+                <ul>
+                    <li><strong>Frame₄ (body):</strong> vuoto (nessun simbolo ancora). → Prosegue.</li>
+                    <li><strong>Frame₃'' (calcola):</strong> vuoto. → Prosegue.</li>
+                    <li><strong>Frame₂ (core):</strong> <code>symbols.get("Auto")</code> → <strong>Trovato!</strong> → <code>["root","core","Auto"]</code> → <code>registry.exists</code> → <strong>true!</strong></li>
+                </ul>
+            </li>
+            <li><strong>Risultato:</strong> <code class="highlight">TypeRef::Resolved(["root", "core", "Auto"])</code></li>
+            <li><strong>Registrazione:</strong> <code>define_symbol("a", ["root","core","Auto"])</code> nel Frame₄.</li>
+        </ol>
+
+        <h4>calls: <code>[Unresolved(["String"])]</code></h4>
+        <p>Stessa ricerca esaustiva come per il campo <code>id</code> di Veicolo — "String" non esiste né nei frame né nel Registry:</p>
+        <p><strong>Risultato:</strong> <code class="highlight">TypeRef::Failed(["String"])</code></p>
+
+        <h4>instantiates: <code>[Unresolved(["Auto"]), Unresolved(["Veicolo"])]</code></h4>
+
+        <p><strong>"Auto"</strong> con <code>current_prefix = ["root", "core"]</code>:</p>
+        <ol>
+            <li><strong>Step 0 (Cache):</strong> <code>cache.get("root::core", ["Auto"])</code> → <strong>HIT!</strong> <code>Local(["root","core","Auto"])</code></li>
+            <li><strong>Risultato:</strong> <code class="highlight">TypeRef::Resolved(["root", "core", "Auto"])</code> — <strong>O(1)</strong> grazie alla memoization!</li>
+        </ol>
+
+        <p><strong>"Veicolo"</strong> con <code>current_prefix = ["root", "core"]</code>:</p>
+        <ol>
+            <li><strong>Step 0 (Cache):</strong> <code>cache.get("root::core", ["Veicolo"])</code> → miss (la cache ha "Veicolo" sotto "root::core::Auto", non "root::core").</li>
+            <li><strong>Step 1 — Lexical Climb:</strong>
+                <ul>
+                    <li><strong>Frame₄ (body):</strong> <code>symbols.get("Veicolo")</code> → non trovato. → Prosegue.</li>
+                    <li><strong>Frame₃'' (calcola):</strong> vuoto. → Prosegue.</li>
+                    <li><strong>Frame₂ (core):</strong> <code>symbols.get("Veicolo")</code> → <strong>Trovato!</strong> → <code>["root","core","Veicolo"]</code> → <code>registry.exists</code> → <strong>true!</strong></li>
+                </ul>
+            </li>
+            <li><strong>Cache insert:</strong> <code>cache.insert("root::core", ["Veicolo"], Local(["root","core","Veicolo"]))</code></li>
+            <li><strong>Risultato:</strong> <code class="highlight">TypeRef::Resolved(["root", "core", "Veicolo"])</code></li>
+        </ol>
+
+        <p><strong>POP scope</strong> del blocco body: <code>Frame₄</code> distrutto (il simbolo <code>"a"</code> viene perso).</p>
+    </div>
+
+        <div class="tree-container">
+<span class="symbol">Stato Cache dopo risoluzione di calcola():</span>
+  store = {
+    "root::core::Auto" → {
+      ["Veicolo"] → Local(["root", "core", "Veicolo"]),
+      ["Db"]      → External(["external", "db", "Database"]),
+    },
+    "root::core" → {
+      ["Auto"]    → Local(["root", "core", "Auto"]),         <span class="green">✓ NUOVO</span>
+      ["Veicolo"] → Local(["root", "core", "Veicolo"]),      <span class="green">✓ NUOVO</span>
+    },
+  }</div>
+
+        <p><strong>POP scope</strong> per calcola (scope funzione): <code>Frame₃''</code> distrutto.</p>
+
+    <!-- 10.9 -->
+    <h3>10.9 — POP scope di "core" e risalita al modulo "root"</h3>
+
+    <p>Tutti i componenti del modulo "core" sono stati risolti. Si fa il POP dello scope di "core":</p>
+
+    <div class="tree-container">
+<span class="symbol">SymbolStack dopo POP di "core":</span>
+
+  ┌─────────────────────────────────────────────────────────────────┐
+  │ <span class="node">Frame₁</span> (modulo "root")                          <span class="dim">← TOP</span>          │
+  │   symbols: { "User" → ["root","User"], "core" → ["root","core"] }│
+  │   imports: [ <span class="import">external::db::Database as Db</span> ]                      │
+  ├─────────────────────────────────────────────────────────────────┤
+  │ <span class="node">Frame₀</span> (GLOBAL ROOT)                                            │
+  │   symbols: { }   imports: [ ]                                   │
+  └─────────────────────────────────────────────────────────────────┘
+<span class="dim">Frame₂ (core) con tutti i suoi simboli (Veicolo, Auto, calcola) è stato distrutto.</span>
+<span class="dim">Ma i risultati delle risoluzioni sono preservati nella cache e nell'IR modificato.</span></div>
+
+    <!-- 10.10 -->
+    <h3>10.10 — Risoluzione della struct <code>User</code> (nel modulo "root")</h3>
+
+    <div class="step step-success">
+        <h3>PUSH scope + Risoluzione di User</h3>
+        <pre><code>new_prefix = ["root"] + ["User"] = ["root", "User"]
+st.name = ["root", "User"]
+
+// PUSH scope per User
+new_ctx.stack.borrow_mut().push_scope();
+// Hoist: nessun nested_type né metodo</code></pre>
+
+        <div class="tree-container">
+<span class="symbol">SymbolStack durante risoluzione di User:</span>
+
+  ┌─────────────────────────────────────────────────────────────────┐
+  │ <span class="node">Frame₂'</span> (struct User)                          <span class="dim">← TOP</span>          │
+  │   symbols: { }                                                  │
+  │   imports: [ ]                                                  │
+  ├─────────────────────────────────────────────────────────────────┤
+  │ <span class="node">Frame₁</span> (modulo "root")                                          │
+  │   symbols: { "User" → ["root","User"], "core" → ["root","core"] }│
+  │   imports: [ <span class="import">external::db::Database as Db</span> ]                      │
+  ├─────────────────────────────────────────────────────────────────┤
+  │ <span class="node">Frame₀</span> (GLOBAL ROOT) — symbols: { } — imports: [ ]               │
+  └─────────────────────────────────────────────────────────────────┘</div>
+
+        <h4>Campo <code>name: Unresolved(["String"])</code></h4>
+        <p>Con <code>current_prefix = ["root","User"]</code> → scope_key = <code>"root::User"</code>:</p>
+        <ol>
+            <li><strong>Step 0 (Cache):</strong> <code>cache.get("root::User", ["String"])</code> → miss.</li>
+            <li><strong>Step 1 — Lexical Climb:</strong>
+                <ul>
+                    <li><strong>Frame₂' (User):</strong> vuoto. → Prosegue.</li>
+                    <li><strong>Frame₁ (root):</strong> "String" non in symbols. Import alias "Db" ≠ "String". → Prosegue.</li>
+                    <li><strong>Frame₀ (GLOBAL):</strong> vuoto. → Fine loop.</li>
+                </ul>
+            </li>
+            <li><strong>Step 2a:</strong> <code>registry.exists(["String"])</code> → false.</li>
+            <li><strong>Step 2b:</strong> <code>registry.exists(["root","String"])</code> → false.</li>
+            <li><strong>Risultato:</strong> <code class="highlight">TypeRef::Failed(["String"])</code></li>
+        </ol>
+
+        <p><strong>POP scope</strong> per User: <code>Frame₂'</code> distrutto.</p>
+    </div>
+
+    <!-- 10.11 -->
+    <h3>10.11 — POP scope di "root" e POP del GLOBAL ROOT</h3>
+
+    <div class="tree-container">
+<span class="symbol">SymbolStack dopo POP di "root":</span>
+
+  ┌─────────────────────────────────────────────────────────────────┐
+  │ <span class="node">Frame₀</span> (GLOBAL ROOT)                          <span class="dim">← TOP (e unico)</span>  │
+  │   symbols: { }   imports: [ ]                                   │
+  └─────────────────────────────────────────────────────────────────┘
+
+<span class="symbol">Dopo POP finale del GLOBAL ROOT in resolve_type_refs():</span>
+
+  <span class="dim">frames: []  ← Stack completamente vuoto. Tutto è stato distrutto.</span></div>
+
+    <!-- 10.12 -->
+    <h3>10.12 — Risultato Finale dell'IR Risolta</h3>
+
+    <div class="step step-success">
+        <h3>IR dopo la Name Resolution</h3>
+        <div class="tree-container">
+<span class="node">Module ["root"]</span>
+ <span class="arrow">├──</span> <span class="import">imports:</span> [ external::db::Database as Db ]
+ <span class="arrow">├──</span> <span class="symbol">structured_types:</span>
+ <span class="arrow">│</span>    <span class="arrow">└──</span> <span class="green">["root", "User"]</span>
+ <span class="arrow">│</span>         name: <span class="node">Failed(["String"])</span>
+ <span class="arrow">└──</span> <span class="node">sub_modules:</span>
+      <span class="arrow">└──</span> <span class="node">Module ["root", "core"]</span>
+           <span class="arrow">├──</span> <span class="symbol">structured_types:</span>
+           <span class="arrow">│</span>    <span class="arrow">├──</span> <span class="green">["root", "core", "Veicolo"]</span>
+           <span class="arrow">│</span>    <span class="arrow">│</span>    id: <span class="node">Failed(["String"])</span>
+           <span class="arrow">│</span>    <span class="arrow">└──</span> <span class="green">["root", "core", "Auto"]</span>
+           <span class="arrow">│</span>         base:    <span class="green">Resolved(["root", "core", "Veicolo"])</span>   <span class="dim">✓ locale</span>
+           <span class="arrow">│</span>         storage: <span class="import">External(["external", "db", "Database"])</span>  <span class="dim">⬡ esterno</span>
+           <span class="arrow">└──</span> <span class="symbol">free_functions:</span>
+                <span class="arrow">└──</span> <span class="green">["root", "core", "calcola"]</span>
+                     return:       <span class="green">Resolved(["root", "core", "Auto"])</span>
+                     calls:        [<span class="node">Failed(["String"])</span>]
+                     instantiates: [<span class="green">Resolved(["root","core","Auto"])</span>,
+                                    <span class="green">Resolved(["root","core","Veicolo"])</span>]</div>
+    </div>
+
+    <h4>Riepilogo delle risoluzioni</h4>
+    <table>
+        <thead><tr><th>Riferimento originale</th><th>Esito</th><th>Percorso risolto</th><th>Come è stato trovato</th></tr></thead>
+        <tbody>
+            <tr><td><code>Veicolo</code> (in Auto.base)</td><td>✅ Resolved</td><td><code>["root","core","Veicolo"]</code></td><td>Step 1A — simbolo locale in Frame₂ (core) dopo climb da Frame₃' (Auto)</td></tr>
+            <tr><td><code>Db</code> (in Auto.storage)</td><td>⬡ External</td><td><code>["external","db","Database"]</code></td><td>Step 1B — import con alias in Frame₁ (root) dopo climb da Frame₃'→Frame₂→Frame₁</td></tr>
+            <tr><td><code>Auto</code> (return di calcola)</td><td>✅ Resolved</td><td><code>["root","core","Auto"]</code></td><td>Step 1A — simbolo locale in Frame₂ (core) dopo climb da Frame₃'' (calcola)</td></tr>
+            <tr><td><code>Auto</code> (instantiates)</td><td>✅ Resolved</td><td><code>["root","core","Auto"]</code></td><td>Step 0 — <strong>cache hit!</strong> (già risolto per il return type, stesso scope_key "root::core")</td></tr>
+            <tr><td><code>Veicolo</code> (instantiates)</td><td>✅ Resolved</td><td><code>["root","core","Veicolo"]</code></td><td>Step 1A — simbolo locale in Frame₂ (core)</td></tr>
+            <tr><td><code>String</code> (ovunque)</td><td>❌ Failed</td><td><code>["String"]</code></td><td>Non presente in nessun frame né nel GlobalRegistry — è un tipo del linguaggio</td></tr>
+        </tbody>
+    </table>
+
+    <div class="tree-container">
+<span class="symbol">Stato Cache Finale:</span>
+  store = {
+    "root::core::Auto" → {
+      ["Veicolo"] → Local(["root", "core", "Veicolo"]),
+      ["Db"]      → External(["external", "db", "Database"]),
+    },
+    "root::core" → {
+      ["Auto"]    → Local(["root", "core", "Auto"]),
+      ["Veicolo"] → Local(["root", "core", "Veicolo"]),
+    },
+  }
+  <span class="dim">Nota: "String" non è cachato perché il risultato era None (Failed).</span>
+  <span class="dim">Le chiavi della cache sono scope path ("root::core::Auto" vs "root::core"),</span>
+  <span class="dim">quindi lo stesso nome risolto da scope diversi produce entry separate.</span></div>
+
+    <div class="info-box">
+        <strong>Perché "String" fallisce?</strong> <code>String</code> è un tipo del linguaggio Rust (parte della standard library), non un tipo definito nel codice sorgente analizzato. Poiché il GlobalRegistry contiene solo i componenti estratti dal sorgente e non ha import verso <code>std::string::String</code>, il resolver non può trovarlo. In un progetto reale, <code>String</code> verrebbe gestito come tipo primitivo dal parser (nella Fase 1), oppure l'utente aggiungerebbe un import esplicito.
+    </div>
+
+    <h3>10.13 — Diagramma temporale completo dello stack</h3>
+    <p>Ecco la vista completa dell'evoluzione dello SymbolStack durante tutto il traversal:</p>
+
+    <div class="tree-container">
+<span class="symbol">Timeline dello SymbolStack (profondità nel tempo):</span>
+
+Tempo  Azione                          Stack (profondità)
+─────  ──────────────────────────────  ──────────────────────────
+ t₀    push_scope() GLOBAL ROOT       [F₀]
+ t₁    push_scope() modulo "root"     [F₀, F₁]
+ t₂    push_scope() modulo "core"     [F₀, F₁, F₂]
+ t₃    push_scope() struct Veicolo    [F₀, F₁, F₂, <span class="node">F₃</span>]
+       <span class="dim">resolve "String" → Failed</span>
+ t₄    <span class="node">pop_scope()</span> Veicolo              [F₀, F₁, F₂]
+ t₅    push_scope() struct Auto       [F₀, F₁, F₂, <span class="symbol">F₃'</span>]
+       <span class="dim">resolve "Veicolo" → Local  (climb: F₃'→F₂)</span>
+       <span class="dim">resolve "Db"      → External (climb: F₃'→F₂→F₁)</span>
+ t₆    <span class="node">pop_scope()</span> Auto                 [F₀, F₁, F₂]
+ t₇    push_scope() fn calcola        [F₀, F₁, F₂, <span class="import">F₃''</span>]
+       <span class="dim">resolve "Auto"    → Local  (climb: F₃''→F₂)</span>
+       <span class="dim">resolve "String"  → Failed (climb completo)</span>
+       <span class="dim">resolve "Auto"    → CACHE HIT! O(1)</span>
+       <span class="dim">resolve "Veicolo" → Local  (climb: F₃''→F₂)</span>
+ t₈    <span class="node">pop_scope()</span> calcola              [F₀, F₁, F₂]
+ t₉    <span class="node">pop_scope()</span> modulo "core"        [F₀, F₁]
+ t₁₀   push_scope() struct User       [F₀, F₁, <span class="symbol">F₂'</span>]
+       <span class="dim">resolve "String" → Failed (climb completo)</span>
+ t₁₁   <span class="node">pop_scope()</span> User                 [F₀, F₁]
+ t₁₂   <span class="node">pop_scope()</span> modulo "root"        [F₀]
+ t₁₃   <span class="node">pop_scope()</span> GLOBAL ROOT          [ ]           <span class="dim">← stack vuoto</span></div>
+
+    <!-- ============================================================ -->
+    <h2 id="typeref-lifecycle">11. Ciclo di Vita di un TypeRef</h2>
+
+    <p>Riassumendo, ogni riferimento di tipo attraversa il seguente ciclo di vita durante la pipeline:</p>
+
+    <div class="tree-container" style="line-height: 2;">
+<span class="symbol">Fase 1 (Estrazione)</span>
+ Il parser CST estrae il nome testuale dal codice sorgente.
+ <span class="arrow">└──→</span> <code>TypeRef::Unresolved(["Veicolo"])</code>
+
+<span class="symbol">Fase 2 (Risoluzione)</span>
+ Il resolver cerca il nome tramite Lexical Climb sullo SymbolStack + GlobalRegistry.
+ <span class="arrow">├──→</span> <code>TypeRef::Resolved(["root", "core", "Veicolo"])</code>   <span class="dim">// Trovato nel Registry</span>
+ <span class="arrow">├──→</span> <code>TypeRef::External(["ext", "db", "Database"])</code>     <span class="dim">// Import verificato, non nel Registry</span>
+ <span class="arrow">└──→</span> <code>TypeRef::Failed(["UnknownType"])</code>                <span class="dim">// Non trovato da nessuna parte</span>
+
+<span class="symbol">Fase 3 (Grafo Dipendenze)</span>
+ I TypeRef risolti generano archi nel grafo.
+ <span class="arrow">├──→</span> Resolved → arco verso nodo interno
+ <span class="arrow">├──→</span> External → arco verso confine esterno
+ <span class="arrow">└──→</span> Failed  → nessun arco (o arco speciale, dipende dalla policy)</div>
+
+    <!-- ============================================================ -->
+    <h2 id="comparison">12. Confronto: Arena Pattern vs Symbol Stack</h2>
+
+    <p>La tabella seguente confronta sistematicamente il vecchio approccio (Arena-based ScopeTree) con il nuovo approccio (Symbol Stack dinamico):</p>
+
+    <table>
+        <thead>
+            <tr><th>Aspetto</th><th>Vecchio (Arena ScopeTree)</th><th>Nuovo (Symbol Stack)</th></tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><strong>Struttura dati principale</strong></td>
+                <td><code>ScopeTree { arena: Vec&lt;ScopeNode&gt;, root: usize }</code></td>
+                <td><code>SymbolStack { frames: Vec&lt;StackFrame&gt; }</code></td>
+            </tr>
+            <tr>
+                <td><strong>Ciclo di vita</strong></td>
+                <td>Costruito una volta (<code>ScopeTree::build</code>), statico per tutta l'analisi</td>
+                <td>Cresce e si contrae dinamicamente con push/pop durante il traversal</td>
+            </tr>
+            <tr>
+                <td><strong>Mappa simboli</strong></td>
+                <td><code>HashMap&lt;Identifier, Component&gt;</code> — possiede l'intero componente IR</td>
+                <td><code>HashMap&lt;String, QualifiedName&gt;</code> — mappa nome → percorso assoluto</td>
+            </tr>
+            <tr>
+                <td><strong>Navigazione dell'albero</strong></td>
+                <td>Indici numerici (<code>usize</code>) nel Vec: <code>parent</code>, <code>children</code></td>
+                <td>Iterazione lineare top-down: <code>frames.iter().rev()</code></td>
+            </tr>
+            <tr>
+                <td><strong>Ascensione (Lexical Climb)</strong></td>
+                <td>Risali con <code>arena[node].parent</code> → <code>arena[parent_idx]</code></td>
+                <td>Iterazione implicita: il for loop su <code>iter_frames_top_down()</code></td>
+            </tr>
+            <tr>
+                <td><strong>Validazione percorso</strong></td>
+                <td><code>find_node_by_path(path)</code> — discesa nodo per nodo lungo le <code>children</code></td>
+                <td><code>GlobalRegistry::exists(path)</code> — lookup in <code>HashSet</code> O(1)</td>
+            </tr>
+            <tr>
+                <td><strong>Chiave cache</strong></td>
+                <td><code>(usize, QualifiedName)</code> — indice Arena + nome</td>
+                <td><code>(String, QualifiedName)</code> — scope path ("root::core") + nome</td>
+            </tr>
+            <tr>
+                <td><strong>Consumo di memoria</strong></td>
+                <td>O(N) dove N = numero totale di nodi nell'albero — tutti permanenti</td>
+                <td>O(D) dove D = profondità massima — i frame vengono distrutti al pop</td>
+            </tr>
+            <tr>
+                <td><strong>File sorgente</strong></td>
+                <td>Un unico <code>resolver.rs</code> monolitico</td>
+                <td>Tre file separati: <code>mod.rs</code>, <code>stack.rs</code>, <code>cache.rs</code></td>
+            </tr>
+            <tr>
+                <td><strong>Scope delle funzioni</strong></td>
+                <td>Le funzioni <strong>non</strong> creano nodi nell'Arena</td>
+                <td>Le funzioni <strong>creano</strong> scope (push/pop) con registrazione dei parametri come simboli — più corretto lessicalmente</td>
+            </tr>
+            <tr>
+                <td><strong>Blocchi lessicali</strong></td>
+                <td>Non modellati — <code>calls</code> e <code>instantiates</code> direttamente nella <code>Function</code></td>
+                <td>Modellati con <code>Block</code>: ogni blocco crea il proprio scope annidato con dichiarazioni locali, chiamate, istanziazioni e sotto-blocchi ricorsivi</td>
+            </tr>
+            <tr>
+                <td><strong>Impl blocks non fusi</strong></td>
+                <td><code>module.impl_blocks = vec![]</code> — tutti scartati</td>
+                <td><code>module.impl_blocks = unfused_impls</code> — preserva i non fusi</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <div class="danger-box">
+        <h4 style="margin-top: 0; margin-bottom: 0.5rem; color: var(--danger);">Perché il cambio di architettura?</h4>
+        <p style="margin-bottom: 0;">L'Arena Pattern risolveva il problema dell'ownership bidirezionale in Rust (genitore↔figlio) usando indici <code>usize</code>. Ma questo problema era <em>artificiale</em>: il resolver non ha realmente bisogno di navigare l'albero in entrambe le direzioni. Ha solo bisogno di: (1) sapere quali simboli sono visibili nel contesto corrente (→ SymbolStack), (2) validare se un percorso esiste (→ GlobalRegistry), e (3) cachare i risultati (→ ResolutionCache). Lo stack dinamico modella più naturalmente il concetto di <em>Lexical Scoping</em>: quando entri in uno scope, puoi vedere tutto ciò che è sopra; quando esci, lo scope scompare.</p>
+    </div>
+
+</body>
+</html>
