@@ -66,41 +66,7 @@ fn walk_cst(node: tree_sitter::Node, source: &str, modules: &mut Vec<Module>) {
     }
 }
 
-/// Wrappers around tree-sitter language loading.
-pub mod languages {
-    use super::*;
-
-    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-    pub enum SupportedLanguage {
-        Rust,
-        Java,
-        Python,
-        C,
-        Cpp,
-    }
-
-    impl SupportedLanguage {
-        pub fn to_tree_sitter_lang(&self) -> Language {
-            match self {
-                Self::Rust => tree_sitter_rust::LANGUAGE.into(),
-                Self::Java => tree_sitter_java::LANGUAGE.into(),
-                Self::Python => tree_sitter_python::LANGUAGE.into(),
-                Self::C => tree_sitter_c::LANGUAGE.into(),
-                Self::Cpp => tree_sitter_cpp::LANGUAGE.into(),
-            }
-        }
-
-        pub fn name(&self) -> &'static str {
-            match self {
-                Self::Rust => "rust",
-                Self::Java => "java",
-                Self::Python => "python",
-                Self::C => "c",
-                Self::Cpp => "cpp",
-            }
-        }
-    }
-}
+use crate::language::SupportedLanguage;
 
 /// End-to-end analysis pipeline for a single source file:
 /// 1. Extraction into initial IR modules
@@ -108,7 +74,7 @@ pub mod languages {
 /// 3. Dependency graph construction
 /// 4. Statistics aggregation (summary)
 pub fn full_analysis(
-    lang: languages::SupportedLanguage,
+    lang: SupportedLanguage,
     source: &str,
 ) -> anyhow::Result<(
     Vec<Module>,

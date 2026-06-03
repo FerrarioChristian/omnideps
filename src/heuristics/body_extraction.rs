@@ -65,6 +65,19 @@ pub fn extract_block(node: Node, source: &str) -> crate::ir::Block {
                 }
                 declarations.push(Field { name, ty });
             }
+            
+            // WE MUST ALSO check the right-hand side (initializer/value) for behavioral deps!
+            let mut inner_calls = vec![];
+            let mut inner_inst = vec![];
+            if let Some(val) = child.child_by_field_name("value").or_else(|| child.child_by_field_name("declarator")) {
+                find_behavioral_deps(val, source, &mut inner_calls, &mut inner_inst);
+            } else {
+                // If there's no clear value field, scan the whole declaration just in case (excluding the type/name to avoid false positives)
+                // Actually, find_behavioral_deps is safe to run on the whole node because it looks for call_expression / new_expression
+                find_behavioral_deps(child, source, &mut inner_calls, &mut inner_inst);
+            }
+            calls.extend(inner_calls);
+            instantiates.extend(inner_inst);
         }
         // 2. Nested Blocks
         else if kind.contains("body") || kind.contains("block") || kind == "compound_statement" {

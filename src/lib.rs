@@ -4,4 +4,5 @@ pub mod heuristics;
 pub mod ir;
 pub mod resolver;
 pub mod debug;
+pub mod language;
 

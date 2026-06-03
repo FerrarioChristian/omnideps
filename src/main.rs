@@ -1,9 +1,10 @@
 use anyhow::Result;
 use clap::Parser;
 use language_agnostic_analyzer::{
-    analyzer::{self, full_analysis},
+    analyzer::full_analysis,
     ir::AnalysisSummary,
     debug::print_references,
+    language::SupportedLanguage,
 };
 use std::fs;
 use walkdir::WalkDir;
@@ -34,7 +35,8 @@ fn analyze_single_file(
     csv_out: Option<&std::path::Path>,
     debug_refs: bool,
 ) -> Result<()> {
-    let lang = detect_language(path)?;
+    let lang = SupportedLanguage::from_path(path)
+        .ok_or_else(|| anyhow::anyhow!("Language not supported for file: {}", path.display()))?;
     let source = fs::read_to_string(path)?;
     let (modules, graph, summary) = full_analysis(lang, &source)?;
 
@@ -85,10 +87,10 @@ fn analyze_directory(
 
     for entry in WalkDir::new(dir).into_iter().filter_map(|e| e.ok()) {
         if entry.file_type().is_file()
-            && let Ok(lang) = detect_language(entry.path())
+            && let Some(lang) = SupportedLanguage::from_path(entry.path())
         {
             let source = fs::read_to_string(entry.path())?;
-            let (modules, graph, summary) = analyzer::full_analysis(lang, &source)?;
+            let (modules, graph, summary) = full_analysis(lang, &source)?;
             total_summary.total_modules += summary.total_modules;
             total_summary.total_structured_types += summary.total_structured_types;
             total_summary.total_free_functions += summary.total_free_functions;
@@ -128,19 +130,6 @@ fn analyze_directory(
         save_summary_csv(&total_summary, csv)?;
     }
     Ok(())
-}
-
-/// Helper function to match file extensions to tree-sitter language parsers.
-fn detect_language(path: &std::path::Path) -> Result<analyzer::languages::SupportedLanguage> {
-    use analyzer::languages::SupportedLanguage;
-    match path.extension().and_then(|s| s.to_str()) {
-        Some("rs") => Ok(SupportedLanguage::Rust),
-        Some("java") => Ok(SupportedLanguage::Java),
-        Some("py") => Ok(SupportedLanguage::Python),
-        Some("c") | Some("h") => Ok(SupportedLanguage::C),
-        Some("cpp") | Some("cxx") | Some("cc") | Some("hxx") => Ok(SupportedLanguage::Cpp),
-        _ => anyhow::bail!("Language not supported for file: {}", path.display()),
-    }
 }
 
 /// Prints a basic aggregation of the extracted components to standard output.
