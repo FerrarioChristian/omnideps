@@ -1,4 +1,4 @@
-use crate::ir::Module;
+use crate::model::Module;
 use tree_sitter::Language;
 
 /// Extracts the basic Intermediate Representation (IR) modules from a source file given its Tree-sitter Language.
@@ -34,7 +34,7 @@ fn walk_cst(node: tree_sitter::Node, source: &str, modules: &mut Vec<Module>) {
         }
         
         match comp {
-            crate::heuristics::ParsedItem::Component(crate::ir::Component::Module(m)) => {
+            crate::heuristics::ParsedItem::Component(crate::model::Component::Module(m)) => {
                 // Traverse children to populate the new module before adding it
                 let mut cursor = node.walk();
                 let mut new_modules = vec![m];
@@ -44,8 +44,8 @@ fn walk_cst(node: tree_sitter::Node, source: &str, modules: &mut Vec<Module>) {
                 // The new module is now populated (it is located at new_modules[0])
                 modules[0].sub_modules.push(new_modules.remove(0));
             }
-            crate::heuristics::ParsedItem::Component(crate::ir::Component::StructuredType(st)) => modules[0].structured_types.push(st),
-            crate::heuristics::ParsedItem::Component(crate::ir::Component::Function(ff)) => {
+            crate::heuristics::ParsedItem::Component(crate::model::Component::StructuredType(st)) => modules[0].structured_types.push(st),
+            crate::heuristics::ParsedItem::Component(crate::model::Component::Function(ff)) => {
                 modules[0].free_functions.push(ff);
                 let mut cursor = node.walk();
                 for child in node.children(&mut cursor) {
@@ -78,8 +78,8 @@ pub fn full_analysis(
     source: &str,
 ) -> anyhow::Result<(
     Vec<Module>,
-    crate::ir::DependencyGraph,
-    crate::ir::AnalysisSummary,
+    crate::model::DependencyGraph,
+    crate::model::AnalysisSummary,
 )> {
     let modules = generic_extract(lang.to_tree_sitter_lang(), source)?;
     

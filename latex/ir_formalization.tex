@@ -49,12 +49,10 @@ Dove:
     fornito da un \textit{Primitive Registry}
     architetturale (\textit{Data-Driven}) alimentato in fase di caricamento.
     Essendo definiti a livello di linguaggio, non necessitano di risoluzione.
-  \item \textbf{Unresolved}: Rappresenta un identificatore estratto
-    dal parser (es. \texttt{List}) di cui non si conosce ancora il
-    percorso assoluto. È lo stato tipico prodotto dalla Fase 1 di Estrazione.
+  \item \textbf{ResolutionQuery($\mathcal{Q}$)}: Sostituisce il vecchio stato \texttt{Unresolved}. Rappresenta un'espressione algebrica composta da operazioni \texttt{Find}, \texttt{Extract} e \texttt{Call}. È il prodotto della Fase di Substituzione (Lexical Scoping).
   \item \textbf{Resolved}: Rappresenta un tipo definito dall'utente
-    per cui la fase di Risoluzione ha trovato una corrispondenza
-    univoca nella Tabella dei Simboli. Contiene il nome qualificato
+    per cui l'Esecutore di Query ha trovato una corrispondenza
+    univoca navigando l'IR. Contiene il nome qualificato
     assoluto (es. \texttt{java::util::List}).
   \item \textbf{External}: Rappresenta un tipo per cui la fase di Risoluzione ha
     trovato una corrispondenza in una clausola di importazione esplicita

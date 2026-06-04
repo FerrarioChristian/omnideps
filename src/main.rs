@@ -2,7 +2,7 @@ use anyhow::Result;
 use clap::Parser;
 use language_agnostic_analyzer::{
     analyzer::full_analysis,
-    ir::AnalysisSummary,
+    model::AnalysisSummary,
     debug::print_references,
     language::SupportedLanguage,
 };

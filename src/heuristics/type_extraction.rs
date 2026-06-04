@@ -4,7 +4,7 @@
 //! variables, fields, or return values, returning an `Unresolved` reference
 //! that will later be processed by the Name Resolution engine.
 
-use crate::ir::{StructuredTypeKind, TypeRef};
+use crate::model::{StructuredTypeKind, TypeRef};
 use tree_sitter::Node;
 
 use super::text_parsing::{node_text, split_qualified_name};

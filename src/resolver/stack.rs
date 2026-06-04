@@ -1,12 +1,12 @@
-use crate::ir::{Import, QualifiedName};
 use std::collections::HashMap;
+use crate::model::{Import, Query};
 
-/// A frame representing a single lexical scope (e.g., a Module, a Struct, a Function, or a `{}` block).
+/// A single frame representing a lexical scope during the Query Building phase.
 #[derive(Debug, Clone)]
 pub struct StackFrame {
-    /// Local symbols defined exactly in this scope. Maps the local name to its absolute QualifiedName.
-    pub symbols: HashMap<String, QualifiedName>,
-    /// Jump points (import/use statements) available in this scope.
+    /// Local symbols defined in this scope. Maps a simple name to its algebraic Query.
+    pub symbols: HashMap<String, Query>,
+    /// Jump points (imports) available in this scope.
     pub imports: Vec<Import>,
 }
 
@@ -19,7 +19,7 @@ impl StackFrame {
     }
 }
 
-/// The Environment (ρ): a dynamic stack of symbol tables reflecting the current lexical context.
+/// The Environment (ρ) used during the Query Building phase to apply substitutions.
 #[derive(Debug, Clone)]
 pub struct SymbolStack {
     pub frames: Vec<StackFrame>,
@@ -30,12 +30,12 @@ impl SymbolStack {
         Self { frames: Vec::new() }
     }
 
-    /// Pushes a new empty lexical scope onto the stack.
+    /// Enters a new lexical scope by pushing an empty frame.
     pub fn push_scope(&mut self) {
         self.frames.push(StackFrame::new());
     }
 
-    /// Pops the top lexical scope from the stack, destroying it.
+    /// Exits the current lexical scope, destroying all local symbols.
     pub fn pop_scope(&mut self) {
         self.frames.pop();
     }
@@ -45,21 +45,21 @@ impl SymbolStack {
         self.frames.last_mut()
     }
 
-    /// Defines a local symbol in the current scope, mapping its local name to its absolute path.
-    pub fn define_symbol(&mut self, local_name: String, absolute_path: QualifiedName) {
+    /// Registers a local symbol and its corresponding substitution Query in the current frame.
+    pub fn define_symbol(&mut self, local_name: String, query: Query) {
         if let Some(frame) = self.current_frame_mut() {
-            frame.symbols.insert(local_name, absolute_path);
+            frame.symbols.insert(local_name, query);
         }
     }
 
-    /// Adds an import (jump point) to the current scope.
+    /// Adds an import to the current frame.
     pub fn add_import(&mut self, import: Import) {
         if let Some(frame) = self.current_frame_mut() {
             frame.imports.push(import);
         }
     }
 
-    /// Exposes the frames for iterating top-down during resolution.
+    /// Iterates through the stack frames from top (most local) to bottom (global).
     pub fn iter_frames_top_down(&self) -> impl Iterator<Item = &StackFrame> {
         self.frames.iter().rev()
     }

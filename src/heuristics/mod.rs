@@ -5,7 +5,7 @@ pub mod structural_extraction;
 pub mod body_extraction;
 pub mod parsers;
 
-use crate::ir::{Component, ImplBlock, Import};
+use crate::model::{Component, ImplBlock, Import};
 use tree_sitter::Node;
 
 pub enum ParsedItem {

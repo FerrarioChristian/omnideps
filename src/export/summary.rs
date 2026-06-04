@@ -1,4 +1,4 @@
-use crate::ir::*;
+use crate::model::*;
 
 // ==================== BENCHMARK ====================
 /// Aggregates basic statistics about the extracted components across all provided modules.

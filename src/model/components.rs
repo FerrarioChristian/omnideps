@@ -1,3 +1,5 @@
+use super::queries::TypeRef;
+
 pub type Identifier = String;
 pub type QualifiedName = Vec<Identifier>;
 
@@ -9,16 +11,6 @@ pub enum PrimitiveType {
     String,
     Void,
     Other(String),
-    // Aggiungere altri tipi primitivi comuni se necessario
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize)]
-pub enum TypeRef {
-    Primitive(PrimitiveType),
-    Unresolved(QualifiedName),
-    Resolved(QualifiedName),
-    External(QualifiedName),
-    Failed(QualifiedName),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize)]
@@ -51,16 +43,12 @@ pub struct Signature {
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize)]
 pub struct Block {
-    /// Local variables declared in this block (reusing Field)
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub declarations: Vec<Field>,
-    /// Types whose methods are called in this block
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub calls: Vec<TypeRef>,
-    /// Types instantiated in this block
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub instantiates: Vec<TypeRef>,
-    /// Nested blocks (if, while, anonymous scopes)
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub sub_blocks: Vec<Block>,
 }
@@ -117,7 +105,6 @@ pub struct Module {
     pub free_functions: Vec<Function>,
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub impl_blocks: Vec<ImplBlock>,
-    // Convertire le tre tipologie di componenti in un'unica lista di Componenti, Vec<Box<Component>>
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -125,41 +112,4 @@ pub enum Component {
     Module(Module),
     StructuredType(StructuredType),
     Function(Function),
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize)]
-pub enum DependencyEdgeKind {
-    IsA,
-    Implements,
-    UsesFieldType,
-    UsesLocalType,
-    UsesParamType,
-    UsesReturnType,
-    NestedIn,
-    ModuleContainment,
-    Calls,
-    Instantiates,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize)]
-pub struct Dependency {
-    pub from: QualifiedName,
-    pub to: QualifiedName,
-    pub kind: DependencyEdgeKind,
-}
-
-#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
-pub struct DependencyGraph {
-    pub nodes: Vec<Component>,
-    pub edges: Vec<Dependency>,
-}
-
-// Per i benchmark
-#[derive(Debug, Default)]
-pub struct AnalysisSummary {
-    pub total_modules: usize,
-    pub total_structured_types: usize,
-    pub total_free_functions: usize,
-    pub resolved_refs: usize,
-    pub failed_refs: usize,
 }

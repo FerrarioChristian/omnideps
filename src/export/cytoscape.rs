@@ -1,4 +1,4 @@
-use crate::ir::{Component, DependencyGraph, QualifiedName};
+use crate::model::{Component, DependencyGraph, QualifiedName};
 use serde::Serialize;
 use std::collections::HashSet;
 use std::fs;

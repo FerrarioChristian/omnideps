@@ -1,4 +1,4 @@
-use crate::ir::{Function, ImplBlock, Import, Module, StructuredType};
+use crate::model::{Function, ImplBlock, Import, Module, StructuredType};
 use tree_sitter::Node;
 
 use super::classifiers::*;
@@ -63,7 +63,7 @@ pub fn try_parse_function(node: Node, source: &str) -> Option<Function> {
 
     Some(Function {
         name: vec![name],
-        signature: crate::ir::Signature {
+        signature: crate::model::Signature {
             parameters,
             return_type,
         },

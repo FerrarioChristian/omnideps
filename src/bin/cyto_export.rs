@@ -1,6 +1,6 @@
 use anyhow::{Context, Result};
 use clap::Parser;
-use language_agnostic_analyzer::ir::DependencyGraph;
+use language_agnostic_analyzer::model::DependencyGraph;
 use std::fs;
 use std::path::PathBuf;
 

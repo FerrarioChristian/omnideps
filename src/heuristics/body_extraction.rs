@@ -4,7 +4,7 @@
 //! local variable declarations, instantiated types, and method calls. It powers the 
 //! Behavioral Lexical Scoping engine.
 
-use crate::ir::{Field, TypeRef};
+use crate::model::{Field, TypeRef};
 use tree_sitter::Node;
 
 use super::text_parsing::{extract_identifier, node_text, split_qualified_name};
@@ -19,7 +19,7 @@ use super::type_extraction::extract_type_ref;
 /// # Arguments
 /// * `node` - The block-like AST node to parse.
 /// * `source` - The complete source code string.
-pub fn extract_block(node: Node, source: &str) -> crate::ir::Block {
+pub fn extract_block(node: Node, source: &str) -> crate::model::Block {
     let mut declarations = vec![];
     let mut calls = vec![];
     let mut instantiates = vec![];
@@ -93,7 +93,7 @@ pub fn extract_block(node: Node, source: &str) -> crate::ir::Block {
         }
     }
 
-    crate::ir::Block {
+    crate::model::Block {
         declarations,
         calls,
         instantiates,

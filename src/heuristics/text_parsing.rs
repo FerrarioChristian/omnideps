@@ -4,7 +4,7 @@
 //! parsing (e.g., splitting qualified names, extracting raw text) from the higher-level 
 //! structural and semantic extraction phases.
 
-use crate::ir::QualifiedName;
+use crate::model::QualifiedName;
 use tree_sitter::Node;
 
 /// Extracts the raw UTF-8 text from a Tree-sitter node safely.

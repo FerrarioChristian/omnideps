@@ -1,4 +1,4 @@
-use crate::ir::*;
+use crate::model::*;
 
 /// Constructs a dependency graph linking components based on inheritance, types used in fields, parameters, etc.
 pub fn build_dependency_graph(modules: &[Module]) -> DependencyGraph {

@@ -4,7 +4,7 @@
 //! of all absolute paths present in the workspace. This dictionary is crucial during the
 //! resolution phase to accurately distinguish between `Local` entities and `External` boundaries.
 
-use crate::ir::{Module, QualifiedName, StructuredType, TypeRef};
+use crate::model::{Module, QualifiedName, StructuredType, TypeRef};
 use std::collections::HashSet;
 
 /// The central dictionary indexing all absolute paths within the analyzed project.
@@ -39,6 +39,7 @@ impl GlobalRegistry {
             // Register ImplBlock methods and nested types
             let target_name = match &ib.impl_for {
                 TypeRef::Unresolved(qn) | TypeRef::Resolved(qn) => qn.last().cloned().unwrap_or_default(),
+                TypeRef::ResolutionQuery(q) => crate::resolver::executor::extract_base_name(q),
                 _ => "".to_string(),
             };
             if !target_name.is_empty() {

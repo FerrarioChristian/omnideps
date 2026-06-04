@@ -4,7 +4,7 @@
 //! and prints a clear, human-readable report of every `TypeRef` encountered (e.g. `Resolved`, `Failed`, `External`),
 //! alongside its architectural context (e.g. `SuperType`, `Param`, `LocalVar`).
 
-use crate::ir::*;
+use crate::model::*;
 
 /// Traverses a list of parsed and resolved modules, printing a formatted report
 /// of all type references found within their nested components.
@@ -84,10 +84,11 @@ fn visit_block(b: &Block, context: &str) {
 fn print_ref(kind: &str, context: &str, tr: &TypeRef) {
     let (state, text) = match tr {
         TypeRef::Primitive(p) => ("PRIMITIVE", format!("{:?}", p)),
+        TypeRef::Unresolved(q) => ("⚠️ UNRESOLVED", q.join("::")),
+        TypeRef::ResolutionQuery(q) => ("🔍 QUERY", format!("{:?}", q)),
         TypeRef::Resolved(q) => ("✅ RESOLVED", q.join("::")),
         TypeRef::External(q) => ("🌐 EXTERNAL", q.join("::")),
         TypeRef::Failed(q) => ("❌ FAILED", q.join("::")),
-        TypeRef::Unresolved(q) => ("⚠️ UNRESOLVED", q.join("::")),
     };
     println!("[{:^12}] {:<30} | {} ({})", state, kind, text, context);
 }

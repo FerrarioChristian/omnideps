@@ -4,7 +4,7 @@
 //! like fields, methods, parameters, and super-types. It heavily utilizes 
 //! recursive traversal patterns to abstract away language-specific syntax trees.
 
-use crate::ir::{Field, Function, Parameter, StructuredType, TypeRef};
+use crate::model::{Field, Function, Parameter, StructuredType, TypeRef};
 use tree_sitter::Node;
 
 use super::text_parsing::{extract_identifier, node_text, split_qualified_name};
@@ -149,6 +149,26 @@ pub fn extract_super_types(node: Node, source: &str) -> Vec<TypeRef> {
 
 /// Extracts the target type that an implementation block is extending (e.g. `Target` in `impl Target`).
 pub fn extract_impl_for(node: Node, source: &str) -> TypeRef {
+    // In Rust, `impl Trait for Target` has `trait` and `type` fields.
+    if let Some(type_node) = node.child_by_field_name("type") {
+        return extract_type_ref(type_node, source);
+    }
+    
+    // Fallback: If there's no trait, the first type is the target (impl Target).
+    // If there is a trait (impl Trait for Target), the second type is the target.
+    if let Some(trait_node) = node.child_by_field_name("trait") {
+        // Find the type identifier that comes AFTER the trait node
+        let mut cursor = node.walk();
+        let mut found_trait = false;
+        for child in node.children(&mut cursor) {
+            if child.id() == trait_node.id() {
+                found_trait = true;
+            } else if found_trait && matches!(child.kind(), "type_identifier" | "scoped_type_identifier" | "identifier") {
+                return extract_type_ref(child, source);
+            }
+        }
+    }
+    
     extract_type_ref(node, source)
 }
 

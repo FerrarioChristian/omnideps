@@ -1,4 +1,4 @@
-use crate::ir::QualifiedName;
+use crate::model::QualifiedName;
 use super::ResolutionResult;
 use std::collections::HashMap;
 
