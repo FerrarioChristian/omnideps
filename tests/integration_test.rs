@@ -1,4 +1,5 @@
-use language_agnostic_analyzer::analyzer::{self, full_analysis};
+use language_agnostic_analyzer::analyzer::full_analysis;
+use language_agnostic_analyzer::language::SupportedLanguage;
 use std::fs;
 use std::path::Path;
 use walkdir::WalkDir;
@@ -28,11 +29,11 @@ fn test_benchmarks_analysis() {
 
             // Definisce il parser Tree-sitter corrispondente in base all'estensione
             let lang = match ext {
-                "rs" => analyzer::languages::SupportedLanguage::Rust,
-                "java" => analyzer::languages::SupportedLanguage::Java,
-                "py" => analyzer::languages::SupportedLanguage::Python,
-                "c" | "h" => analyzer::languages::SupportedLanguage::C,
-                "cpp" | "cxx" | "cc" | "hxx" => analyzer::languages::SupportedLanguage::Cpp,
+                "rs" => SupportedLanguage::Rust,
+                "java" => SupportedLanguage::Java,
+                "py" => SupportedLanguage::Python,
+                "c" | "h" => SupportedLanguage::C,
+                "cpp" | "cxx" | "cc" | "hxx" => SupportedLanguage::Cpp,
                 _ => continue, // Ignora file JSON e altri non supportati
             };
 
