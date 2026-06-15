@@ -139,7 +139,7 @@ fn execute_impl_block(ctx: &ExecutorContext, mut ib: ImplBlock) -> ImplBlock {
 fn evaluate_typeref(ctx: &ExecutorContext, tr: TypeRef) -> TypeRef {
     match tr {
         TypeRef::ResolutionQuery(query) => {
-            if let Some(res) = evaluate_query(ctx, &query) {
+            if let Some(res) = evaluate_query(ctx, &query, false) {
                 // If evaluating `Call` or `Extract` succeeds, `res` is an absolute path.
                 // We check if it's local or external.
                 if ctx.registry.exists(&res) {
@@ -171,7 +171,9 @@ pub fn extract_base_name(query: &Query) -> String {
 }
 
 /// Evaluates a query algebraically against the global registry and current context.
-fn evaluate_query(ctx: &ExecutorContext, query: &Query) -> Option<QualifiedName> {
+/// If `resolve_call_return` is true, a Call(Q) query evaluates to its return type.
+/// If false, a Call(Q) query evaluates to the function's path itself (useful for logging dependency edges).
+fn evaluate_query(ctx: &ExecutorContext, query: &Query, resolve_call_return: bool) -> Option<QualifiedName> {
     match query {
         Query::Find(name) => {
             // Find-going-up: Ascend the current prefix
@@ -219,7 +221,7 @@ fn evaluate_query(ctx: &ExecutorContext, query: &Query) -> Option<QualifiedName>
         }
         Query::Extract(parent_query, member_name) => {
             // Find-going-down
-            if let Some(mut parent_path) = evaluate_query(ctx, parent_query) {
+            if let Some(mut parent_path) = evaluate_query(ctx, parent_query, true) {
                 parent_path.push(member_name.clone());
                 // We don't check existence immediately, because it might be an external chain (e.g. `std::vec::Vec`)
                 // The final validation happens in `evaluate_typeref`.
@@ -229,8 +231,26 @@ fn evaluate_query(ctx: &ExecutorContext, query: &Query) -> Option<QualifiedName>
             }
         }
         Query::Call(target_query) => {
-            // Call simply evaluates the target. The return type extraction is abstracted in this phase.
-            evaluate_query(ctx, target_query)
+            let target_path = evaluate_query(ctx, target_query, false)?;
+
+            if resolve_call_return {
+                // If we need the return type (e.g. chained calls `a.f().g()`), we look up the target_path in the registry
+                if let Some(crate::resolver::registry::RegistryEntry::Function { return_type }) = ctx.registry.get(&target_path) {
+                    // Try to evaluate the return type mathematically!
+                    match return_type {
+                        TypeRef::ResolutionQuery(ret_q) => evaluate_query(ctx, ret_q, true),
+                        TypeRef::Resolved(qn) => Some(qn.clone()),
+                        TypeRef::External(qn) => Some(qn.clone()),
+                        TypeRef::Unresolved(qn) => Some(qn.clone()), // Fallback, though builder substitutes all
+                        _ => None,
+                    }
+                } else {
+                    None // Not a known function or missing return type
+                }
+            } else {
+                // Standard behavior: evaluate to the function path itself
+                Some(target_path)
+            }
         }
     }
 }

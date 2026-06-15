@@ -5,17 +5,25 @@
 //! resolution phase to accurately distinguish between `Local` entities and `External` boundaries.
 
 use crate::model::{Module, QualifiedName, StructuredType, TypeRef};
-use std::collections::HashSet;
+use std::collections::HashMap;
+
+/// Denotes the type of component registered, used for type inference.
+#[derive(Debug, Clone)]
+pub enum RegistryEntry {
+    Module,
+    StructuredType,
+    Function { return_type: TypeRef },
+}
 
 /// The central dictionary indexing all absolute paths within the analyzed project.
 pub struct GlobalRegistry {
-    pub paths: HashSet<QualifiedName>,
+    pub paths: HashMap<QualifiedName, RegistryEntry>,
 }
 
 impl GlobalRegistry {
     /// Builds the global registry by recursively iterating through all modules and components.
     pub fn build(modules: &[Module]) -> Self {
-        let mut registry = Self { paths: HashSet::new() };
+        let mut registry = Self { paths: HashMap::new() };
         for m in modules {
             registry.register_module(m, vec![]);
         }
@@ -25,7 +33,7 @@ impl GlobalRegistry {
     /// Recursively registers a Module, its functions, structured types, and Impl blocks.
     fn register_module(&mut self, m: &Module, mut prefix: QualifiedName) {
         prefix.extend(m.name.clone());
-        self.paths.insert(prefix.clone());
+        self.paths.insert(prefix.clone(), RegistryEntry::Module);
 
         for st in &m.structured_types {
             self.register_structured_type(st, prefix.clone());
@@ -33,7 +41,7 @@ impl GlobalRegistry {
         for ff in &m.free_functions {
             let mut ff_prefix = prefix.clone();
             ff_prefix.extend(ff.name.clone());
-            self.paths.insert(ff_prefix);
+            self.paths.insert(ff_prefix, RegistryEntry::Function { return_type: ff.signature.return_type.clone() });
         }
         for ib in &m.impl_blocks {
             // Register ImplBlock methods and nested types
@@ -48,7 +56,7 @@ impl GlobalRegistry {
                 for method in &ib.methods {
                     let mut m_prefix = target_prefix.clone();
                     m_prefix.extend(method.name.clone());
-                    self.paths.insert(m_prefix);
+                    self.paths.insert(m_prefix, RegistryEntry::Function { return_type: method.signature.return_type.clone() });
                 }
                 for nested in &ib.nested_types {
                     self.register_structured_type(nested, target_prefix.clone());
@@ -63,12 +71,12 @@ impl GlobalRegistry {
     /// Recursively registers a StructuredType, its methods, and any nested types.
     fn register_structured_type(&mut self, st: &StructuredType, mut prefix: QualifiedName) {
         prefix.extend(st.name.clone());
-        self.paths.insert(prefix.clone());
+        self.paths.insert(prefix.clone(), RegistryEntry::StructuredType);
 
         for method in &st.methods {
             let mut m_prefix = prefix.clone();
             m_prefix.extend(method.name.clone());
-            self.paths.insert(m_prefix);
+            self.paths.insert(m_prefix, RegistryEntry::Function { return_type: method.signature.return_type.clone() });
         }
         for nested in &st.nested_types {
             self.register_structured_type(nested, prefix.clone());
@@ -77,6 +85,11 @@ impl GlobalRegistry {
 
     /// Validates whether a given absolute path points to a known Local component.
     pub fn exists(&self, path: &QualifiedName) -> bool {
-        self.paths.contains(path)
+        self.paths.contains_key(path)
+    }
+
+    /// Retrieves the entry for type inference.
+    pub fn get(&self, path: &QualifiedName) -> Option<&RegistryEntry> {
+        self.paths.get(path)
     }
 }

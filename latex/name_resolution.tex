@@ -1,46 +1,67 @@
 \chapter{Costruzione e Risoluzione delle Query Architetturali}
 \label{ch:name_resolution}
 
-La fase di \textit{Reference Resolution} (Risoluzione dei Riferimenti) è il cuore
+La fase di \textit{Reference Resolution} (Risoluzione dei
+Riferimenti) è il cuore
 logico dell'analizzatore architetturale. Il suo scopo è trasformare
 riferimenti astratti ed esposti ad ambiguità testuali (i nomi grezzi
 estratti dall'albero sintattico) in identificatori univoci e globalmente validi.
 
-Seguendo un paradigma mutuato dalla teoria dei compilatori, questa fase non agisce 
-come un'operazione monolitica, bensì separa in modo netto lo scandaglio del codice 
+Seguendo un paradigma mutuato dalla teoria dei compilatori, questa
+fase non agisce
+come un'operazione monolitica, bensì separa in modo netto lo
+scandaglio del codice
 dalla valutazione delle dipendenze, sfruttando un'algebra di \textit{Query}.
 
 \section{Fase 1: Costruzione delle Query (Substitution Phase)}
-Le variabili locali, sebbene fondamentali per il tracciamento del flusso dei dati, 
-\textbf{non} costituiscono componenti architetturali (sono inoltre soggette a \textit{variable shadowing}). 
-Per mantenere l'astrazione scalabile, l'analizzatore utilizza il \textit{Symbol Stack} ($\rho$) 
+Le variabili locali, sebbene fondamentali per il tracciamento del
+flusso dei dati,
+\textbf{non} costituiscono componenti architetturali (sono inoltre
+soggette a \textit{variable shadowing}).
+Per mantenere l'astrazione scalabile, l'analizzatore utilizza il
+\textit{Symbol Stack} ($\rho$)
 esclusivamente come artefatto intermedio e temporaneo di sostituzione.
 
-Quando il parser incontra una dichiarazione come \texttt{let i: a.b.T}, il Symbol Stack registra 
-la regola di sostituzione temporanea per il \textit{typename}. 
-Nel momento in cui si riscontra un utilizzo di variabile, come \texttt{i.f()}, l'analizzatore 
-esegue una sostituzione sintattica, producendo nell'IR una query matematica algebrica, 
+Quando il parser incontra una dichiarazione come \texttt{let i:
+a.b.T}, il Symbol Stack registra
+la regola di sostituzione temporanea per il \textit{typename}.
+Nel momento in cui si riscontra un utilizzo di variabile, come
+\texttt{i.f()}, l'analizzatore
+esegue una sostituzione sintattica, producendo nell'IR una query
+matematica algebrica,
 espressa nel tipo \texttt{ResolutionQuery($\mathcal{Q}$)}.
 
 \subsection{L'Algebra delle Query ($\mathcal{Q}$)}
-Tutte le operazioni manipolano l'IR (ovvero navigano il grafo dei componenti). 
+Tutte le operazioni manipolano l'IR (ovvero navigano il grafo dei componenti).
 Le query generate sono combinazioni delle seguenti primitive:
 \begin{itemize}
-    \item \texttt{Find(name)} (\textit{find-going-up}): Trova un punto di partenza risalendo l'albero dei componenti.
-    \item \texttt{Extract(query, name)} (\textit{find-going-down}): Ricevuto un punto di partenza, discende di un passo verso la destinazione indicata (es. \texttt{T.x}), attraversando opzionalmente la catena di ereditarietà.
-    \item \texttt{Call(query)}: Dato un componente "chiamabile" (come una funzione o metodo), restituisce il suo tipo di ritorno (o \texttt{Void}).
+  \item \texttt{Find(name)} (\textit{find-going-up}): Trova un punto
+    di partenza risalendo l'albero dei componenti.
+  \item \texttt{Extract(query, name)} (\textit{find-going-down}):
+    Ricevuto un punto di partenza, discende di un passo verso la
+    destinazione indicata (es. \texttt{T.x}), attraversando
+    opzionalmente la catena di ereditarietà.
+  \item \texttt{Call(query)}: Dato un componente "chiamabile" (come
+    una funzione o metodo), restituisce il suo tipo di ritorno (o
+    \texttt{Void}).
 \end{itemize}
 
-L'espressione \texttt{i.f()} (con \texttt{i} di tipo \texttt{a.b.T}) viene così espansa nella query innestata:
+L'espressione \texttt{i.f()} (con \texttt{i} di tipo \texttt{a.b.T})
+viene così espansa nella query innestata:
 $$ \texttt{Call(Extract(Extract(Extract(Find('a'), 'b'), 'T'), 'f'))} $$
 
-Terminata la lettura della funzione, il Symbol Stack viene \textbf{distrutto}. Le variabili locali vengono obliate, purificate in pure dipendenze architetturali.
+Terminata la lettura della funzione, il Symbol Stack viene
+\textbf{distrutto}. Le variabili locali vengono obliate, purificate
+in pure dipendenze architetturali.
 
 \section{Fase 2: Risoluzione delle Query (Navigation Phase)}
-La fase di \textit{Reference Resolution} effettiva si attua \textbf{solo dopo} aver letto tutto il codice.
-Questa netta separazione assicura che un componente non ancora dichiarato nel codice sorgente (forward reference) sia regolarmente tracciabile.
+La fase di \textit{Reference Resolution} effettiva si attua
+\textbf{solo dopo} aver letto tutto il codice.
+Questa netta separazione assicura che un componente non ancora
+dichiarato nel codice sorgente (forward reference) sia regolarmente tracciabile.
 
-Il motore di esecuzione naviga l'IR valutando algebricamente l'albero delle Query generate.
+Il motore di esecuzione naviga l'IR valutando algebricamente l'albero
+delle Query generate.
 
 \subsection{Limiti di una Symbol Table Piatta}
 Nella prima formalizzazione dell'architettura, la \textit{Symbol

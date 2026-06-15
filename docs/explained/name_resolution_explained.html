@@ -25,166 +25,51 @@
             --pre-bg: #1b1f23;
             --pre-text: #e6edf3;
         }
-
         * { box-sizing: border-box; margin: 0; padding: 0; }
-
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif;
-            line-height: 1.7;
-            max-width: 1060px;
-            margin: 0 auto;
-            padding: 2.5rem 2rem;
-            color: var(--text);
-            background: var(--bg);
+            line-height: 1.7; max-width: 1060px; margin: 0 auto; padding: 2.5rem 2rem;
+            color: var(--text); background: var(--bg);
         }
-
-        h1 {
-            font-size: 2rem;
-            font-weight: 700;
-            margin-bottom: 0.5rem;
-            color: var(--text);
-            letter-spacing: -0.02em;
-        }
+        h1 { font-size: 2rem; font-weight: 700; margin-bottom: 0.5rem; letter-spacing: -0.02em; }
         h1 + p { color: var(--text-secondary); font-size: 1.1em; margin-bottom: 2rem; }
-
-        h2 {
-            font-size: 1.45rem;
-            font-weight: 600;
-            color: var(--text);
-            margin-top: 2.8rem;
-            margin-bottom: 1rem;
-            padding-bottom: 0.4rem;
-            border-bottom: 1px solid var(--border);
-        }
-
-        p, li { font-size: 1rem; color: var(--text); }
-        p { margin-bottom: 0.8rem; }
-        li { margin-bottom: 0.3rem; }
-        ul { padding-left: 1.5rem; margin-bottom: 1rem; }
-
-        code {
-            background: var(--code-bg);
-            padding: 2px 6px;
-            border-radius: 4px;
-            font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
-            font-size: 0.88em;
-            color: var(--text);
-            border: 1px solid var(--border);
-        }
-        pre {
-            background: var(--pre-bg);
-            color: var(--pre-text);
-            padding: 1.2rem 1.4rem;
-            border-radius: 8px;
-            overflow-x: auto;
-            font-size: 0.88em;
-            line-height: 1.55;
-            margin: 0.8rem 0 1.2rem 0;
-            border: 1px solid #30363d;
-        }
-
-        .danger-box {
-            background: var(--danger-subtle);
-            border: 1px solid #ff8182;
-            padding: 1rem 1.2rem;
-            border-radius: 8px;
-            margin: 1rem 0;
-        }
-        .success-box {
-            background: var(--success-subtle);
-            border: 1px solid #4ac26b;
-            padding: 1rem 1.2rem;
-            border-radius: 8px;
-            margin: 1rem 0;
-        }
-        .info-box {
-            background: var(--accent-subtle);
-            border: 1px solid #84c5f5;
-            padding: 1rem 1.2rem;
-            border-radius: 8px;
-            margin: 1rem 0;
-        }
-
-        .tree-container {
-            background: #f0f3f6;
-            border: 1px solid var(--border);
-            padding: 1.4rem 1.6rem;
-            border-radius: 8px;
-            font-family: 'SFMono-Regular', Consolas, monospace;
-            font-size: 0.92em;
-            line-height: 1.65;
-            margin: 1rem 0;
-            white-space: pre;
-            overflow-x: auto;
-        }
-        .node { font-weight: 700; color: #cf222e; }
-        .symbol { color: var(--accent); font-weight: 600; }
-        .dim { color: #8b949e; font-style: italic; }
-
-        .flowchart {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 0.5rem;
-            align-items: center;
-            margin: 1rem 0;
-            font-family: 'SFMono-Regular', Consolas, monospace;
-            font-size: 0.88em;
-        }
-        .flowchart .box {
-            background: var(--accent-subtle);
-            border: 1px solid #84c5f5;
-            padding: 0.4rem 0.8rem;
-            border-radius: 6px;
-            font-weight: 600;
-            color: var(--accent);
-        }
-        .flowchart .box.active {
-            background: var(--success-subtle);
-            border-color: #4ac26b;
-            color: var(--success);
-        }
+        h2 { font-size: 1.45rem; font-weight: 600; margin-top: 2.8rem; margin-bottom: 1rem; padding-bottom: 0.4rem; border-bottom: 1px solid var(--border); }
+        h3 { font-size: 1.15rem; font-weight: 600; margin-top: 1.5rem; margin-bottom: 0.6rem; }
+        h4 { font-size: 1.05rem; font-weight: 600; margin-top: 1.2rem; margin-bottom: 0.4rem; }
+        p, li { font-size: 1rem; } p { margin-bottom: 0.8rem; } li { margin-bottom: 0.3rem; }
+        ul, ol { padding-left: 1.5rem; margin-bottom: 1rem; }
+        p.ref { color: var(--text-secondary); font-size: 0.9em; margin-bottom: 0.5rem; }
+        code { background: var(--code-bg); padding: 2px 6px; border-radius: 4px; font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace; font-size: 0.88em; border: 1px solid var(--border); }
+        pre { background: var(--pre-bg); color: var(--pre-text); padding: 1.2rem 1.4rem; border-radius: 8px; overflow-x: auto; font-size: 0.88em; line-height: 1.55; margin: 0.8rem 0 1.2rem 0; border: 1px solid #30363d; }
+        pre code { background: none; border: none; padding: 0; color: inherit; }
+        .danger-box { background: var(--danger-subtle); border: 1px solid #ff8182; padding: 1rem 1.2rem; border-radius: 8px; margin: 1rem 0; }
+        .success-box { background: var(--success-subtle); border: 1px solid #4ac26b; padding: 1rem 1.2rem; border-radius: 8px; margin: 1rem 0; }
+        .info-box { background: var(--accent-subtle); border: 1px solid #84c5f5; padding: 1rem 1.2rem; border-radius: 8px; margin: 1rem 0; }
+        .warn-box { background: var(--warning-subtle); border: 1px solid #d4a72c; padding: 1rem 1.2rem; border-radius: 8px; margin: 1rem 0; }
+        .purple-box { background: var(--purple-subtle); border: 1px solid #c297ff; padding: 1rem 1.2rem; border-radius: 8px; margin: 1rem 0; }
+        .tree-container { background: #f0f3f6; border: 1px solid var(--border); padding: 1.4rem 1.6rem; border-radius: 8px; font-family: 'SFMono-Regular', Consolas, monospace; font-size: 0.92em; line-height: 1.65; margin: 1rem 0; white-space: pre; overflow-x: auto; }
+        .node { font-weight: 700; color: #cf222e; } .symbol { color: var(--accent); font-weight: 600; }
+        .dim { color: #8b949e; font-style: italic; } .green { color: var(--success); font-weight: 600; }
+        .purple-text { color: var(--purple); font-weight: 600; } .arrow { color: #8b949e; }
+        .import { color: var(--warning); font-weight: 600; }
+        .step { border: 1px solid var(--border); border-radius: 8px; padding: 1rem 1.2rem; margin: 1rem 0; background: var(--card-bg); }
+        .step-success { border-color: #4ac26b; }
+        .flowchart { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; margin: 1rem 0; font-family: 'SFMono-Regular', Consolas, monospace; font-size: 0.88em; }
+        .flowchart .box { background: var(--accent-subtle); border: 1px solid #84c5f5; padding: 0.4rem 0.8rem; border-radius: 6px; font-weight: 600; color: var(--accent); }
+        .flowchart .box.active { background: var(--success-subtle); border-color: #4ac26b; color: var(--success); }
         .flowchart .sep { color: #8b949e; font-size: 1.2em; }
-
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin: 1rem 0;
-            font-size: 0.95em;
-        }
-        th, td {
-            border: 1px solid var(--border);
-            padding: 0.6rem 0.8rem;
-            text-align: left;
-        }
+        table { width: 100%; border-collapse: collapse; margin: 1rem 0; font-size: 0.95em; }
+        th, td { border: 1px solid var(--border); padding: 0.6rem 0.8rem; text-align: left; }
         th { background: var(--code-bg); font-weight: 600; }
-
-        .wiki-nav {
-            display: flex;
-            align-items: center;
-            gap: 0.6rem;
-            padding: 0.7rem 1rem;
-            margin-bottom: 2rem;
-            background: var(--code-bg);
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            font-size: 0.88em;
-            flex-wrap: wrap;
-        }
-        .wiki-nav a {
-            color: var(--accent);
-            text-decoration: none;
-            padding: 0.25rem 0.6rem;
-            border-radius: 4px;
-            transition: background 0.15s;
-        }
+        .wiki-nav { display: flex; align-items: center; gap: 0.6rem; padding: 0.7rem 1rem; margin-bottom: 2rem; background: var(--code-bg); border: 1px solid var(--border); border-radius: 8px; font-size: 0.88em; flex-wrap: wrap; }
+        .wiki-nav a { color: var(--accent); text-decoration: none; padding: 0.25rem 0.6rem; border-radius: 4px; transition: background 0.15s; }
         .wiki-nav a:hover { background: var(--accent-subtle); }
-        .wiki-nav a.active {
-            background: var(--accent);
-            color: #fff;
-            font-weight: 600;
-        }
+        .wiki-nav a.active { background: var(--accent); color: #fff; font-weight: 600; }
         .wiki-nav .sep { color: var(--border); font-size: 1.1em; }
         .wiki-nav .label { color: var(--text-secondary); font-weight: 600; margin-right: 0.2rem; }
+        .toc { background: var(--code-bg); border: 1px solid var(--border); border-radius: 8px; padding: 1.2rem 1.5rem; margin-bottom: 2rem; }
+        .toc h3 { margin-top: 0; margin-bottom: 0.6rem; } .toc ol { margin-bottom: 0; }
+        .toc a { color: var(--accent); text-decoration: none; } .toc a:hover { text-decoration: underline; }
     </style>
 </head>
 <body>
@@ -201,113 +86,1087 @@
     </nav>
 
     <h1>Deep Dive: Il Motore di Name Resolution</h1>
-    <p>Documentazione tecnica esaustiva dell'architettura a <strong>Query Engine</strong> implementata in <code>src/resolver/</code> (builder.rs, executor.rs), con spiegazione passo-passo della separazione tra costruzione (substitution) ed esecuzione (navigation).</p>
+    <p>Documentazione tecnica esaustiva dell'architettura a <strong>Query Engine bifase</strong> implementata in <code>src/resolver/</code>. Questo documento copre ogni componente, algoritmo, e scelta progettuale con le relative motivazioni teoriche — materiale diretto per la tesi.</p>
 
+    <div class="toc">
+        <h3>Indice</h3>
+        <ol>
+            <li><a href="#overview">Panoramica e Obiettivo</a></li>
+            <li><a href="#architecture">Architettura: dal Monofase al Query Engine Bifase</a></li>
+            <li><a href="#query-algebra">L'Algebra delle Query (𝒬)</a></li>
+            <li><a href="#symbol-stack">L'Environment (ρ): Il Symbol Stack</a></li>
+            <li><a href="#builder">Fase 2a: Query Building (<code>builder.rs</code>)</a></li>
+            <li><a href="#registry">Il Global Registry</a></li>
+            <li><a href="#executor">Fase 2b: Query Execution (<code>executor.rs</code>)</a></li>
+            <li><a href="#primitives">Il Primitive Registry</a></li>
+            <li><a href="#traversal">Attraversamento Ricorsivo dell'IR</a></li>
+            <li><a href="#impl-flattening">Flattening degli Impl Blocks</a></li>
+            <li><a href="#full-example">Esempio Completo End-to-End</a></li>
+            <li><a href="#typeref-lifecycle">Ciclo di Vita di un TypeRef</a></li>
+            <li><a href="#comparison">Confronto Architetturale: v2 vs v3</a></li>
+        </ol>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- SEZIONE 1 -->
     <!-- ============================================================ -->
     <h2 id="overview">1. Panoramica e Obiettivo</h2>
 
-    <p>La <strong>Name Resolution</strong> è la Fase 2 della pipeline di analisi. Questo motore prende l'IR astratto (contenente riferimenti <code>Unresolved</code>) e li trasforma in query algebriche, che vengono successivamente navigate globalmente per risolvere i riferimenti a componenti.</p>
+    <p>La <strong>Name Resolution</strong> (Risoluzione dei Riferimenti) è il cuore logico dell'analizzatore architetturale. È la fase che trasforma nomi grezzi e ambigui — estratti dal parser nella Fase 1 — in identificatori univoci e globalmente validi. Senza questa fase, l'analizzatore non saprebbe se <code>Veicolo</code> scritto in un file si riferisce alla struct <code>root::core::Veicolo</code>, a un tipo esterno importato, o a un tipo inesistente.</p>
 
+    <p><strong>Perché è il cuore del sistema?</strong> Perché l'intero grafo delle dipendenze (Fase 3) si basa sui risultati della risoluzione. Se un tipo viene marcato erroneamente come <code>Failed</code>, scompare un arco dal grafo. Se viene marcato come <code>External</code> invece di <code>Resolved</code>, il grafo mostra una dipendenza verso una libreria esterna inesistente. La qualità dell'analisi architetturale dipende interamente dalla correttezza della risoluzione.</p>
+
+    <h3>1.1 Il Problema Fondamentale</h3>
+    <p>Quando il parser estrae dall'AST un riferimento come <code>Veicolo</code>, non sa quale <code>Veicolo</code> sia. Potrebbe essere:</p>
+    <ul>
+        <li>La struct <code>Veicolo</code> definita nello stesso modulo → <strong>Resolved</strong></li>
+        <li>Un tipo importato da una libreria esterna → <strong>External</strong></li>
+        <li>Un tipo primitivo del linguaggio come <code>String</code> → <strong>Primitive</strong></li>
+        <li>Un tipo che non esiste da nessuna parte → <strong>Failed</strong></li>
+    </ul>
+    <p>Il resolver deve operare questa classificazione per <strong>ogni singolo TypeRef</strong> nell'IR — nei campi delle struct, nei parametri delle funzioni, nei tipi di ritorno, nelle dichiarazioni locali, nelle chiamate e nelle istanziazioni.</p>
+
+    <h3>1.2 La Macchina a Stati di TypeRef</h3>
+    <p>Ogni riferimento di tipo attraversa una sequenza di stati definiti nell'enum <code>TypeRef</code> (<code>model/queries.rs</code>):</p>
     <table>
-        <thead>
-            <tr><th>Stato TypeRef</th><th>Significato</th><th>Esempio</th></tr>
-        </thead>
+        <thead><tr><th>Stato</th><th>Significato</th><th>Chi lo produce</th><th>Esempio</th></tr></thead>
         <tbody>
             <tr>
+                <td><code>Unresolved(path)</code></td>
+                <td>Nome grezzo estratto dal parser. È il punto di partenza: il tipo è un semplice token testuale senza contesto semantico.</td>
+                <td>Fase 1 (Estrazione)</td>
+                <td><code>["Veicolo"]</code></td>
+            </tr>
+            <tr>
                 <td><code>ResolutionQuery(Query)</code></td>
-                <td>Riferimento matematico sostituito localmente dal Symbol Stack</td>
+                <td>Stato intermedio prodotto dalla sostituzione lessicale. Le variabili locali sono state espanse in query algebriche, ma il percorso assoluto non è ancora stato determinato.</td>
+                <td>Fase 2a (Builder)</td>
                 <td><code>Extract(Find("T"), "f")</code></td>
             </tr>
             <tr>
                 <td><code>Resolved(path)</code></td>
-                <td>Nome trovato globalmente navigando l'IR — percorso assoluto</td>
+                <td>Nome risolto con successo. Il percorso è assoluto e punta a un componente presente nel progetto analizzato.</td>
+                <td>Fase 2b (Executor)</td>
                 <td><code>["root", "core", "Veicolo"]</code></td>
             </tr>
             <tr>
                 <td><code>External(path)</code></td>
-                <td>Nome riconosciuto tramite import ma non presente internamente</td>
+                <td>Nome riconosciuto tramite un import, ma il componente non è presente nell'IR locale — è una dipendenza esterna.</td>
+                <td>Fase 2b (Executor)</td>
                 <td><code>["external", "db", "Database"]</code></td>
             </tr>
             <tr>
-                <td><code>Failed(path)</code></td>
-                <td>Tutti i tentativi di risoluzione sono falliti — il nome rimane irrisolto</td>
-                <td><code>["UnknownType"]</code></td>
+                <td><code>Primitive(type)</code></td>
+                <td>Tipo primitivo del linguaggio corrente, riconosciuto dal PrimitiveRegistry data-driven.</td>
+                <td>Fase 2b (Executor)</td>
+                <td><code>Primitive(Other("String"))</code></td>
             </tr>
             <tr>
-                <td><code>Primitive(type)</code></td>
-                <td>Tipo primitivo (Int, Float, Bool, String, Void) — decodificato data-driven</td>
-                <td><code>Primitive(String)</code></td>
+                <td><code>Failed(path)</code></td>
+                <td>Tutti i tentativi di risoluzione sono falliti. Il nome rimane irrisolto — nel grafo non verrà generato alcun arco.</td>
+                <td>Fase 2b (Executor)</td>
+                <td><code>["UnknownType"]</code></td>
             </tr>
         </tbody>
     </table>
 
-    <p>La pipeline completa in <code>analyzer.rs</code> è:</p>
+    <h3>1.3 Posizione nella Pipeline</h3>
     <div class="flowchart">
         <span class="box">1. Estrazione CST→IR</span>
         <span class="sep">→</span>
-        <span class="box active">2. Query Building</span>
+        <span class="box active">2a. Query Building</span>
         <span class="sep">→</span>
-        <span class="box active">3. Query Execution</span>
+        <span class="box active">2b. Query Execution</span>
         <span class="sep">→</span>
-        <span class="box">4. Dependency Graph</span>
+        <span class="box">3. Dependency Graph</span>
     </div>
+    <p class="ref">Riferimento: <code>src/resolver/mod.rs:10-21</code></p>
+    <pre><code>pub fn resolve_type_refs(modules: Vec&lt;Module&gt;, primitives: &amp;PrimitiveRegistry) -&gt; Vec&lt;Module&gt; {
+    // Fase 2a: Sostituzione lessicale — produce ResolutionQuery
+    let modules_with_queries = builder::build_queries(modules);
+    // Fase 2b: Navigazione globale — produce Resolved/External/Failed/Primitive
+    let resolved_modules = executor::execute_queries(modules_with_queries, primitives);
+    resolved_modules
+}</code></pre>
+    <p>Da notare: la funzione prende ownership dei moduli (<code>Vec&lt;Module&gt;</code>, non <code>&amp;</code>) e li restituisce trasformati. Questo è un pattern "pipeline" che evita mutazioni in-place e semplifica il ragionamento sul flusso dei dati.</p>
 
     <!-- ============================================================ -->
-    <h2 id="architecture">2. Architettura: Costruzione ed Esecuzione</h2>
+    <!-- SEZIONE 2 -->
+    <!-- ============================================================ -->
+    <h2 id="architecture">2. Architettura: dal Monofase al Query Engine Bifase</h2>
 
-    <h3>2.1 Separazione delle Responsabilità</h3>
-    <p>A seguito di iterazioni architetturali profonde, l'infrastruttura è stata separata matematicamente in due fasi rigorose. Le variabili locali (es. <code>i</code>) non sono componenti architetturali veri e propri, bensì astrazioni passeggere. Di conseguenza, la logica di valutazione in tempo reale è stata spaccata in due passaggi asincroni:</p>
+    <h3>2.1 Evoluzione Storica</h3>
+    <p>L'architettura di risoluzione ha attraversato tre iterazioni fondamentali:</p>
+    <table>
+        <thead><tr><th>Versione</th><th>Approccio</th><th>Struttura dati principale</th><th>Problema fondamentale</th></tr></thead>
+        <tbody>
+            <tr>
+                <td><strong>v1</strong></td>
+                <td>Arena + ScopeTree statico</td>
+                <td><code>ScopeTree { arena: Vec&lt;ScopeNode&gt; }</code></td>
+                <td>Il <code>current_scope</code> non veniva mai aggiornato — tutto partiva da ROOT</td>
+            </tr>
+            <tr>
+                <td><strong>v2</strong></td>
+                <td>SymbolStack monofase</td>
+                <td><code>SymbolStack { frames: Vec&lt;StackFrame&gt; }</code> con <code>String → QualifiedName</code></td>
+                <td>Forward references impossibili; niente catene di chiamate; primitivi marcati come Failed</td>
+            </tr>
+            <tr>
+                <td><strong>v3</strong> (attuale)</td>
+                <td>Query Engine bifase</td>
+                <td><code>SymbolStack</code> con <code>String → Query</code> + <code>GlobalRegistry</code> con <code>RegistryEntry</code></td>
+                <td>—</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h3>2.2 Perché il Modello Monofase (v2) Non Era Sufficiente</h3>
+    <p>Nella v2, la risoluzione avveniva in un <strong>singolo pass</strong>: durante l'attraversamento dell'IR, ogni <code>Unresolved</code> veniva immediatamente risolto. Questo causava tre problemi strutturali:</p>
 
     <div class="danger-box">
-        <h4 style="margin-top: 0; margin-bottom: 0.5rem; color: var(--danger);">Phase 1: Query Building (Substitution)</h4>
-        <p style="margin-bottom: 0;">Un ambiente effimero (il <code>Symbol Stack</code>) viene istanziato all'entrata di una funzione. Non effettua risoluzioni, ma applica pura <strong>sostituzione sintattica</strong> sulle variabili oscurate. Quando la funzione termina, il Symbol Stack si autodistrugge. Lascia indietro unicamente costrutti <code>ResolutionQuery</code> privi di contesto locale.</p>
+        <h4 style="margin-top: 0; color: var(--danger);">Problema 1: Forward References</h4>
+        <p>Se il tipo <code>Auto</code> è dichiarato dopo <code>calcola()</code> nel codice sorgente, quando il resolver incontra <code>-> Auto</code> nella firma della funzione, il tipo non è ancora stato registrato nello stack. L'ordine di dichiarazione nel codice sorgente influenza il risultato della risoluzione — violazione del principio di <em>declaration-order independence</em>.</p>
+    </div>
+
+    <div class="danger-box">
+        <h4 style="margin-top: 0; color: var(--danger);">Problema 2: Catene di Chiamate</h4>
+        <p>L'espressione <code>a.f().g()</code> richiede di conoscere il tipo di ritorno di <code>f()</code> per risolvere <code>g()</code>. Nella v2, lo stack mappava <code>String → QualifiedName</code> — un percorso assoluto, non un'espressione risolvibile. Non c'era modo di esprimere "chiama f, prendi il tipo di ritorno, poi cerca g su quel tipo".</p>
+    </div>
+
+    <div class="danger-box">
+        <h4 style="margin-top: 0; color: var(--danger);">Problema 3: Mixing di Responsabilità</h4>
+        <p>Il singolo pass mescolava due operazioni logicamente distinte: (1) la sostituzione delle variabili locali e (2) la navigazione globale dell'IR. Questo rendeva il codice fragile e difficile da ragionare, con il <code>RefCell</code> dello stack condiviso attraverso tutto il traversal.</p>
+    </div>
+
+    <h3>2.3 La Soluzione: Separazione in Due Fasi</h3>
+    <p>L'intuizione chiave viene dalla teoria dei compilatori: nella <em>compilazione per fasi</em> (multi-pass compilation), ogni passo ha una responsabilità limitata. Analogamente, separando la <strong>costruzione dell'intento</strong> (cosa vuole il codice) dalla <strong>valutazione dell'intento</strong> (dove porta quell'intento nell'IR), si ottengono vantaggi fondamentali:</p>
+
+    <div class="purple-box">
+        <h4 style="margin-top: 0; color: var(--purple);">Fondamento Teorico: Lazy Evaluation Applicata alla Risoluzione</h4>
+        <p>La <code>Query</code> algebrica è concettualmente una <em>thunk</em> — un'espressione non ancora valutata che cattura l'intento del programmatore. Come nell'evaluazione lazy dei linguaggi funzionali, la valutazione viene rinviata al momento in cui <strong>tutto il contesto è disponibile</strong>. Questo elimina il problema dei forward-references per costruzione: quando l'Executor valuta le query, l'intero IR è già stato letto e indicizzato nel GlobalRegistry.</p>
     </div>
 
     <div class="success-box">
-        <h4 style="margin-top: 0; margin-bottom: 0.5rem; color: var(--success);">Phase 2: Query Execution (Navigation)</h4>
-        <p style="margin-bottom: 0;">Avendo purificato l'IR da variabili fittizie, un navigatore globale (l'Executor) riceve in carico i nodi <code>Query</code> e li valuta salendo e scendendo per l'albero di tutti i componenti del progetto ormai letti e conosciuti.</p>
+        <h4 style="margin-top: 0; color: var(--success);">Fase 2a: Query Building (Substitution) — <code>builder.rs</code></h4>
+        <p><strong>Responsabilità unica:</strong> eliminare le variabili locali dall'IR, sostituendole con espressioni algebriche (<code>Query</code>) che catturano l'intento di risoluzione senza eseguirlo. Usa il <code>SymbolStack</code> come ambiente effimero.</p>
+        <p><strong>Invariante:</strong> dopo questa fase, l'IR non contiene più <code>TypeRef::Unresolved</code> — tutti sono diventati <code>TypeRef::ResolutionQuery</code>.</p>
     </div>
 
-    <h2 id="query-algebra">3. L'Algebra delle Query</h2>
-    <p>Ogni espressione è formata dalla combinazione di sole tre primitive matematiche definite nell'enum <code>Query</code> (in <code>model/queries.rs</code>):</p>
-    <pre><code>pub enum Query {
-    Find(String),
-    Extract(Box&lt;Query&gt;, String),
-    Call(Box&lt;Query&gt;),
-}</code></pre>
-    <ul>
-        <li><strong>Find("a")</strong>: Cerca <code>a</code> salendo (find-going-up) lungo gli scope genitori.</li>
-        <li><strong>Extract(Q, "b")</strong>: Valuta <code>Q</code>, poi scende (find-going-down) al suo interno cercando <code>b</code>.</li>
-        <li><strong>Call(Q)</strong>: Valuta <code>Q</code> invocandolo come funzione, estraendone il tipo di ritorno.</li>
-    </ul>
+    <div class="success-box">
+        <h4 style="margin-top: 0; color: var(--success);">Fase 2b: Query Execution (Navigation) — <code>executor.rs</code></h4>
+        <p><strong>Responsabilità unica:</strong> valutare algebricamente ogni <code>Query</code> navigando l'IR completo (tramite il <code>GlobalRegistry</code>), classificando il risultato in <code>Resolved</code>, <code>External</code>, <code>Primitive</code>, o <code>Failed</code>.</p>
+        <p><strong>Invariante:</strong> dopo questa fase, l'IR non contiene più <code>TypeRef::ResolutionQuery</code> — tutti sono stati classificati.</p>
+    </div>
 
+    <h3>2.4 I 5 Componenti del Motore</h3>
     <div class="tree-container">
-<span class="symbol">L'Architettura del Motore (Builder & Executor)</span>
+<span class="symbol">Architettura del Query Engine (5 Componenti)</span>
 
 ┌──────────────────────────────────────────────────────────────────┐
 │                                                                  │
-│  <span class="node">① SymbolStack (Substitution)</span>  <span class="dim">(src/resolver/builder.rs)</span>          │
+│  <span class="node">① SymbolStack</span>  <span class="dim">(stack.rs) — Solo Fase 2a</span>                        │
 │  ┌────────────────────────────────────────────────────────────┐  │
-│  │  Applica la sostituzione macro alle variabili locali.     │  │
-│  │  Genera: Query::Call(Extract(Find("a"), "f"))             │  │
+│  │  Environment ρ effimero. Mappa nomi locali → Query.       │  │
+│  │  Si crea all'inizio della Fase 2a e muore alla fine.      │  │
+│  │  Implementa push_scope/pop_scope/define_symbol.           │  │
 │  └────────────────────────────────────────────────────────────┘  │
 │                                                                  │
-│  <span class="node">② GlobalRegistry (Navigation)</span>  <span class="dim">(src/resolver/executor.rs)</span>      │
+│  <span class="node">② BuilderContext</span>  <span class="dim">(builder.rs) — Solo Fase 2a</span>                   │
 │  ┌────────────────────────────────────────────────────────────┐  │
-│  │  Indice navigabile di tutto l'IR. Risolve Find(X).        │  │
-│  │  Discende tramite Extract(X, Y).                          │  │
+│  │  Contiene un &amp;RefCell&lt;SymbolStack&gt;. Attraversa l'IR       │  │
+│  │  ricorsivamente. Per ogni componente: push, define,       │  │
+│  │  substitute, pop. Produce ResolutionQuery.                │  │
 │  └────────────────────────────────────────────────────────────┘  │
 │                                                                  │
-│  <span class="node">③ PrimitiveRegistry</span>  <span class="dim">(src/resolver/primitives.rs)</span>                 │
+│  <span class="node">③ GlobalRegistry</span>  <span class="dim">(registry.rs) — Costruito all'inizio Fase 2b</span>  │
 │  ┌────────────────────────────────────────────────────────────┐  │
-│  │  Caricato via JSON a compile-time (Data-Driven)           │  │
-│  │  Gestisce il Decoppiamento Primitivo per evitare Failed.  │  │
+│  │  HashMap&lt;QN, RegistryEntry&gt;. "Elenco telefonico" di      │  │
+│  │  tutto il progetto. Ogni componente ha un percorso        │  │
+│  │  assoluto. Le funzioni salvano anche il return_type       │  │
+│  │  per abilitare l'inferenza nelle catene di chiamate.      │  │
+│  └────────────────────────────────────────────────────────────┘  │
+│                                                                  │
+│  <span class="node">④ ExecutorContext</span>  <span class="dim">(executor.rs) — Solo Fase 2b</span>                  │
+│  ┌────────────────────────────────────────────────────────────┐  │
+│  │  Immutabile (no RefCell). Contiene:                       │  │
+│  │  · current_prefix — dove siamo nell'IR                    │  │
+│  │  · imports_stack — import accumulati gerarchicamente      │  │
+│  │  · &amp;registry — per lookup e type inference                │  │
+│  │  · &amp;primitives — per il fallback primitivo                │  │
+│  └────────────────────────────────────────────────────────────┘  │
+│                                                                  │
+│  <span class="node">⑤ PrimitiveRegistry</span>  <span class="dim">(primitives.rs) — Caricato all'avvio</span>       │
+│  ┌────────────────────────────────────────────────────────────┐  │
+│  │  HashSet&lt;String&gt; con i primitivi del linguaggio corrente. │  │
+│  │  Caricato da primitives.json a compile-time. Usato come   │  │
+│  │  ultimo fallback prima di dichiarare Failed.              │  │
 │  └────────────────────────────────────────────────────────────┘  │
 │                                                                  │
 └──────────────────────────────────────────────────────────────────┘</div>
 
+    <!-- ============================================================ -->
+    <!-- SEZIONE 3 -->
+    <!-- ============================================================ -->
+    <h2 id="query-algebra">3. L'Algebra delle Query (𝒬)</h2>
+    <p class="ref">Riferimento: <code>src/model/queries.rs:1-15</code></p>
+
+    <p>L'intuizione fondamentale dell'architettura v3 è che <strong>ogni operazione di risoluzione può essere espressa come composizione di sole tre primitive</strong>. Queste primitive catturano le due direzioni di navigazione possibili in un grafo gerarchico (salire e scendere) più l'operazione di invocazione.</p>
+
+    <pre><code>pub enum Query {
+    /// Find-going-up: cerca un componente risalendo lo scope.
+    Find(String),
+    /// Find-going-down: dato il risultato di una sub-query, scendi al membro.
+    Extract(Box&lt;Query&gt;, String),
+    /// Invoca la sub-query come funzione e restituisci il tipo di ritorno.
+    Call(Box&lt;Query&gt;),
+}</code></pre>
+
+    <h3>3.1 Query::Find — Ricerca Ascendente (find-going-up)</h3>
+    <p><code>Find("X")</code> è il punto di partenza di quasi ogni query. Semanticamente dice: <em>"cerca un componente chiamato X partendo dal mio contesto attuale e risalendo verso la root finché non lo trovi"</em>.</p>
+    <p><strong>Perché "risalendo"?</strong> Perché il <em>lexical scoping</em> funziona così: se scrivi <code>Veicolo</code> dentro una funzione che è dentro un modulo <code>core</code>, il compilatore cerca prima <code>Veicolo</code> nello scope della funzione, poi nello scope del modulo <code>core</code>, poi nello scope del modulo root. Trova il primo match e si ferma.</p>
+    <p><strong>Perché solo il nome semplice, non il path completo?</strong> Perché i path multi-segmento (<code>a.b.T</code>) sono scomposti dal Builder in catene di <code>Extract</code>. <code>Find</code> riceve sempre e solo il primo segmento.</p>
+
+    <h3>3.2 Query::Extract — Discesa di un Livello (find-going-down)</h3>
+    <p><code>Extract(Q, "Y")</code> dice: <em>"valuta Q per ottenere un componente, poi cerca il membro Y al suo interno"</em>. È l'operatore di accesso ai membri (<code>.</code> o <code>::</code>).</p>
+    <p><strong>Perché <code>Box&lt;Query&gt;</code>?</strong> Perché <code>Extract</code> contiene ricorsivamente un'altra query. In Rust, i tipi ricorsivi devono essere allocati sullo heap tramite <code>Box</code> per avere una dimensione nota a compile-time.</p>
+    <p><strong>Perché la composizione è lineare?</strong> Un path come <code>a.b.c.d</code> diventa <code>Extract(Extract(Extract(Find("a"), "b"), "c"), "d")</code>. L'annidamento cresce linearmente con il numero di segmenti. Questo è intenzionale: ogni livello di <code>Extract</code> corrisponde a un passo di discesa nell'albero dei componenti.</p>
+
+    <h3>3.3 Query::Call — Invocazione e Tipo di Ritorno</h3>
+    <p><code>Call(Q)</code> dice: <em>"valuta Q, trattalo come una funzione, e restituisci il suo tipo di ritorno"</em>. È ciò che abilita le catene di chiamate.</p>
+    <p><strong>Perché è necessario?</strong> Consideriamo <code>a.f().g()</code>:</p>
+    <ul>
+        <li><code>a.f()</code> restituisce un oggetto di tipo <code>T</code> (il return type di <code>f</code>)</li>
+        <li><code>.g()</code> deve essere cercato nei metodi di <code>T</code>, non nei metodi di <code>a</code></li>
+    </ul>
+    <p>Senza <code>Call</code>, non c'è modo di esprimere "il risultato di una chiamata". L'Executor, quando incontra <code>Call</code> all'interno di un <code>Extract</code>, consulta il <code>GlobalRegistry</code> per il tipo di ritorno della funzione, permettendo la risoluzione transitiva.</p>
+
+    <h3>3.4 Perché Tre Primitive Sono Sufficienti</h3>
+    <p>Ogni espressione di accesso in un linguaggio di programmazione può essere scomposta in sequenze di:</p>
+    <ol>
+        <li><strong>Partenza</strong> — trovare un punto iniziale nello scope (Find)</li>
+        <li><strong>Navigazione</strong> — scendere di un livello alla volta (Extract)</li>
+        <li><strong>Invocazione</strong> — passare attraverso una chiamata di funzione (Call)</li>
+    </ol>
+    <p>Non servono primitive aggiuntive perché l'analizzatore opera a livello <em>architetturale</em>, non a livello di espressioni arbitrarie. Non deve valutare operatori aritmetici, condizioni, o flussi di controllo — deve solo tracciare <em>da dove vengono i tipi</em>.</p>
+
+    <h3>3.5 Esempi di Composizione</h3>
+    <div class="tree-container">
+<span class="symbol">Espressione sorgente → Query algebrica generata dal Builder</span>
+
+<span class="green">① Nome semplice:</span>
+   Veicolo          → <span class="purple-text">Find("Veicolo")</span>
+   <span class="dim">Nessuna variabile locale trovata nello stack → Find generico.</span>
+
+<span class="green">② Path qualificato:</span>
+   std::io::File    → <span class="purple-text">Extract(Extract(Find("std"), "io"), "File")</span>
+   <span class="dim">Il primo segmento diventa Find, ogni segmento successivo diventa Extract.</span>
+
+<span class="green">③ Accesso a membro di variabile locale:</span>
+   db.query()       → <span class="purple-text">Call(Extract(Find("Db"), "query"))</span>
+   <span class="dim">Se "db" è una variabile locale di tipo Db (registrata nello stack come</span>
+   <span class="dim">Find("Db")), lo stack SOSTITUISCE "db" con Find("Db").</span>
+   <span class="dim">Poi .query → Extract(..., "query"), poi () → Call(...).</span>
+
+<span class="green">④ Catena di chiamate:</span>
+   a.f().g()        → <span class="purple-text">Call(Extract(Call(Extract(Find("A"), "f")), "g"))</span>
+   <span class="dim">a → Find("A") [sostituzione]</span>
+   <span class="dim">.f() → Call(Extract(Find("A"), "f"))</span>
+   <span class="dim">   ↑ questo Call produce il TIPO DI RITORNO di f()</span>
+   <span class="dim">.g() → Call(Extract([tipo_ritorno_f], "g"))</span>
+
+<span class="green">⑤ self/this:</span>
+   self.get_id()    → <span class="purple-text">Call(Extract(Find("Veicolo"), "get_id"))</span>
+   <span class="dim">"self" è registrato dal Builder come Find("Veicolo") quando</span>
+   <span class="dim">si entra nel StructuredType "Veicolo".</span>
+
+<span class="green">⑥ Costruttore:</span>
+   Db::new()        → <span class="purple-text">Call(Extract(Find("Db"), "new"))</span>
+   <span class="dim">Il Builder trasforma calls con is_call=true → wrapping in Call.</span>
+
+<span class="green">⑦ Istanziazione:</span>
+   Auto { ... }     → <span class="purple-text">Find("Auto")</span>
+   <span class="dim">Le istanziazioni (instantiates) usano is_call=false → niente Call wrapper.</span></div>
+
+    <h3>3.6 Il Flag <code>is_call</code> in <code>substitute_type</code></h3>
+    <p>La funzione <code>substitute_type</code> accetta un parametro booleano <code>is_call</code>. Questo determina se la query finale deve essere wrappata in <code>Call(...)</code>:</p>
+    <ul>
+        <li><code>is_call = true</code>: usato per gli elementi nel campo <code>block.calls</code> — sono chiamate a funzione, vogliamo tracciare la funzione stessa come dipendenza</li>
+        <li><code>is_call = false</code>: usato per tutto il resto — tipi dei campi, parametri, tipi di ritorno, istanziazioni, dichiarazioni</li>
+    </ul>
+    <p><strong>Motivazione:</strong> la distinzione serve nella Fase 3 (Dependency Graph) per generare archi semanticamente diversi (un <em>Calls</em> vs un <em>UsesFieldType</em>). Ma già nella Fase 2, il wrapping in <code>Call</code> influenza come l'Executor valuta la query (vedi sezione 7.3).</p>
+
+    <!-- ============================================================ -->
+    <!-- SEZIONE 4 -->
+    <!-- ============================================================ -->
+    <h2 id="symbol-stack">4. L'Environment (ρ): Il Symbol Stack</h2>
+    <p class="ref">Riferimento: <code>src/resolver/stack.rs:1-67</code></p>
+
+    <h3>4.1 Fondamento Teorico</h3>
+    <p>Dalla formalizzazione LaTeX (cap. <em>Costruzione e Risoluzione delle Query Architetturali</em>), l'ambiente lessicale è modellato come:</p>
     <div class="info-box">
-        <strong>Vantaggi dell'Astrazione:</strong> Grazie a questa netta divisione in due step, l'Analizzatore ottiene una vera semantica lessicale, diventando infinitamente più resiliente all'ordine di dichiarazione (risolve nativamente i forward-references) e scartando completamente l'onere di mantenere in memoria tabelle di scope annidati durante la fase di risoluzione effettiva.
+        <strong>Definizione formale:</strong> L'Environment ρ è definito come uno stack di frame:<br>
+        <code>ρ = ⟨Σ₀, Σ₁, ..., Σₙ⟩</code><br>
+        Ogni frame <code>Σₖ = ⟨Symbols, I_imports⟩</code> rappresenta un singolo livello di annidamento lessicale. Lo stack cresce verso l'alto: <code>Σₙ</code> è il frame corrente (top), <code>Σ₀</code> è il frame globale (bottom).
+    </div>
+    <p><strong>Perché uno stack e non un albero?</strong> Perché durante il traversal dell'IR, il resolver visita un solo "ramo" dell'albero alla volta. Lo stack modella esattamente il percorso dalla root allo scope corrente. Quando il traversal esce da uno scope (pop) ed entra nel fratello successivo (push), il nuovo frame riutilizza la stessa posizione nello stack — nessun nodo permanente viene allocato.</p>
+
+    <h3>4.2 Struttura di <code>StackFrame</code></h3>
+    <pre><code>pub struct StackFrame {
+    pub symbols: HashMap&lt;String, Query&gt;,  // nome semplice → Query di sostituzione
+    pub imports: Vec&lt;Import&gt;,             // jump points disponibili in questo scope
+}</code></pre>
+
+    <div class="warn-box">
+        <h4 style="margin-top: 0; color: var(--warning);">Evoluzione della mappa <code>symbols</code> attraverso le versioni</h4>
+        <table>
+            <thead><tr><th>Versione</th><th>Tipo della mappa</th><th>Cosa rappresenta</th></tr></thead>
+            <tbody>
+                <tr><td>v1 (Arena)</td><td><code>HashMap&lt;Identifier, Component&gt;</code></td><td>Possedeva l'intero componente IR clonato — costoso e fragile</td></tr>
+                <tr><td>v2 (Monofase)</td><td><code>HashMap&lt;String, QualifiedName&gt;</code></td><td>Percorso assoluto — sufficiente per risoluzione diretta, ma non per catene</td></tr>
+                <tr><td>v3 (Bifase)</td><td><code>HashMap&lt;String, Query&gt;</code></td><td>Query algebrica — cattura l'intento, non il risultato. Abilita catene e lazy evaluation</td></tr>
+            </tbody>
+        </table>
+        <p style="margin-bottom: 0;">Il cambiamento da <code>QualifiedName</code> a <code>Query</code> è il cuore della transizione v2→v3. Nella v2, quando si registrava <code>v → ["root","core","Veicolo"]</code>, il percorso era già risolto. Ma per risolvere <code>v.id</code>, bisognava concatenare stringhe: <code>["root","core","Veicolo","id"]</code>. Se il percorso conteneva una catena di chiamate (es. <code>v.f().id</code>), non c'era modo di esprimerlo come una semplice concatenazione. Con <code>Query</code>, si registra <code>v → Find("Veicolo")</code> e poi <code>v.f().id</code> diventa <code>Extract(Call(Extract(Find("Veicolo"), "f")), "id")</code> — composizione naturale.</p>
+    </div>
+
+    <h3>4.3 API Completa del <code>SymbolStack</code></h3>
+    <table>
+        <thead><tr><th>Metodo</th><th>Semantica</th><th>Operazione formale</th><th>Quando viene chiamato</th></tr></thead>
+        <tbody>
+            <tr>
+                <td><code>push_scope()</code></td>
+                <td>Aggiunge un <code>StackFrame</code> vuoto in cima allo stack</td>
+                <td>ρ' = ρ ∪ { Σ<sub>n+1</sub> }</td>
+                <td>Entrando in un modulo, struct, funzione, blocco, o impl block</td>
+            </tr>
+            <tr>
+                <td><code>pop_scope()</code></td>
+                <td>Rimuove e <strong>distrugge</strong> il frame in cima allo stack. Tutti i simboli vengono persi irrecuperabilmente.</td>
+                <td>ρ' = tail(ρ)</td>
+                <td>Uscendo da qualsiasi scope</td>
+            </tr>
+            <tr>
+                <td><code>define_symbol(name, query)</code></td>
+                <td>Registra un simbolo locale nel frame corrente</td>
+                <td>Σ<sub>n</sub>.Symbols[name] = query</td>
+                <td>Dopo aver sostituito il tipo di un parametro o dichiarazione locale</td>
+            </tr>
+            <tr>
+                <td><code>add_import(import)</code></td>
+                <td>Aggiunge un import al frame corrente</td>
+                <td>Σ<sub>n</sub>.I<sub>imports</sub> ← import</td>
+                <td><em>Non usato nella v3 — gli import sono gestiti dall'Executor</em></td>
+            </tr>
+            <tr>
+                <td><code>iter_frames_top_down()</code></td>
+                <td>Iteratore top-down (dal frame più locale a quello più globale)</td>
+                <td>∀k da n a 0: Σ<sub>k</sub></td>
+                <td>Usato da <code>substitute_type</code> per trovare la prima sostituzione</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h3>4.4 Perché <code>RefCell</code>?</h3>
+    <p>Il <code>BuilderContext</code> contiene un <code>&amp;RefCell&lt;SymbolStack&gt;</code>. Questo è necessario per un motivo specifico di Rust:</p>
+    <p>Il Builder attraversa l'IR con funzioni ricorsive (<code>build_module_queries</code>, <code>build_structured_type_queries</code>, ecc.) che condividono tutte lo stesso stack. In Rust, passare un <code>&amp;mut SymbolStack</code> a una funzione che poi chiama altre funzioni con lo stesso riferimento mutabile viola le regole del borrow checker (una sola <code>&amp;mut</code> alla volta).</p>
+    <p><code>RefCell</code> sposta il controllo dal compile-time al runtime: permette di prendere il borrow mutabile (<code>borrow_mut()</code>) solo quando serve, rilasciandolo subito dopo. Questo è sicuro perché:</p>
+    <ul>
+        <li>Ogni <code>borrow_mut()</code> nel codice è una singola operazione atomica (insert, push, pop)</li>
+        <li>Non ci sono mai due <code>borrow_mut()</code> simultanei — il borrow viene rilasciato prima della prossima operazione</li>
+    </ul>
+
+    <h3>4.5 Ciclo di Vita Completo</h3>
+    <div class="tree-container">
+<span class="green">t₁</span>  build_queries() → push_scope()
+  Stack: [ <span class="node">F₀</span> (GLOBAL ROOT) ]
+
+<span class="green">t₂</span>  build_module_queries("root") → push_scope()
+  Stack: [ <span class="node">F₀</span>, <span class="node">F₁</span> (root) ]
+
+<span class="green">t₃</span>  build_structured_type_queries("User") → push_scope()
+  Stack: [ F₀, F₁, <span class="symbol">F₂</span> { self→Find("User"), this→Find("User") } ]
+  <span class="dim">substitute "String" → Find("String")</span>
+
+<span class="green">t₄</span>  <span class="node">pop_scope()</span> User              Stack: [ F₀, F₁ ]
+
+<span class="green">t₅</span>  build_module_queries("core") → push_scope()
+  Stack: [ F₀, F₁, <span class="node">F₂'</span> (core) ]
+
+<span class="green">t₆</span>    build_structured_type_queries("Veicolo") → push_scope()
+      Stack: [ F₀, F₁, F₂', <span class="symbol">F₃</span> { self→Find("Veicolo"), this→Find("Veicolo") } ]
+      <span class="dim">Veicolo.id.ty: "String" → Find("String")</span>
+
+<span class="green">t₇</span>    <span class="node">pop_scope()</span> Veicolo          Stack: [ F₀, F₁, F₂' ]
+
+<span class="green">t₈</span>    build_structured_type_queries("Auto") → push_scope()
+      Stack: [ F₀, F₁, F₂', <span class="symbol">F₃'</span> { self→Find("Auto"), this→Find("Auto") } ]
+      <span class="dim">Auto.base.ty: "Veicolo" → Find("Veicolo")</span>
+      <span class="dim">Auto.storage.ty: "Db" → Find("Db")</span>
+
+<span class="green">t₉</span>    <span class="node">pop_scope()</span> Auto             Stack: [ F₀, F₁, F₂' ]
+
+<span class="green">t₁₀</span>   build_function_queries("calcola") → push_scope()
+      Stack: [ F₀, F₁, F₂', <span class="import">F₃''</span> ]
+      <span class="dim">param "v": Unresolved(["Veicolo"]) → substitute → Find("Veicolo")</span>
+      define_symbol("v", Find("Veicolo"))
+      Stack: [ ..., <span class="import">F₃''</span> { v→Find("Veicolo") } ]
+      <span class="dim">return_type: "Auto" → Find("Auto")</span>
+
+<span class="green">t₁₁</span>     build_block_queries(body) → push_scope()
+        Stack: [ ..., F₃'', <span class="purple-text">F₄</span> ]
+        <span class="dim">decl "a": "Auto" → Find("Auto")</span>
+        define_symbol("a", Find("Auto"))
+        <span class="dim">calls "String" → Call(Find("String"))</span>      <span class="dim">← is_call=true!</span>
+        <span class="dim">instantiates "Auto" → Find("Auto")</span>          <span class="dim">← is_call=false</span>
+
+<span class="green">t₁₂</span>     <span class="node">pop_scope()</span> body block     Stack: [ ..., F₃'' ]
+<span class="green">t₁₃</span>   <span class="node">pop_scope()</span> calcola         Stack: [ F₀, F₁, F₂' ]
+<span class="green">t₁₄</span> <span class="node">pop_scope()</span> core module       Stack: [ F₀, F₁ ]
+<span class="green">t₁₅</span> <span class="node">pop_scope()</span> root module       Stack: [ F₀ ]
+<span class="green">t₁₆</span> <span class="node">pop_scope()</span> GLOBAL ROOT       Stack: [ ]  <span class="dim">← vuoto, fase completata</span></div>
+
+    <!-- ============================================================ -->
+    <!-- SEZIONE 5 -->
+    <!-- ============================================================ -->
+    <h2 id="builder">5. Fase 2a: Query Building (<code>builder.rs</code>)</h2>
+    <p class="ref">Riferimento: <code>src/resolver/builder.rs:1-150</code></p>
+
+    <h3>5.1 La Funzione <code>substitute_type</code> — Analisi Riga per Riga</h3>
+    <p>Questa è la funzione più importante della Fase 2a. Ogni TypeRef dell'IR passa attraverso di essa.</p>
+    <pre><code>fn substitute_type(ctx: &amp;BuilderContext, tr: TypeRef, is_call: bool) -&gt; TypeRef {
+    match tr {
+        TypeRef::Unresolved(qn) if !qn.is_empty() =&gt; {</code></pre>
+    <p><strong>Riga 1:</strong> Pattern matching su <code>tr</code>. Processa <strong>solo</strong> i <code>TypeRef::Unresolved</code> non vuoti. Tutti gli altri stati (<code>Primitive</code>, già <code>Resolved</code>, ecc.) passano inalterati — il Builder non li tocca.</p>
+    <p><strong>Perché il guard <code>if !qn.is_empty()</code>?</strong> Per protezione contro path vuoti che il parser potrebbe generare in casi degeneri. Un <code>Unresolved([])</code> non ha significato e viene ignorato.</p>
+
+    <pre><code>            let first = &amp;qn[0];
+            let mut base_query = if let Some(local_query) = ctx.stack.borrow()
+                .frames.iter().rev()
+                .find_map(|f| f.symbols.get(first))
+            {
+                local_query.clone()   // SOSTITUZIONE AVVENUTA
+            } else {
+                Query::Find(first.clone())  // NESSUNA SOSTITUZIONE
+            };</code></pre>
+    <p><strong>Righe 2-8:</strong> Il cuore della sostituzione lessicale. Il primo segmento del path (<code>qn[0]</code>) viene cercato nello SymbolStack <strong>top-down</strong> (<code>.iter().rev()</code>). Due esiti:</p>
+    <ul>
+        <li><strong>Match trovato:</strong> il primo segmento è una variabile locale (es. <code>v</code>) il cui tipo è stato registrato come query (es. <code>Find("Veicolo")</code>). La query registrata <strong>sostituisce</strong> il nome della variabile. Questo è il meccanismo che "elimina" le variabili locali dall'IR.</li>
+        <li><strong>Nessun match:</strong> il primo segmento non è una variabile locale — è un nome di tipo "puro" (es. <code>Veicolo</code>). Viene wrappato in <code>Query::Find(name)</code>, che delega la risoluzione alla Fase 2b.</li>
+    </ul>
+
+    <div class="purple-box">
+        <h4 style="margin-top: 0; color: var(--purple);">Concetto chiave: Variable Shadowing</h4>
+        <p style="margin-bottom: 0;">L'iterazione <code>iter().rev()</code> (dall'alto verso il basso) garantisce che una variabile definita in uno scope interno nasconda (<em>shadow</em>) una variabile con lo stesso nome in uno scope esterno. Questo è il comportamento standard del lexical scoping. Esempio: se un parametro <code>v</code> nella funzione ha lo stesso nome di un tipo <code>v</code> nel modulo, il parametro (frame più in alto) viene trovato per primo.</p>
+    </div>
+
+    <pre><code>            for part in qn.into_iter().skip(1) {
+                base_query = Query::Extract(Box::new(base_query), part);
+            }</code></pre>
+    <p><strong>Righe 9-11:</strong> Per ogni segmento rimanente del path, si aggiunge un livello di <code>Extract</code>. Se il path originale era <code>["a", "b", "T"]</code>, si produce <code>Extract(Extract(Find("a"), "b"), "T")</code>.</p>
+
+    <pre><code>            if is_call {
+                base_query = Query::Call(Box::new(base_query));
+            }
+            TypeRef::ResolutionQuery(base_query)</code></pre>
+    <p><strong>Righe 12-14:</strong> Se <code>is_call == true</code>, la query viene wrappata in <code>Call(...)</code>. Infine, la query costruita viene emessa come <code>TypeRef::ResolutionQuery</code>.</p>
+
+    <h3>5.2 Iniezione di <code>self</code> e <code>this</code></h3>
+    <p>All'ingresso di ogni <code>StructuredType</code>, il Builder registra due simboli speciali:</p>
+    <pre><code>let self_query = Query::Find(st.name.last().unwrap_or(&amp;"".to_string()).clone());
+ctx.stack.borrow_mut().define_symbol("self".to_string(), self_query.clone());
+ctx.stack.borrow_mut().define_symbol("this".to_string(), self_query);</code></pre>
+    <p><strong>Perché <code>st.name.last()</code>?</strong> Perché il nome del tipo strutturato nell'IR prima della Fase 2b è un nome <em>relativo</em> (es. <code>["Veicolo"]</code>), non assoluto (che diventerà <code>["root","core","Veicolo"]</code> solo nell'Executor). <code>.last()</code> estrae <code>"Veicolo"</code>.</p>
+    <p><strong>Perché sia <code>self</code> che <code>this</code>?</strong> Per essere language-agnostic: Rust usa <code>self</code>, Java/C# usano <code>this</code>, Python usa <code>self</code>. Registrandoli entrambi, il sistema funziona per tutti i linguaggi.</p>
+    <p><strong>Cosa succede per gli ImplBlock?</strong> Stessa logica, ma il <code>self</code>/<code>this</code> punta alla query del <code>impl_for</code> (cioè il tipo per cui l'impl è definito), non al nome dell'impl block stesso.</p>
+
+    <h3>5.3 Registrazione dei Parametri — Perché Solo <code>ResolutionQuery</code></h3>
+    <pre><code>ff.signature.parameters = ff.signature.parameters.into_iter().map(|mut p| {
+    p.ty = substitute_type(ctx, p.ty, false);
+    if let Some(name) = &amp;p.name {
+        if let TypeRef::ResolutionQuery(ref q) = p.ty {
+            ctx.stack.borrow_mut().define_symbol(name.clone(), q.clone());
+        }
+    }
+    p
+}).collect();</code></pre>
+    <p>Il parametro viene prima sostituito (<code>substitute_type</code>), poi, <strong>solo se</strong> il tipo risultante è un <code>ResolutionQuery</code>, viene registrato nello stack.</p>
+    <p><strong>Perché solo <code>ResolutionQuery</code>?</strong> Se il tipo del parametro era già <code>Primitive</code> (es. <code>int</code>) o <code>Resolved</code>, non c'è nulla da "risolvere" — la variabile non aggiunge informazione utile per le sostituzioni successive. In pratica, dopo <code>substitute_type</code>, quasi tutti i tipi diventano <code>ResolutionQuery</code> (perché l'estrazione produce <code>Unresolved</code>), quindi questo guard cattura il 95%+ dei casi.</p>
+
+    <h3>5.4 Differenza tra <code>calls</code> e <code>instantiates</code></h3>
+    <pre><code>block.calls = block.calls.into_iter().map(|c| substitute_type(ctx, c, true)).collect();
+block.instantiates = block.instantiates.into_iter().map(|i| substitute_type(ctx, i, false)).collect();</code></pre>
+    <p>Le <strong>calls</strong> usano <code>is_call = true</code> (producono <code>Call(…)</code>), le <strong>instantiates</strong> usano <code>is_call = false</code>. La ragione è semantica:</p>
+    <ul>
+        <li><code>db.query()</code> è una chiamata → l'arco di dipendenza punta alla <em>funzione</em> <code>query</code></li>
+        <li><code>Auto { ... }</code> è un'istanziazione → l'arco punta al <em>tipo</em> <code>Auto</code></li>
+    </ul>
+
+    <!-- ============================================================ -->
+    <!-- SEZIONE 6 -->
+    <!-- ============================================================ -->
+    <h2 id="registry">6. Il Global Registry</h2>
+    <p class="ref">Riferimento: <code>src/resolver/registry.rs:1-95</code></p>
+
+    <h3>6.1 A Cosa Serve — L'Elenco Telefonico del Progetto</h3>
+    <p>Il GlobalRegistry è un indice piatto che contiene il <strong>percorso assoluto di ogni componente nel progetto</strong>. Viene costruito all'inizio della Fase 2b, <strong>prima di qualsiasi risoluzione</strong>, leggendo l'IR prodotto dalla Fase 2a.</p>
+    <p><strong>Analogia:</strong> se l'IR è una città con strade e edifici, il GlobalRegistry è l'elenco telefonico — contiene tutti gli indirizzi ma non i dettagli degli edifici. L'Executor lo consulta per rispondere alla domanda: "esiste un componente all'indirizzo X?"</p>
+
+    <h3>6.2 Perché <code>HashMap&lt;QN, RegistryEntry&gt;</code> e Non <code>HashSet&lt;QN&gt;</code></h3>
+    <p>La v2 usava un <code>HashSet&lt;QualifiedName&gt;</code> — solo esistenza, nessuna informazione sul tipo. Questo era sufficiente per la risoluzione base ma impediva l'inferenza di tipo per le catene di chiamate.</p>
+    <pre><code>pub enum RegistryEntry {
+    Module,
+    StructuredType,
+    Function { return_type: TypeRef },  // ← Questo abilita Call(Q) + resolve_call_return
+}</code></pre>
+    <p><strong>Perché salvare il <code>return_type</code>?</strong> Quando l'Executor incontra <code>Call(Extract(Find("Auto"), "calcola"))</code> con <code>resolve_call_return = true</code>, deve sapere cosa restituisce <code>calcola()</code>. Chiama <code>registry.get(["root","core","calcola"])</code> e legge <code>RegistryEntry::Function { return_type: ResolutionQuery(Find("Auto")) }</code>. Poi valuta ricorsivamente <code>Find("Auto")</code> per ottenere il tipo di ritorno assoluto.</p>
+
+    <h3>6.3 Costruzione: <code>register_module</code> Passo per Passo</h3>
+    <p>La funzione <code>register_module</code> attraversa l'IR ricorsivamente. Ad ogni livello:</p>
+
+    <div class="step step-success">
+        <h3>I 5 passi di <code>register_module</code></h3>
+        <div class="tree-container">
+<span class="green">Passo 1 — Il modulo stesso:</span>
+  prefix.extend(m.name.clone());
+  paths.insert(prefix, <span class="green">RegistryEntry::Module</span>);
+  <span class="dim">Es: ["root", "core"] → Module</span>
+
+<span class="green">Passo 2 — I tipi strutturati:</span>
+  Per ogni st in m.structured_types:
+    register_structured_type(st, prefix)  <span class="dim">← funzione ricorsiva separata</span>
+
+<span class="green">Passo 3 — Le funzioni libere:</span>
+  Per ogni ff in m.free_functions:
+    ff_prefix = prefix + ff.name
+    paths.insert(ff_prefix, <span class="green">Function { return_type: ff.signature.return_type }</span>)
+  <span class="dim">Es: ["root", "core", "calcola"] → Function { ret: Find("Auto") }</span>
+
+<span class="green">Passo 4 — Gli impl blocks:</span>
+  Per ogni ib in m.impl_blocks:
+    target_name = <span class="import">ultimo segmento di ib.impl_for</span>
+    <span class="dim">↑ Estratto diversamente a seconda del tipo di TypeRef:</span>
+    <span class="dim">  Unresolved(qn) → qn.last()</span>
+    <span class="dim">  ResolutionQuery(q) → extract_base_name(q)  ← discende ricorsivamente</span>
+    target_prefix = prefix + target_name
+    Per ogni metodo: paths.insert(target_prefix + nome, Function{ret})
+    Per ogni nested: register_structured_type(nested, target_prefix)
+
+<span class="green">Passo 5 — I sotto-moduli (ricorsione):</span>
+  Per ogni sub in m.sub_modules:
+    register_module(sub, prefix)  <span class="dim">← ricorsione nel sotto-modulo</span></div>
+    </div>
+
+    <div class="warn-box">
+        <h4 style="margin-top: 0; color: var(--warning);">Dettaglio critico: Passo 4 — Estrazione del target_name dagli ImplBlock</h4>
+        <p>I metodi di un <code>impl Block</code> devono essere registrati <strong>sotto il nome del tipo target</strong>, non sotto il nome dell'impl block. Se abbiamo <code>impl Veicolo { fn new() ... }</code>, il metodo <code>new</code> deve essere registrato come <code>["root","core","Veicolo","new"]</code>, non come <code>["root","core","impl_Veicolo","new"]</code>.</p>
+        <p>Ma il <code>impl_for</code> a questo punto è già un <code>ResolutionQuery</code> (prodotto dalla Fase 2a). Per estrarne il nome, si usa <code>extract_base_name(q)</code>, che discende ricorsivamente nella query fino a trovare il <code>Find(name)</code> alla base. <code>Extract(Find("Veicolo"), "new")</code> → "Veicolo".</p>
+    </div>
+
+    <h3>6.4 <code>register_structured_type</code> — Registrazione Ricorsiva</h3>
+    <pre><code>fn register_structured_type(&amp;mut self, st: &amp;StructuredType, mut prefix: QualifiedName) {
+    prefix.extend(st.name.clone());
+    self.paths.insert(prefix.clone(), RegistryEntry::StructuredType);
+    // Metodi del tipo
+    for method in &amp;st.methods {
+        let mut m_prefix = prefix.clone();
+        m_prefix.extend(method.name.clone());
+        self.paths.insert(m_prefix, RegistryEntry::Function { return_type: method.signature.return_type.clone() });
+    }
+    // Tipi annidati — RICORSIONE
+    for nested in &amp;st.nested_types {
+        self.register_structured_type(nested, prefix.clone());
+    }
+}</code></pre>
+    <p><strong>Perché la ricorsione su <code>nested_types</code>?</strong> Linguaggi come Java e C# permettono di definire classi all'interno di altre classi (inner classes). Queste devono essere registrate con il loro percorso completo (es. <code>["root","OuterClass","InnerClass"]</code>).</p>
+
+    <h3>6.5 Le Due API: <code>exists</code> vs <code>get</code></h3>
+    <ul>
+        <li><code>exists(path)</code> → <code>bool</code>: usato da <code>evaluate_typeref</code> per decidere se un path è <code>Resolved</code> (esiste nel registry) o <code>External</code> (non esiste). Costo: O(1) hash lookup.</li>
+        <li><code>get(path)</code> → <code>Option&lt;&amp;RegistryEntry&gt;</code>: usato da <code>evaluate_query</code> nel branch <code>Call</code> con <code>resolve_call_return = true</code> per leggere il <code>return_type</code> di una funzione. È l'unico punto dove il registry fornisce <em>informazione</em> oltre alla semplice esistenza.</li>
+    </ul>
+
+    <!-- ============================================================ -->
+    <!-- SEZIONE 7 -->
+    <!-- ============================================================ -->
+    <h2 id="executor">7. Fase 2b: Query Execution (<code>executor.rs</code>)</h2>
+    <p class="ref">Riferimento: <code>src/resolver/executor.rs:1-256</code></p>
+
+    <h3>7.1 L'<code>ExecutorContext</code> — Ogni Campo Spiegato</h3>
+    <pre><code>pub struct ExecutorContext&lt;'a&gt; {
+    pub current_prefix: QualifiedName,
+    pub imports_stack: Vec&lt;Vec&lt;Import&gt;&gt;,
+    pub registry: &amp;'a GlobalRegistry,
+    pub primitives: &amp;'a PrimitiveRegistry,
+}</code></pre>
+    <table>
+        <thead><tr><th>Campo</th><th>Tipo</th><th>A cosa serve</th><th>Chi lo modifica</th></tr></thead>
+        <tbody>
+            <tr>
+                <td><code>current_prefix</code></td>
+                <td><code>Vec&lt;String&gt;</code></td>
+                <td>Il percorso assoluto dello scope corrente nel traversal. Es: <code>["root","core","Auto"]</code>. Usato da <code>Find</code> come punto di partenza per il prefix climbing.</td>
+                <td>Ogni <code>execute_*</code> lo estende con il nome del componente</td>
+            </tr>
+            <tr>
+                <td><code>imports_stack</code></td>
+                <td><code>Vec&lt;Vec&lt;Import&gt;&gt;</code></td>
+                <td>Stack gerarchico di import. Ogni livello di modulo aggiunge il proprio <code>Vec&lt;Import&gt;</code>. Permette di cercare gli import a tutti i livelli dal più locale al più globale.</td>
+                <td>Solo <code>execute_module</code> aggiunge un nuovo livello</td>
+            </tr>
+            <tr>
+                <td><code>registry</code></td>
+                <td><code>&amp;GlobalRegistry</code></td>
+                <td>Riferimento immutabile all'indice globale. Usato per <code>exists()</code> e <code>get()</code>.</td>
+                <td>Mai modificato</td>
+            </tr>
+            <tr>
+                <td><code>primitives</code></td>
+                <td><code>&amp;PrimitiveRegistry</code></td>
+                <td>Riferimento al registro primitivi. Usato come ultimo fallback.</td>
+                <td>Mai modificato</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <div class="info-box">
+        <strong>Differenza architettonica fondamentale dalla Fase 2a:</strong> L'ExecutorContext è <strong>immutabile</strong>. Non c'è <code>RefCell</code>. Ogni funzione di traversal crea un <strong>nuovo</strong> contesto con il prefix esteso — non muta il contesto esistente. Questo rende il codice più facile da ragionare e thread-safe.
+    </div>
+
+    <h3>7.2 <code>evaluate_typeref</code> — La Funzione di Classificazione</h3>
+    <p>Questa funzione è il punto d'ingresso per la risoluzione di ogni singolo <code>TypeRef</code>:</p>
+    <pre><code>fn evaluate_typeref(ctx: &amp;ExecutorContext, tr: TypeRef) -&gt; TypeRef {
+    match tr {
+        TypeRef::ResolutionQuery(query) =&gt; {
+            if let Some(res) = evaluate_query(ctx, &amp;query, false) {
+                // La query ha prodotto un path. Ma è locale o esterno?
+                if ctx.registry.exists(&amp;res) {
+                    TypeRef::Resolved(res)      // ✅ Trovato nel progetto
+                } else {
+                    TypeRef::External(res)      // ⚠️ Path costruito ma non locale
+                }
+            } else {
+                // La query ha fallito completamente. Ultimo tentativo: è un primitivo?
+                let name = extract_base_name(&amp;query);
+                if ctx.primitives.is_primitive(&amp;name) {
+                    TypeRef::Primitive(PrimitiveType::Other(name))
+                } else {
+                    TypeRef::Failed(vec![name]) // ❌ Non trovato
+                }
+            }
+        }
+        _ =&gt; tr,  // Già Resolved/External/Primitive/Failed → passthrough
+    }
+}</code></pre>
+
+    <p><strong>Nota critica sull'ordine di priorità:</strong></p>
+    <ol>
+        <li>Prima si tenta la risoluzione algebrica (<code>evaluate_query</code>)</li>
+        <li>Se produce un path → si verifica esistenza nel registry</li>
+        <li>Se la query fallisce → si tenta il primitivo</li>
+        <li>Se anche il primitivo fallisce → <code>Failed</code></li>
+    </ol>
+    <p><strong>Perché <code>evaluate_query</code> è chiamata con <code>resolve_call_return: false</code>?</strong> Perché a questo livello top-level, per un <code>Call(Find("f"))</code>, vogliamo l'arco di dipendenza verso la <em>funzione stessa</em>, non verso il suo tipo di ritorno. Il tipo di ritorno serve solo internamente quando <code>Call</code> è genitore di un <code>Extract</code> in una catena.</p>
+
+    <h3>7.3 <code>evaluate_query</code> — Il Motore Algebrico (Deep Dive)</h3>
+
+    <h4>7.3.1 <code>Query::Find</code> — L'Algoritmo di Prefix Climbing</h4>
+    <p>Questa è la funzione più complessa dell'Executor. Implementa il "find-going-up" — la risalita lessicale:</p>
+    <pre><code>Query::Find(name) =&gt; {
+    let mut prefix = ctx.current_prefix.clone();
+    loop {
+        // 1. Costruisci candidato: prefix + name
+        let mut candidate = prefix.clone();
+        candidate.push(name.clone());
+        if ctx.registry.exists(&amp;candidate) {
+            return Some(candidate);  // TROVATO nel registry!
+        }
+
+        // 2. Controlla gli import a TUTTI i livelli
+        for level_imports in ctx.imports_stack.iter().rev() {
+            for imp in level_imports {
+                if let Some(alias) = &amp;imp.alias {
+                    if alias == name { return Some(imp.path.clone()); }
+                } else if let Some(last) = imp.path.last() {
+                    if last == name { return Some(imp.path.clone()); }
+                }
+            }
+        }
+
+        // 3. Risali di un livello
+        if prefix.is_empty() { break; }
+        prefix.pop();
+    }
+
+    // 4. Fallback assoluti
+    let direct = vec![name.clone()];
+    if ctx.registry.exists(&amp;direct) { return Some(direct); }
+    let root_cand = vec!["root".to_string(), name.clone()];
+    if ctx.registry.exists(&amp;root_cand) { return Some(root_cand); }
+
+    None  // Non trovato da nessuna parte
+}</code></pre>
+
+    <p><strong>Esempio dettagliato:</strong> Risolvere <code>Find("Veicolo")</code> dal contesto <code>["root","core","calcola"]</code>:</p>
+    <div class="tree-container">
+<span class="symbol">Iterazione 1:</span> prefix = ["root", "core", "calcola"]
+  candidate = ["root", "core", "calcola", "Veicolo"]
+  registry.exists? → <span class="node">❌ No</span>
+  <span class="dim">imports check: nessun match a nessun livello</span>
+  prefix.pop() → ["root", "core"]
+
+<span class="symbol">Iterazione 2:</span> prefix = ["root", "core"]
+  candidate = ["root", "core", "Veicolo"]
+  registry.exists? → <span class="green">✅ Sì!</span>
+  → return Some(["root", "core", "Veicolo"])</div>
+
+    <div class="warn-box">
+        <h4 style="margin-top: 0; color: var(--warning);">Perché il fallback <code>["root", name]</code>?</h4>
+        <p style="margin-bottom: 0;">In molti linguaggi, il modulo principale del progetto si chiama "root" nell'IR. Se il prefix climbing non trova nulla, l'ultimo tentativo è cercare direttamente sotto root. Questo gestisce il caso in cui un tipo viene referenziato da un contesto il cui prefix non include "root" (es. perché il contesto è a livello globale con prefix vuoto <code>[]</code>).</p>
+    </div>
+
+    <h4>7.3.2 <code>Query::Extract</code> — Discesa Senza Verifica</h4>
+    <pre><code>Query::Extract(parent_query, member_name) =&gt; {
+    if let Some(mut parent_path) = evaluate_query(ctx, parent_query, true) {
+        parent_path.push(member_name.clone());
+        Some(parent_path)  // Restituisce SEMPRE, senza verificare esistenza!
+    } else { None }
+}</code></pre>
+    <p><strong>Due scelte critiche:</strong></p>
+    <ol>
+        <li><strong><code>resolve_call_return: true</code> per il genitore:</strong> Se il genitore è un <code>Call(Q)</code>, vogliamo il tipo di ritorno della funzione, non la funzione stessa. Es: in <code>a.f().g()</code>, <code>Extract(Call(Extract(Find("A"),"f")), "g")</code> — il genitore <code>Call(…)</code> deve restituire il tipo di ritorno di <code>f</code> perché <code>g</code> va cercato <em>su quel tipo</em>.</li>
+        <li><strong>Nessuna verifica di esistenza:</strong> il path costruito non viene verificato contro il registry. Questo è intenzionale per supportare catene esterne come <code>std::vec::Vec</code> dove i segmenti intermedi non sono nel registry locale. La verifica avviene a monte in <code>evaluate_typeref</code>.</li>
+    </ol>
+
+    <h4>7.3.3 <code>Query::Call</code> — Il Comportamento Duale</h4>
+    <pre><code>Query::Call(target_query) =&gt; {
+    let target_path = evaluate_query(ctx, target_query, false)?;
+
+    if resolve_call_return {
+        // MODALITÀ CATENA: serve il tipo di ritorno
+        if let Some(RegistryEntry::Function { return_type }) = ctx.registry.get(&amp;target_path) {
+            match return_type {
+                TypeRef::ResolutionQuery(ret_q) =&gt; evaluate_query(ctx, ret_q, true),
+                TypeRef::Resolved(qn) =&gt; Some(qn.clone()),
+                TypeRef::External(qn) =&gt; Some(qn.clone()),
+                TypeRef::Unresolved(qn) =&gt; Some(qn.clone()),
+                _ =&gt; None,
+            }
+        } else { None }
+    } else {
+        // MODALITÀ ARCO: serve il path della funzione stessa
+        Some(target_path)
+    }
+}</code></pre>
+
+    <div class="purple-box">
+        <h4 style="margin-top: 0; color: var(--purple);">Il Parametro <code>resolve_call_return</code> — Spiegazione Profonda</h4>
+        <p>Questo flag booleano è la chiave dell'intera architettura di inferenza. Ha due modalità:</p>
+        <ul>
+            <li><strong><code>false</code></strong> (default, usato da <code>evaluate_typeref</code>): <code>Call(Find("f"))</code> produce <code>["root","core","f"]</code>. Il risultato è il <strong>path della funzione</strong>. Questo è ciò che serve per gli archi di dipendenza nel grafo (Fase 3).</li>
+            <li><strong><code>true</code></strong> (usato da <code>Extract</code> quando il genitore è un <code>Call</code>): <code>Call(Find("f"))</code> consulta il <code>GlobalRegistry</code> per il <code>return_type</code> di <code>f</code> e restituisce il <strong>tipo di ritorno</strong>. Questo è ciò che serve per le catene: in <code>f().g()</code>, <code>g</code> va cercato nel tipo di ritorno di <code>f</code>, non in <code>f</code> stessa.</li>
+        </ul>
+        <p><strong>Perché il target_query è sempre valutato con <code>false</code>?</strong> Perché <code>evaluate_query(ctx, target_query, false)</code> produce il path della funzione — quello che serve per fare <code>registry.get(path)</code> e leggere il <code>return_type</code>. Se usassimo <code>true</code>, otterremmo il tipo di ritorno del target, che non è la funzione stessa!</p>
+        <p style="margin-bottom: 0;"><strong>Il caso <code>ResolutionQuery(ret_q)</code> nel return type:</strong> Se il tipo di ritorno della funzione è ancora una query (perché non è stato ancora risolto — siamo nel mezzo dell'esecuzione), viene valutato ricorsivamente con <code>evaluate_query(ctx, ret_q, true)</code>. Questo permette catene arbitrariamente lunghe.</p>
+    </div>
+
+    <h3>7.4 <code>extract_base_name</code> — Utilità per il Fallback</h3>
+    <pre><code>pub fn extract_base_name(query: &amp;Query) -&gt; String {
+    match query {
+        Query::Find(n) =&gt; n.clone(),
+        Query::Extract(q, _) =&gt; extract_base_name(q),
+        Query::Call(q) =&gt; extract_base_name(q),
+    }
+}</code></pre>
+    <p>Discende ricorsivamente nella query fino a trovare il <code>Find(name)</code> alla base. Usata in due contesti: (1) in <code>evaluate_typeref</code> per il fallback primitivo, e (2) nel registry per estrarre il target name degli impl blocks.</p>
+
+    <!-- ============================================================ -->
+    <!-- SEZIONE 8 -->
+    <!-- ============================================================ -->
+    <h2 id="primitives">8. Il Primitive Registry</h2>
+    <p class="ref">Riferimento: <code>src/resolver/primitives.rs:1-42</code></p>
+
+    <h3>8.1 Motivazione: Decoppiamento Primitivo</h3>
+    <p>Senza il PrimitiveRegistry, ogni tipo primitivo (<code>String</code>, <code>int</code>, <code>bool</code>, <code>float</code>) verrebbe marcato come <code>Failed</code> — non è definito nel progetto, non è importato da nessuna parte. Ma nel grafo delle dipendenze, un <code>Failed</code> può essere interpretato come un errore nell'analisi. Un campo <code>name: String</code> non è un errore — è un tipo primitivo del linguaggio.</p>
+
+    <h3>8.2 Design Data-Driven e Language-Agnostic</h3>
+    <pre><code>pub fn load(lang_name: &amp;str) -&gt; anyhow::Result&lt;Self&gt; {
+    let primitives_json = include_str!("../../primitives.json");
+    let registry: HashMap&lt;String, Vec&lt;String&gt;&gt; = serde_json::from_str(primitives_json)?;
+    let lang_primitives = registry.get(lang_name).cloned()
+        .unwrap_or_default().into_iter().collect();
+    Ok(Self { lang_primitives })
+}</code></pre>
+    <p><strong>Perché <code>include_str!</code>?</strong> Il file JSON viene embedded nel binario a compile-time. Non serve un file esterno a runtime — il binario è autosufficiente.</p>
+    <p><strong>Perché un file JSON e non codice Rust?</strong> Perché l'analizzatore è <em>language-agnostic</em>. Ogni linguaggio ha i suoi primitivi. Il JSON permette di aggiungere nuovi linguaggi senza ricompilare.</p>
+
+    <h3>8.3 Perché il Primitivo Si Controlla per ULTIMO</h3>
+    <p>Il check <code>primitives.is_primitive(name)</code> avviene <strong>solo dopo</strong> che <code>evaluate_query</code> ha fallito completamente. Questo ordine è intenzionale:</p>
+    <ul>
+        <li>Se nel progetto esiste un tipo chiamato <code>String</code> (es. una classe custom), deve essere risolto come <code>Resolved</code>, non come <code>Primitive</code></li>
+        <li>Se un import porta un tipo <code>String</code> da una libreria esterna, deve essere <code>External</code></li>
+        <li><code>Primitive</code> è il fallback ultimo — solo se il nome non è stato trovato da nessuna parte</li>
+    </ul>
+
+    <!-- ============================================================ -->
+    <!-- SEZIONE 9 -->
+    <!-- ============================================================ -->
+    <h2 id="traversal">9. Attraversamento Ricorsivo dell'IR</h2>
+
+    <h3>9.1 Fase 2a (Builder) — Tabella di Traversal</h3>
+    <table>
+        <thead><tr><th>Funzione</th><th>Push/Pop?</th><th>Cosa registra nello stack</th><th>Cosa sostituisce</th></tr></thead>
+        <tbody>
+            <tr><td><code>build_module_queries</code></td><td>✅ push/pop</td><td>Niente</td><td>Niente (delega ai figli)</td></tr>
+            <tr><td><code>build_structured_type_queries</code></td><td>✅ push/pop</td><td><code>self</code>, <code>this</code> → <code>Find(type_name)</code></td><td><code>super_types</code>, <code>fields.ty</code></td></tr>
+            <tr><td><code>build_function_queries</code></td><td>✅ push/pop</td><td>Ogni parametro: <code>name → query</code></td><td><code>parameters.ty</code>, <code>return_type</code></td></tr>
+            <tr><td><code>build_block_queries</code></td><td>✅ push/pop</td><td>Ogni dichiarazione: <code>name → query</code></td><td><code>declarations.ty</code>, <code>calls</code> (is_call=true), <code>instantiates</code></td></tr>
+            <tr><td><code>build_impl_block_queries</code></td><td>✅ push/pop</td><td><code>self</code>, <code>this</code> → query del tipo target</td><td><code>impl_for</code>, <code>implements_trait</code></td></tr>
+        </tbody>
+    </table>
+
+    <h3>9.2 Fase 2b (Executor) — Tabella di Traversal</h3>
+    <table>
+        <thead><tr><th>Funzione</th><th>Modifica al prefix</th><th>Modifica all'imports_stack</th><th>Name rewriting</th></tr></thead>
+        <tbody>
+            <tr><td><code>execute_module</code></td><td><code>prefix + m.name</code></td><td>Aggiunge <code>m.imports</code></td><td><code>m.name = new_prefix</code></td></tr>
+            <tr><td><code>execute_structured_type</code></td><td><code>prefix + st.name</code></td><td>Eredita</td><td><code>st.name = new_prefix</code></td></tr>
+            <tr><td><code>execute_function</code></td><td><code>prefix + f.name</code></td><td>Eredita</td><td><code>f.name = new_prefix</code></td></tr>
+            <tr><td><code>execute_block</code></td><td><strong>Nessuna</strong></td><td>Eredita</td><td>Nessuno</td></tr>
+            <tr><td><code>execute_impl_block</code></td><td><code>prefix + target_type_name</code></td><td>Eredita</td><td><code>ib.name = target_prefix</code></td></tr>
+        </tbody>
+    </table>
+
+    <div class="warn-box">
+        <h4 style="margin-top: 0; color: var(--warning);">Perché <code>execute_block</code> non crea un nuovo prefix?</h4>
+        <p style="margin-bottom: 0;">I blocchi (<code>Block</code>) non sono componenti architetturali con un nome proprio. Un blocco <code>if</code> o <code>while</code> non appare nel grafo delle dipendenze come nodo. I blocchi contengono dichiarazioni e chiamate, ma queste vengono risolte nel contesto della funzione che le contiene. Per questo <code>execute_block</code> usa il <code>ctx</code> del genitore senza modificarlo.</p>
+    </div>
+
+    <div class="warn-box">
+        <h4 style="margin-top: 0; color: var(--warning);">Perché <code>execute_impl_block</code> usa il nome del tipo target, non dell'impl?</h4>
+        <p style="margin-bottom: 0;">Se abbiamo <code>impl Veicolo { fn new() ... }</code>, il metodo <code>new</code> deve essere raggiungibile come <code>["root","core","Veicolo","new"]</code>. Il prefix dell'impl block viene impostato al tipo target (es. <code>["root","core","Veicolo"]</code>) così che i metodi al suo interno abbiano percorsi coerenti con i metodi definiti direttamente nella struct.</p>
+    </div>
+
+    <h3>9.3 Name Rewriting — Un Effetto Collaterale Fondamentale</h3>
+    <p>L'Executor, oltre a risolvere le query, ha un effetto collaterale importante: <strong>riscrive i nomi dei componenti da relativi ad assoluti</strong>.</p>
+    <pre><code>// In execute_module:
+m.name = new_prefix.clone();  // ["core"] → ["root", "core"]
+
+// In execute_structured_type:
+st.name = new_prefix.clone(); // ["Veicolo"] → ["root", "core", "Veicolo"]
+
+// In execute_function:
+f.name = new_prefix.clone();  // ["calcola"] → ["root", "core", "calcola"]</code></pre>
+    <p>Questo name rewriting è necessario perché dopo la Fase 2, l'IR deve contenere <strong>solo percorsi assoluti</strong>. La Fase 3 (Dependency Graph) usa questi percorsi assoluti come identificatori univoci dei nodi del grafo.</p>
+
+    <!-- ============================================================ -->
+    <!-- SEZIONE 10 -->
+    <!-- ============================================================ -->
+    <h2 id="impl-flattening">10. Flattening degli Impl Blocks</h2>
+    <p class="ref">Riferimento: <code>src/resolver/executor.rs:45-63</code></p>
+
+    <p><strong>Cos'è?</strong> In Rust, i metodi di una struct sono definiti in blocchi <code>impl</code> separati dalla definizione della struct. In Java/C#, i metodi sono definiti dentro la classe. L'analizzatore normalizza questa differenza <strong>fondendo</strong> i metodi degli impl blocks nelle struct target.</p>
+
+    <pre><code>let mut unfused_impls = vec![];
+for ib in m.impl_blocks {
+    let mut fused = false;
+    if let TypeRef::Resolved(ref target_name) = ib.impl_for {
+        if let Some(target_st) = m.structured_types.iter_mut()
+            .find(|st| &amp;st.name == target_name)
+        {
+            target_st.methods.extend(ib.methods.clone());
+            target_st.nested_types.extend(ib.nested_types.clone());
+            if let Some(trait_ref) = ib.implements_trait.clone() {
+                target_st.super_types.push(trait_ref);
+            }
+            fused = true;
+        }
+    }
+    if !fused { unfused_impls.push(ib); }
+}
+m.impl_blocks = unfused_impls;</code></pre>
+
+    <p><strong>Condizioni per la fusione:</strong></p>
+    <ol>
+        <li><code>ib.impl_for</code> deve essere <code>TypeRef::Resolved</code> — il tipo target è stato trovato nel progetto</li>
+        <li>Il tipo target deve esistere nel campo <code>m.structured_types</code> dello <strong>stesso modulo</strong></li>
+    </ol>
+    <p><strong>Perché preservare gli unfused?</strong> Un impl block per un tipo <code>External</code> (es. <code>impl ExternalTrait for LocalType</code>) non può essere fuso perché il tipo target non è nell'IR locale. I suoi metodi devono essere preservati per la Fase 3.</p>
+
+    <!-- ============================================================ -->
+    <!-- SEZIONE 11 -->
+    <!-- ============================================================ -->
+    <h2 id="full-example">11. Esempio Completo End-to-End</h2>
+
+    <h3>11.1 Codice Sorgente</h3>
+    <pre><code>use external::db::Database as Db;
+
+mod core {
+    struct Veicolo { id: String }
+    struct Auto { base: Veicolo, storage: Db }
+    fn calcola(v: Veicolo) -&gt; Auto {
+        let a = Auto { base: v, storage: Db::new() };
+        a
+    }
+}
+
+struct User { name: String }</code></pre>
+
+    <h3>11.2 IR dopo l'Estrazione (Fase 1)</h3>
+    <div class="tree-container">
+<span class="node">Module ["root"]</span>
+ <span class="arrow">├──</span> <span class="import">imports:</span> [{ path: ["external","db","Database"], alias: "Db" }]
+ <span class="arrow">├──</span> <span class="symbol">structured_types:</span>
+ <span class="arrow">│</span>    <span class="arrow">└──</span> User { name: <span class="dim">Unresolved(["String"])</span> }
+ <span class="arrow">├──</span> <span class="symbol">free_functions:</span> []
+ <span class="arrow">└──</span> <span class="node">sub_modules:</span>
+      <span class="arrow">└──</span> <span class="node">Module ["core"]</span>
+           <span class="arrow">├──</span> <span class="symbol">structured_types:</span>
+           <span class="arrow">│</span>    <span class="arrow">├──</span> Veicolo { id: <span class="dim">Unresolved(["String"])</span> }
+           <span class="arrow">│</span>    <span class="arrow">└──</span> Auto    { base: <span class="dim">Unresolved(["Veicolo"])</span>,
+           <span class="arrow">│</span>                  storage: <span class="dim">Unresolved(["Db"])</span> }
+           <span class="arrow">└──</span> <span class="symbol">free_functions:</span>
+                <span class="arrow">└──</span> calcola(v: <span class="dim">Unresolved(["Veicolo"])</span>) → <span class="dim">Unresolved(["Auto"])</span>
+                     body: Block {
+                       declarations: [ a: <span class="dim">Unresolved(["Auto"])</span> ]
+                       calls: [ <span class="dim">Unresolved(["String"])</span> ]
+                       instantiates: [ <span class="dim">Unresolved(["Auto"])</span>, <span class="dim">Unresolved(["Veicolo"])</span> ]
+                     }</div>
+
+    <h3>11.3 Dopo la Fase 2a: Tutte le Query Generate</h3>
+    <table>
+        <thead><tr><th>Componente</th><th>Campo</th><th>Originale</th><th>Query generata</th></tr></thead>
+        <tbody>
+            <tr><td>User</td><td>name.ty</td><td><code>Unresolved(["String"])</code></td><td><code>Find("String")</code></td></tr>
+            <tr><td>Veicolo</td><td>id.ty</td><td><code>Unresolved(["String"])</code></td><td><code>Find("String")</code></td></tr>
+            <tr><td>Auto</td><td>base.ty</td><td><code>Unresolved(["Veicolo"])</code></td><td><code>Find("Veicolo")</code></td></tr>
+            <tr><td>Auto</td><td>storage.ty</td><td><code>Unresolved(["Db"])</code></td><td><code>Find("Db")</code></td></tr>
+            <tr><td>calcola</td><td>param v.ty</td><td><code>Unresolved(["Veicolo"])</code></td><td><code>Find("Veicolo")</code></td></tr>
+            <tr><td>calcola</td><td>return_type</td><td><code>Unresolved(["Auto"])</code></td><td><code>Find("Auto")</code></td></tr>
+            <tr><td>calcola.body</td><td>decl a.ty</td><td><code>Unresolved(["Auto"])</code></td><td><code>Find("Auto")</code></td></tr>
+            <tr><td>calcola.body</td><td>calls[0]</td><td><code>Unresolved(["String"])</code></td><td><code>Call(Find("String"))</code></td></tr>
+            <tr><td>calcola.body</td><td>instantiates[0]</td><td><code>Unresolved(["Auto"])</code></td><td><code>Find("Auto")</code></td></tr>
+            <tr><td>calcola.body</td><td>instantiates[1]</td><td><code>Unresolved(["Veicolo"])</code></td><td><code>Find("Veicolo")</code></td></tr>
+        </tbody>
+    </table>
+
+    <h3>11.4 GlobalRegistry Costruito (inizio Fase 2b)</h3>
+    <div class="tree-container">
+<span class="symbol">GlobalRegistry.paths:</span>
+  <span class="green">✓</span> ["root"]                      → Module
+  <span class="green">✓</span> ["root", "User"]              → StructuredType
+  <span class="green">✓</span> ["root", "core"]              → Module
+  <span class="green">✓</span> ["root", "core", "Veicolo"]   → StructuredType
+  <span class="green">✓</span> ["root", "core", "Auto"]      → StructuredType
+  <span class="green">✓</span> ["root", "core", "calcola"]   → Function { ret: <span class="purple-text">ResolutionQuery(Find("Auto"))</span> }
+
+<span class="dim">Totale: 6 percorsi registrati.</span></div>
+
+    <h3>11.5 Risoluzione di Ogni Query (Fase 2b)</h3>
+
+    <div class="step">
+        <h3><code>Find("Veicolo")</code> dal contesto <code>["root","core","Auto"]</code></h3>
+        <div class="tree-container">
+  prefix = ["root", "core", "Auto"]
+    candidate = ["root", "core", "Auto", "Veicolo"] → <span class="node">❌</span>
+  prefix.pop() → ["root", "core"]
+    candidate = ["root", "core", "Veicolo"] → <span class="green">✅ TROVATO!</span>
+  → evaluate_typeref: registry.exists → <span class="green">Resolved(["root","core","Veicolo"])</span></div>
+    </div>
+
+    <div class="step">
+        <h3><code>Find("Db")</code> dal contesto <code>["root","core","Auto"]</code></h3>
+        <div class="tree-container">
+  prefix climbing: nessun match nel registry a nessun livello
+  <span class="import">Controlla imports_stack:</span>
+    level 0 (root): [{ path: ["external","db","Database"], alias: "Db" }]
+    alias "Db" == "Db" → <span class="green">✅ match!</span> → path = ["external","db","Database"]
+  → evaluate_typeref: registry.exists(["external","db","Database"]) → <span class="node">❌</span>
+  → <span class="import">External(["external","db","Database"])</span></div>
+    </div>
+
+    <div class="step">
+        <h3><code>Find("String")</code> — Decoppiamento Primitivo</h3>
+        <div class="tree-container">
+  prefix climbing: nessun match
+  imports: nessun match
+  fallback: ["String"] → <span class="node">❌</span>, ["root","String"] → <span class="node">❌</span>
+  → evaluate_query restituisce <span class="node">None</span>
+  → extract_base_name: "String"
+  → primitives.is_primitive("String") → <span class="green">✅</span>
+  → <span class="green">Primitive(Other("String"))</span></div>
+    </div>
+
+    <h3>11.6 IR Finale (dopo risoluzione + name rewriting)</h3>
+    <table>
+        <thead><tr><th>Componente</th><th>Nome (riscritto)</th><th>TypeRef risolta</th></tr></thead>
+        <tbody>
+            <tr><td>User.name</td><td><code>["root","User"]</code></td><td><code>Primitive(Other("String"))</code></td></tr>
+            <tr><td>Veicolo.id</td><td><code>["root","core","Veicolo"]</code></td><td><code>Primitive(Other("String"))</code></td></tr>
+            <tr><td>Auto.base</td><td><code>["root","core","Auto"]</code></td><td><code>Resolved(["root","core","Veicolo"])</code></td></tr>
+            <tr><td>Auto.storage</td><td><code>["root","core","Auto"]</code></td><td><code>External(["external","db","Database"])</code></td></tr>
+            <tr><td>calcola param v</td><td><code>["root","core","calcola"]</code></td><td><code>Resolved(["root","core","Veicolo"])</code></td></tr>
+            <tr><td>calcola ret</td><td><code>["root","core","calcola"]</code></td><td><code>Resolved(["root","core","Auto"])</code></td></tr>
+        </tbody>
+    </table>
+
+    <!-- ============================================================ -->
+    <!-- SEZIONE 12 -->
+    <!-- ============================================================ -->
+    <h2 id="typeref-lifecycle">12. Ciclo di Vita di un TypeRef</h2>
+
+    <div class="tree-container" style="line-height: 2;">
+<span class="symbol">Fase 1 (Estrazione CST → IR)</span>
+ Il parser estrae il nome testuale dal codice sorgente.
+ <span class="arrow">└──→</span> <code>TypeRef::Unresolved(["Veicolo"])</code>
+
+<span class="symbol">Fase 2a (Query Building — Substitution)</span>
+ Il Builder applica le regole di sostituzione dallo SymbolStack.
+ Se "Veicolo" fosse una variabile locale, verrebbe espansa nella sua query associata.
+ <span class="arrow">└──→</span> <code>TypeRef::ResolutionQuery(Find("Veicolo"))</code>
+
+<span class="symbol">Fase 2b (Query Execution — Navigation)</span>
+ L'Executor naviga l'IR valutando algebricamente la Query.
+ <span class="arrow">├──→</span> <code>TypeRef::Resolved(["root", "core", "Veicolo"])</code>   <span class="dim">registry.exists = true</span>
+ <span class="arrow">├──→</span> <code>TypeRef::External(["ext", "db", "Database"])</code>     <span class="dim">import match, registry.exists = false</span>
+ <span class="arrow">├──→</span> <code>TypeRef::Primitive(Other("String"))</code>             <span class="dim">query fallita, primitivo riconosciuto</span>
+ <span class="arrow">└──→</span> <code>TypeRef::Failed(["UnknownType"])</code>                <span class="dim">query fallita, non primitivo</span>
+
+<span class="symbol">Fase 3 (Dependency Graph)</span>
+ I TypeRef classificati generano archi nel grafo architetturale.
+ <span class="arrow">├──→</span> Resolved  → arco verso nodo interno (Inherits, UsesFieldType, Calls, Instantiates)
+ <span class="arrow">├──→</span> External  → arco verso confine esterno (stessa classificazione semantica)
+ <span class="arrow">├──→</span> Primitive → <span class="dim">ignorato (non è una dipendenza architetturale)</span>
+ <span class="arrow">└──→</span> Failed    → <span class="dim">nessun arco generato (dipendenza persa)</span></div>
+
+    <!-- ============================================================ -->
+    <!-- SEZIONE 13 -->
+    <!-- ============================================================ -->
+    <h2 id="comparison">13. Confronto Architetturale: v2 (Monofase) vs v3 (Query Engine)</h2>
+
+    <table>
+        <thead><tr><th>Aspetto</th><th>v2 (Symbol Stack monofase)</th><th>v3 (Query Engine bifase)</th></tr></thead>
+        <tbody>
+            <tr><td><strong>Numero di fasi</strong></td><td>Singolo pass</td><td>Due fasi: Substitution (2a) → Navigation (2b)</td></tr>
+            <tr><td><strong>SymbolStack mappa</strong></td><td><code>String → QualifiedName</code></td><td><code>String → Query</code></td></tr>
+            <tr><td><strong>Stato intermedio</strong></td><td>Nessuno</td><td><code>TypeRef::ResolutionQuery(Query)</code></td></tr>
+            <tr><td><strong>Forward references</strong></td><td>Problematici</td><td>Risolti nativamente</td></tr>
+            <tr><td><strong>GlobalRegistry</strong></td><td><code>HashSet&lt;QN&gt;</code></td><td><code>HashMap&lt;QN, RegistryEntry&gt;</code></td></tr>
+            <tr><td><strong>Cache</strong></td><td><code>ResolutionCache</code></td><td>Rimossa — non necessaria</td></tr>
+            <tr><td><strong>Catene <code>a.f().g()</code></strong></td><td>Non supportate</td><td>Supportate via <code>resolve_call_return</code></td></tr>
+            <tr><td><strong>self/this</strong></td><td>Non gestiti</td><td>Iniettati automaticamente</td></tr>
+            <tr><td><strong>Primitivi</strong></td><td>Marcati come Failed</td><td>Intercettati dal PrimitiveRegistry</td></tr>
+            <tr><td><strong>Impl blocks non fusi</strong></td><td>Scartati</td><td>Preservati</td></tr>
+            <tr><td><strong>nested_types</strong></td><td>Non registrati</td><td>Registrati ricorsivamente</td></tr>
+            <tr><td><strong>Contesto Executor</strong></td><td>RefCell condiviso (mutabile)</td><td>Clonato (immutabile)</td></tr>
+            <tr><td><strong>File sorgente</strong></td><td><code>mod.rs</code>, <code>stack.rs</code>, <code>cache.rs</code></td><td><code>mod.rs</code>, <code>builder.rs</code>, <code>executor.rs</code>, <code>stack.rs</code>, <code>registry.rs</code>, <code>primitives.rs</code></td></tr>
+        </tbody>
+    </table>
+
+    <div class="danger-box">
+        <h4 style="margin-top: 0; margin-bottom: 0.5rem; color: var(--danger);">Perché il cambio di architettura?</h4>
+        <p>Il modello monofase richiedeva che tutto fosse risolvibile nell'ordine in cui il traversal incontra i nodi. Questo rendeva impossibili i forward-references e le catene di chiamate. La <code>Query</code> algebrica funge da <em>lazy evaluation</em> — cattura l'intento del programmatore senza eseguirlo, rinviando la valutazione al momento in cui tutto il contesto è disponibile.</p>
+        <p style="margin-bottom: 0;">Formalmente, la transizione da v2 a v3 corrisponde al passaggio da una <em>valutazione eager</em> (risolvi subito) a una <em>valutazione deferred</em> (costruisci la query, valutala dopo). Questo è lo stesso principio usato nei compilatori moderni che separano la fase di type-checking (analisi semantica) dalla fase di code generation.</p>
     </div>
 
 </body>

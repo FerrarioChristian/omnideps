@@ -49,7 +49,11 @@ Dove:
     fornito da un \textit{Primitive Registry}
     architetturale (\textit{Data-Driven}) alimentato in fase di caricamento.
     Essendo definiti a livello di linguaggio, non necessitano di risoluzione.
-  \item \textbf{ResolutionQuery($\mathcal{Q}$)}: Sostituisce il vecchio stato \texttt{Unresolved}. Rappresenta un'espressione algebrica composta da operazioni \texttt{Find}, \texttt{Extract} e \texttt{Call}. È il prodotto della Fase di Substituzione (Lexical Scoping).
+  \item \textbf{ResolutionQuery($\mathcal{Q}$)}: Sostituisce il
+    vecchio stato \texttt{Unresolved}. Rappresenta un'espressione
+    algebrica composta da operazioni \texttt{Find}, \texttt{Extract}
+    e \texttt{Call}. È il prodotto della Fase di Substituzione
+    (Lexical Scoping).
   \item \textbf{Resolved}: Rappresenta un tipo definito dall'utente
     per cui l'Esecutore di Query ha trovato una corrispondenza
     univoca navigando l'IR. Contiene il nome qualificato

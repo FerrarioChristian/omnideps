@@ -1,4 +1,6 @@
-# Problemi Identificati nella Name Resolution
+# Problemi Identificati nella Name Resolution v1 (ARCHIVIO STORICO)
+
+> ⚠️ **Questo file documenta problemi della v1 (ScopeTree + Arena). L'architettura è stata sostituita prima dalla v2 (SymbolStack monofase) e poi dalla v3 (Query Engine bifase). Per i problemi attuali, vedere [`name_res_problems_2.md`](name_res_problems_2.md).**
 
 Analisi del file `src/resolver.rs` — problemi, limitazioni e possibili miglioramenti.
 
