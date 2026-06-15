@@ -6,15 +6,12 @@ use crate::model::{Import, Query};
 pub struct StackFrame {
     /// Local symbols defined in this scope. Maps a simple name to its algebraic Query.
     pub symbols: HashMap<String, Query>,
-    /// Jump points (imports) available in this scope.
-    pub imports: Vec<Import>,
 }
 
 impl StackFrame {
     pub fn new() -> Self {
         Self {
             symbols: HashMap::new(),
-            imports: Vec::new(),
         }
     }
 }
@@ -49,13 +46,6 @@ impl SymbolStack {
     pub fn define_symbol(&mut self, local_name: String, query: Query) {
         if let Some(frame) = self.current_frame_mut() {
             frame.symbols.insert(local_name, query);
-        }
-    }
-
-    /// Adds an import to the current frame.
-    pub fn add_import(&mut self, import: Import) {
-        if let Some(frame) = self.current_frame_mut() {
-            frame.imports.push(import);
         }
     }
 

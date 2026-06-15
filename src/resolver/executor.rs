@@ -171,9 +171,9 @@ pub fn extract_base_name(query: &Query) -> String {
 }
 
 /// Evaluates a query algebraically against the global registry and current context.
-/// If `resolve_call_return` is true, a Call(Q) query evaluates to its return type.
-/// If false, a Call(Q) query evaluates to the function's path itself (useful for logging dependency edges).
-fn evaluate_query(ctx: &ExecutorContext, query: &Query, resolve_call_return: bool) -> Option<QualifiedName> {
+/// If `resolve_type` is true, an operation (like `Call` or `Extract` of a field) evaluates to its resulting type.
+/// If false, it evaluates to the path itself (useful for logging dependency edges).
+fn evaluate_query(ctx: &ExecutorContext, query: &Query, resolve_type: bool) -> Option<QualifiedName> {
     match query {
         Query::Find(name) => {
             // Find-going-up: Ascend the current prefix
@@ -221,19 +221,32 @@ fn evaluate_query(ctx: &ExecutorContext, query: &Query, resolve_call_return: boo
         }
         Query::Extract(parent_query, member_name) => {
             // Find-going-down
-            if let Some(mut parent_path) = evaluate_query(ctx, parent_query, true) {
-                parent_path.push(member_name.clone());
-                // We don't check existence immediately, because it might be an external chain (e.g. `std::vec::Vec`)
-                // The final validation happens in `evaluate_typeref`.
-                Some(parent_path)
+            let mut target_path = evaluate_query(ctx, parent_query, true)?;
+            target_path.push(member_name.clone());
+            
+            if resolve_type {
+                // If we need the type of this field (e.g. chained access `a.b.c`), look up the field in the registry
+                if let Some(crate::resolver::registry::RegistryEntry::Field { field_type }) = ctx.registry.get(&target_path) {
+                    match field_type {
+                        TypeRef::ResolutionQuery(ret_q) => evaluate_query(ctx, ret_q, true),
+                        TypeRef::Resolved(qn) => Some(qn.clone()),
+                        TypeRef::External(qn) => Some(qn.clone()),
+                        TypeRef::Unresolved(qn) => Some(qn.clone()),
+                        _ => None,
+                    }
+                } else {
+                    // Not a known field or missing type, but we might still return the path 
+                    // in case it's a module/struct member used directly.
+                    Some(target_path)
+                }
             } else {
-                None
+                Some(target_path)
             }
         }
         Query::Call(target_query) => {
             let target_path = evaluate_query(ctx, target_query, false)?;
 
-            if resolve_call_return {
+            if resolve_type {
                 // If we need the return type (e.g. chained calls `a.f().g()`), we look up the target_path in the registry
                 if let Some(crate::resolver::registry::RegistryEntry::Function { return_type }) = ctx.registry.get(&target_path) {
                     // Try to evaluate the return type mathematically!

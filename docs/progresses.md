@@ -18,7 +18,7 @@ Questo documento traccia lo stato di implementazione e riconoscimento dei vari c
 - [x] **IsA** (Ereditarietà di classi/struct)
   - *Note:* Pienamente funzionante per Rust, Java, Python, e C++. Ho aggiornato l'astrazione in `extract_super_types` affinché consideri esplicitamente `superclass`, `interfaces` (Java), `superclasses` (Python) e itera sui child di tipo `base_class_clause` per il C++.
 - [x] **UsesFieldType** (Il tipo di un campo dati)
-  - *Note:* Riscontrato in Rust. In C le struct annidate o i puntatori `struct Type` generano failed refs a causa degli spazi nel nome.
+  - *Note:* L'Indice Globale traccia e indicizza i field, permettendo la deduzione del tipo di ritorno anche in accessi annidati.
 - [x] **UsesParamType** (Il tipo di un parametro di funzione/metodo)
   - *Note:* Funzionante in Rust e negli altri linguaggi.
 - [x] **UsesReturnType** (Il tipo di ritorno di una funzione/metodo)
@@ -29,6 +29,8 @@ Questo documento traccia lo stato di implementazione e riconoscimento dei vari c
   - *Note:* Funziona per Rust e C++.
 
 ## 3. Casi Limite e Costrutti Complessi
+- [x] **Type Inference Avanzata (Method Chaining)**
+  - *Note:* Pienamente implementata l'inferenza del tipo tramite **Query Engine Algebrico**. Supporta catene complesse (es. `user.get_db().query()`) estraendo algebricamente il tipo di ritorno da ogni nodo intermedio fino al bersaglio finale.
 - [x] Appiattimento dei blocchi di implementazione (`ImplBlock` flattening)
   - *Note:* **Pienamente funzionante in Rust.** I metodi vengono passati correttamente al tipo di riferimento.
 - [x] Tipi annidati in blocchi di implementazione (es. `struct` dentro `impl` in Rust)

@@ -13,6 +13,7 @@ pub enum RegistryEntry {
     Module,
     StructuredType,
     Function { return_type: TypeRef },
+    Field { field_type: TypeRef },
 }
 
 /// The central dictionary indexing all absolute paths within the analyzed project.
@@ -72,6 +73,12 @@ impl GlobalRegistry {
     fn register_structured_type(&mut self, st: &StructuredType, mut prefix: QualifiedName) {
         prefix.extend(st.name.clone());
         self.paths.insert(prefix.clone(), RegistryEntry::StructuredType);
+
+        for field in &st.fields {
+            let mut f_prefix = prefix.clone();
+            f_prefix.push(field.name.clone());
+            self.paths.insert(f_prefix, RegistryEntry::Field { field_type: field.ty.clone() });
+        }
 
         for method in &st.methods {
             let mut m_prefix = prefix.clone();

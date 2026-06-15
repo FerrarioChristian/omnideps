@@ -160,6 +160,6 @@ Rimuovere il campo `imports` da `StackFrame` se non viene mai usato, oppure docu
 | 1 | Import wildcard non gestiti nell'Executor | 🟡 Media | `executor.rs` | Nuovo |
 | 2 | Dichiarazioni registrate solo se ResolutionQuery | 🟡 Media | `builder.rs` | Nuovo |
 | 3 | Extract non verifica esistenza nel registry | 🟡 Media | `executor.rs` | Nuovo (trade-off) |
-| 4 | Call con resolve_call_return=false | 🟡 Media | `executor.rs` | Design intenzionale |
-| 5 | Campo imports vestigiale in StackFrame | 🟢 Bassa | `stack.rs` | Nuovo |
+| 4 | Call con resolve_call_return=false | 🟡 Media | `executor.rs` | **[Risolto]**: Implementata Type Inference per le chiamate a catena |
+| 5 | Campo imports vestigiale in StackFrame | 🟢 Bassa | `stack.rs` | **[Risolto]**: Rimosso per pulizia del codice |
 | 6 | Inherits vs Implements ereditato | 🟢 Bassa | `executor.rs` | Ereditato dalla v2 |
