@@ -3,13 +3,18 @@
 <head>
     <title>Language Agnostic Analyzer - Dependency Graph</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.26.0/cytoscape.min.js"></script>
-        <link rel="stylesheet" href="style.css" type="text/css" /> 
+    <script src="https://unpkg.com/layout-base/layout-base.js"></script>
+    <script src="https://unpkg.com/cose-base/cose-base.js"></script>
+    <script src="https://unpkg.com/cytoscape-fcose/cytoscape-fcose.js"></script>
+    <link rel="stylesheet" href="style.css" type="text/css" /> 
 </head>
 <body>
     <div id="info">
         <div id="status">Loading...</div>
         <select id="graph-selector" style="display: none;"></select>
     </div>
+
+    <a href="legend.html" target="_blank" class="legendBtn">?</a>
     <div id="cy"></div>
 
     <script type="module">
@@ -35,24 +40,45 @@
                         elements: elements,
                         style: style,
                         layout: {
-                            name: 'cose',
-                            idealEdgeLength: 100,
-                            nodeOverlap: 20,
-                            refresh: 20,
+                            name: 'fcose',
+                            quality: "proof",
+                            randomize: true,
+                            animate: true,
+                            animationDuration: 1000,
                             fit: true,
                             padding: 30,
-                            randomize: false,
-                            componentSpacing: 100,
-                            nodeRepulsion: 400000,
-                            edgeElasticity: 100,
-                            nestingFactor: 5,
-                            gravity: 80,
-                            numIter: 1000,
-                            initialTemp: 200,
-                            coolingFactor: 0.95,
-                            minTemp: 1.0
+                            nodeDimensionsIncludeLabels: true,
+                            uniformNodeDimensions: false,
+                            packComponents: true,
+                            step: "all",
+                            idealEdgeLength: edge => 50,
+                            edgeElasticity: edge => 0.45,
+                            nodeRepulsion: node => 4500,
+                            gravity: 0.25,
+                            gravityRange: 3.8,
+                            gravityCompound: 1.0,
+                            gravityRangeCompound: 1.5,
                         }
-                });
+                    });
+
+                    // Visual Debugging Interattivo
+                    cy.on('tap', 'node', function(e) {
+                        var node = e.target;
+                        // Prendi il vicinato (archi in entrata, archi in uscita, e i nodi collegati a 1 passo)
+                        var neighborhood = node.closedNeighborhood();
+                        
+                        // Per non perdere il contesto visivo della scatola, includiamo i parent e i figli
+                        var context = neighborhood.union(node.ancestors()).union(node.descendants());
+                        
+                        cy.elements().addClass('dimmed');
+                        context.removeClass('dimmed');
+                    });
+
+                    cy.on('tap', function(e) {
+                        if (e.target === cy) {
+                            cy.elements().removeClass('dimmed');
+                        }
+                    });
             })
             .catch(err => {
                 document.getElementById('status').innerText = "Error: Load graph failed for " + jsonPath;

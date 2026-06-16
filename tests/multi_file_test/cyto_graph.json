@@ -1,13 +1,6 @@
 [
   {
     "data": {
-      "id": "root",
-      "label": "root",
-      "type": "Module"
-    }
-  },
-  {
-    "data": {
       "id": "root::Controller",
       "label": "Controller",
       "type": "Struct"
@@ -17,7 +10,8 @@
     "data": {
       "id": "root::Controller::do_something",
       "label": "do_something()",
-      "type": "Function"
+      "type": "Function",
+      "parent": "root::Controller"
     }
   },
   {
@@ -31,36 +25,13 @@
     "data": {
       "id": "root::User::get_name",
       "label": "get_name()",
-      "type": "Function"
+      "type": "Function",
+      "parent": "root::User"
     }
   },
   {
     "data": {
       "id": "e0",
-      "source": "root",
-      "target": "root::Controller",
-      "label": "ModuleContainment"
-    }
-  },
-  {
-    "data": {
-      "id": "e1",
-      "source": "root",
-      "target": "root::User",
-      "label": "ModuleContainment"
-    }
-  },
-  {
-    "data": {
-      "id": "e2",
-      "source": "root::Controller",
-      "target": "root::Controller::do_something",
-      "label": "NestedIn"
-    }
-  },
-  {
-    "data": {
-      "id": "e3",
       "source": "root::Controller",
       "target": "root::User",
       "label": "UsesFieldType"
@@ -68,18 +39,10 @@
   },
   {
     "data": {
-      "id": "e4",
+      "id": "e1",
       "source": "root::Controller::do_something",
       "target": "root::User::get_name",
       "label": "Calls"
-    }
-  },
-  {
-    "data": {
-      "id": "e5",
-      "source": "root::User",
-      "target": "root::User::get_name",
-      "label": "NestedIn"
     }
   }
 ]

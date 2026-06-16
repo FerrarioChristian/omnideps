@@ -13,14 +13,34 @@ const style = [
 			'width': 'label',
 			'height': 'label',
 			'padding': '10px',
-			'shape': 'round-rectangle'
+			'shape': 'round-rectangle',
+			'transition-property': 'opacity',
+			'transition-duration': '0.3s'
+		}
+	},
+	{
+		selector: ':parent',
+		style: {
+			'text-valign': 'top',
+			'text-halign': 'center',
+			'background-opacity': 0.15,
+			'background-color': '#2c3e50',
+			'border-width': 2,
+			'border-color': '#7f8c8d',
+			'border-style': 'dashed',
+			'padding': '15px',
+			'color': '#ffffff',
+			'text-outline-width': 0,
+			'font-size': '16px',
+			'font-weight': 'bold',
+			'text-margin-y': -8
 		}
 	},
 	{
 		selector: 'node[type = "Module"]',
 		style: {
 			'background-color': '#d35400',
-			'shape': 'hexagon'
+			'border-color': '#d35400'
 		}
 	},
 	{
@@ -33,24 +53,17 @@ const style = [
 		selector: 'node[type = "Trait"], node[type = "Interface"]',
 		style: {
 			'background-color': '#27ae60',
-			'border-style': 'dashed',
+			'border-style': 'solid',
 			'border-width': 2,
-			'border-color': '#fff'
-		}
-	},
-	{
-		selector: 'node[type = "Enum"]',
-		style: {
-			'background-color': '#f1c40f',
-			'color': '#000',
-			'text-outline-color': '#f1c40f'
+			'border-color': '#2ecc71'
 		}
 	},
 	{
 		selector: 'node[type = "Function"]',
 		style: {
 			'background-color': '#8e44ad',
-			'shape': 'ellipse'
+			'shape': 'ellipse',
+			'padding': '6px'
 		}
 	},
 	{
@@ -63,13 +76,6 @@ const style = [
 		}
 	},
 	{
-		selector: 'node[type = "ImplBlock"]',
-		style: {
-			'background-color': '#7f8c8d',
-			'shape': 'rectangle'
-		}
-	},
-	{
 		selector: 'edge',
 		style: {
 			'width': 2,
@@ -78,22 +84,24 @@ const style = [
 			'target-arrow-shape': 'triangle',
 			'curve-style': 'bezier',
 			'label': 'data(label)',
-			'font-size': '8px',
+			'font-size': '9px',
 			'color': '#ccc',
 			'text-rotation': 'autorotate',
 			'text-background-opacity': 0.8,
 			'text-background-color': '#1e1e1e',
-			'text-background-padding': '2px'
+			'text-background-padding': '3px',
+			'transition-property': 'opacity',
+			'transition-duration': '0.3s'
 		}
 	},
 	{
-		selector: 'edge[label = "Inherits"], edge[label = "Implements"], edge[label = "IsA"]',
+		selector: 'edge[label = "IsA"]',
 		style: {
 			'width': 3,
-			'line-style': 'dashed',
-			'line-color': '#f39c12',
-			'target-arrow-color': '#f39c12',
-			'target-arrow-shape': 'triangle-tee'
+			'line-style': 'solid',
+			'line-color': '#e74c3c',
+			'target-arrow-color': '#e74c3c',
+			'target-arrow-shape': 'triangle'
 		}
 	},
 	{
@@ -116,19 +124,16 @@ const style = [
 	{
 		selector: 'edge[label ^= "Uses"]',
 		style: {
-			'line-color': '#ccd1d1',
-			'target-arrow-color': '#ccd1d1',
+			'line-color': '#95a5a6',
+			'target-arrow-color': '#95a5a6',
 			'line-style': 'dotted',
 			'opacity': 0.7
 		}
 	},
 	{
-		selector: 'edge[label = "NestedIn"], edge[label = "ModuleContainment"]',
+		selector: '.dimmed',
 		style: {
-			'line-color': '#707b7c',
-			'target-arrow-color': '#707b7c',
-			'target-arrow-shape': 'circle',
-			'line-style': 'dotted'
+			'opacity': 0.15
 		}
 	}
 ]
