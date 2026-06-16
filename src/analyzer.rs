@@ -67,29 +67,34 @@ fn walk_cst(node: tree_sitter::Node, source: &str, modules: &mut Vec<Module>) {
 }
 
 use crate::language::SupportedLanguage;
+use crate::resolver::primitives::PrimitiveRegistry;
 
-/// End-to-end analysis pipeline for a single source file:
-/// 1. Extraction into initial IR modules
-/// 2. Symbol resolution mapping names to types
-/// 3. Dependency graph construction
-/// 4. Statistics aggregation (summary)
-pub fn full_analysis(
+/// Step 1: Extracts the basic Intermediate Representation (IR) modules from a source file.
+pub fn parse_source(
     lang: SupportedLanguage,
     source: &str,
-) -> anyhow::Result<(
-    Vec<Module>,
-    crate::model::DependencyGraph,
-    crate::model::AnalysisSummary,
-)> {
+) -> anyhow::Result<(Vec<Module>, PrimitiveRegistry)> {
     let modules = generic_extract(lang.to_tree_sitter_lang(), source)?;
     
     // Load primitives from external registry
-    let prim_registry = crate::resolver::primitives::PrimitiveRegistry::load(lang.name()).unwrap_or_else(|_| {
-        crate::resolver::primitives::PrimitiveRegistry::empty()
+    let prim_registry = PrimitiveRegistry::load(lang.name()).unwrap_or_else(|_| {
+        PrimitiveRegistry::empty()
     });
 
+    Ok((modules, prim_registry))
+}
+
+/// Step 2-4: Resolves references and builds the final Dependency Graph for an entire project.
+pub fn analyze_project(
+    modules: Vec<Module>,
+    prim_registry: PrimitiveRegistry,
+) -> (
+    Vec<Module>,
+    crate::model::DependencyGraph,
+    crate::model::AnalysisSummary,
+) {
     let resolved = crate::resolver::resolve_type_refs(modules, &prim_registry);
     let graph = crate::export::graph::build_dependency_graph(&resolved);
     let summary = crate::export::summary::build_analysis_summary(&resolved);
-    Ok((resolved, graph, summary))
+    (resolved, graph, summary)
 }

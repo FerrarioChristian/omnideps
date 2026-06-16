@@ -34,6 +34,11 @@ impl PrimitiveRegistry {
         }
     }
 
+    /// Merges another registry into this one (useful for multi-language workspaces).
+    pub fn merge(&mut self, other: PrimitiveRegistry) {
+        self.lang_primitives.extend(other.lang_primitives);
+    }
+
     /// Checks if a given identifier is a primitive type in the current language context.
     pub fn is_primitive(&self, name: &str) -> bool {
         self.lang_primitives.contains(name)

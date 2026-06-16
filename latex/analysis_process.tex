@@ -5,21 +5,25 @@ tra domini. La pipeline complessiva è definita dalla composizione di
 tre fasi principali: Estrazione Sintattica, Risoluzione Semantica e
 Costruzione del Grafo.
 Siano $\mathcal{L}$ l'insieme dei linguaggi supportati,
-$\mathcal{S}_{code}$ il dominio del codice sorgente e
+$\mathcal{W}$ il dominio di un Workspace (costituito da molteplici
+file sorgenti $\mathcal{S}_{code}$) e
 $\mathcal{D}_{IR}$ il dominio della rappresentazione intermedia
 definito nel capitolo precedente.
 
 La funzione di analisi completa $\Phi$ è definita come la
 composizione delle tre fasi fondamentali:
-$$\Phi : \mathcal{L} \times \mathcal{S}_{code} \to \mathcal{G}$$
-$$\Phi = G \circ R \circ E$$
+$$\Phi : \mathcal{W} \to \mathcal{G}$$
+$$\Phi = G \circ R \circ E_{w}$$
 Dove:
 \begin{itemize}
-  \item $E : \mathcal{L} \times \mathcal{S}_{code} \to \mathcal{M}$ è
-    la funzione di \textbf{Estrazione}.
-  \item $R : \mathcal{M} \to \mathcal{M}$ è la funzione di
-    \textbf{Risoluzione} dei riferimenti.
-  \item $G : \mathcal{M} \to \mathcal{G}$ è la funzione di
+  \item $E_{w} : \mathcal{W} \to \vec{\mathcal{M}}$ è la funzione di
+    \textbf{Estrazione Olistica}, che applica il parser sintattico $E
+    : \mathcal{L} \times \mathcal{S}_{code} \to \mathcal{M}$ a ogni
+    file del workspace, unificando le estrazioni in una singola
+    foresta di moduli.
+  \item $R : \vec{\mathcal{M}} \to \vec{\mathcal{M}}$ è la funzione di
+    \textbf{Risoluzione} (motore a Query).
+  \item $G : \vec{\mathcal{M}} \to \mathcal{G}$ è la funzione di
     \textbf{Costruzione del Grafo}.
 \end{itemize}
 Questa formulazione evidenzia come il sistema sia una composizione di
@@ -86,23 +90,22 @@ costruzione dei componenti dell'IR:
     implementazione di trait.
 \end{itemize}
 
-\section{Fase 2: Risoluzione dei Nomi e dei Tipi ($R$)}
-La fase di risoluzione è il processo di \textbf{Name Resolution} che
-trasforma i riferimenti simbolici estratti dal codice in puntatori
-semantici certi. Questa fase opera interamente sul dominio dell'IR ed
-è indipendente dal linguaggio sorgente.
+\section{Fase 2: Risoluzione dei Nomi e Motore a Query ($R$)}
+La fase di risoluzione trasforma i riferimenti simbolici estratti dal
+codice in puntatori
+semantici certi, attraversando due step algebrici (Sostituzione ed
+Esecuzione). Questa fase opera interamente sul dominio dell'IR ed è
+indipendente dal linguaggio sorgente e dal numero di file che
+compongono il Workspace.
 
-\subsection{Tabella dei Simboli ($\Sigma$) e Logica di Risoluzione}
-La costruzione della \textbf{Tabella dei Simboli} $\Sigma$, del
-\textbf{Contesto di Risoluzione} $\Gamma$ e le relative regole di
-Lexical Scoping sono state progettate per garantire massima fedeltà
-architetturale e prestazioni ottimali in scenari complessi multi-modulo.
-Essendo questa fase il cuore logico dell'analizzatore (e una
-  soluzione al problema del Name Clashing e del decadimento
-computazionale $O(L)$), l'intera formalizzazione del \textit{Modello
-Gerarchico} e dell'algoritmo di risoluzione (inclusa la
-\textit{Memoization}) è trattata in modo esaustivo nel Capitolo
-\ref{ch:name_resolution}.
+\subsection{L'Algebra delle Query e l'Indice Globale}
+L'intera formalizzazione dell'architettura a due fasi (basata sul
+  \textit{Symbol Stack} per la sostituzione locale e sul
+\textit{GlobalRegistry} per la navigazione globale) è trattata in
+modo esaustivo nel Capitolo \ref{ch:name_resolution}. La fusione
+unificata di tutti i moduli $\vec{\mathcal{M}}$ estratti nel
+Workspace permette all'Indice Globale di tracciare dipendenze
+*cross-file* senza latenza computazionale.
 
 \subsection{Appiattimento (Flattening) dei Blocchi di Implementazione}
 Durante la fase di risoluzione, il sistema applica una trasformazione

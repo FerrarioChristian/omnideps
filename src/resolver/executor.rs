@@ -144,6 +144,14 @@ fn evaluate_typeref(ctx: &ExecutorContext, tr: TypeRef) -> TypeRef {
                 // We check if it's local or external.
                 if ctx.registry.exists(&res) {
                     TypeRef::Resolved(res)
+                } else if res.first() == Some(&"crate".to_string()) {
+                    let mut crate_cand = vec!["root".to_string()];
+                    crate_cand.extend(res.into_iter().skip(1));
+                    if ctx.registry.exists(&crate_cand) {
+                        TypeRef::Resolved(crate_cand)
+                    } else {
+                        TypeRef::External(crate_cand)
+                    }
                 } else {
                     // For now, if it resolves via fallback but isn't in registry, it's external.
                     TypeRef::External(res)

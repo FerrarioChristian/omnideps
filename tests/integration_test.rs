@@ -1,4 +1,4 @@
-use language_agnostic_analyzer::analyzer::full_analysis;
+use language_agnostic_analyzer::analyzer::{parse_source, analyze_project};
 use language_agnostic_analyzer::language::SupportedLanguage;
 use std::fs;
 use std::path::Path;
@@ -39,15 +39,16 @@ fn test_benchmarks_analysis() {
 
             let source = fs::read_to_string(path).expect("Impossibile leggere il file");
 
-            // Verifica che l'analisi non vada in panico e restituisca i 3 componenti
-            let result = full_analysis(lang, &source);
+            // Verifica che l'analisi non vada in panico
+            let parse_result = parse_source(lang, &source);
             assert!(
-                result.is_ok(),
-                "L'analisi ha fallito per il file {:?}",
+                parse_result.is_ok(),
+                "Il parsing ha fallito per il file {:?}",
                 path
             );
 
-            let (_modules, graph, summary) = result.unwrap();
+            let (modules, primitives) = parse_result.unwrap();
+            let (_resolved_modules, graph, summary) = analyze_project(modules, primitives);
 
             // Assicuriamoci che il grafo contenga almeno dei nodi di base se il file non è vuoto
             if source.len() > 10 {

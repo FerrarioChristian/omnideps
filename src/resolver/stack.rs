@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use crate::model::{Import, Query};
+use crate::model::Query;
 
 /// A single frame representing a lexical scope during the Query Building phase.
 #[derive(Debug, Clone)]

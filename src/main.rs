@@ -1,10 +1,11 @@
 use anyhow::Result;
 use clap::Parser;
 use language_agnostic_analyzer::{
-    analyzer::full_analysis,
+    analyzer::{parse_source, analyze_project},
     model::AnalysisSummary,
     debug::print_references,
     language::SupportedLanguage,
+    resolver::primitives::PrimitiveRegistry,
 };
 use std::fs;
 use walkdir::WalkDir;
@@ -14,7 +15,7 @@ use cli::Cli;
 
 /// Entry point of the analyzer.
 /// Parses arguments and routes to either single file analysis or recursive directory analysis.
-fn main() -> Result<()> {
+fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
 
     if cli.path.is_file() {
@@ -34,17 +35,21 @@ fn analyze_single_file(
     json_out: Option<&std::path::Path>,
     csv_out: Option<&std::path::Path>,
     debug_refs: bool,
-) -> Result<()> {
+) -> anyhow::Result<()> {
     let lang = SupportedLanguage::from_path(path)
         .ok_or_else(|| anyhow::anyhow!("Language not supported for file: {}", path.display()))?;
     let source = fs::read_to_string(path)?;
-    let (modules, graph, summary) = full_analysis(lang, &source)?;
+    
+    // Phase 1: Parse
+    let (modules, primitives) = parse_source(lang, &source)?;
+    // Phase 2-4: Resolve and Graph
+    let (resolved_modules, graph, summary) = analyze_project(modules, primitives);
 
     println!("=== ANALISI {} ===", path.display());
     print_summary(&summary);
 
     if debug_refs {
-        print_references(&modules);
+        print_references(&resolved_modules);
     }
 
     if let Some(out) = json_out {
@@ -73,47 +78,45 @@ fn analyze_single_file(
     Ok(())
 }
 
-/// Recursively processes all files in a directory.
-/// Combines the graphs from all recognized source files and aggregates their summaries.
+/// Recursively processes all files in a directory to build a unified workspace.
+/// Resolves cross-file references natively using the algebraic Query Engine.
 fn analyze_directory(
     dir: &std::path::Path,
     json_out: Option<&std::path::Path>,
     csv_out: Option<&std::path::Path>,
     debug_refs: bool,
-) -> Result<()> {
-    let mut total_summary = AnalysisSummary::default();
-    let mut all_graphs = vec![];
+) -> anyhow::Result<()> {
     let mut all_modules = vec![];
+    let mut combined_primitives = PrimitiveRegistry::empty();
 
+    // Phase 1: Unified Extraction
     for entry in WalkDir::new(dir).into_iter().filter_map(|e| e.ok()) {
         if entry.file_type().is_file()
             && let Some(lang) = SupportedLanguage::from_path(entry.path())
         {
-            let source = fs::read_to_string(entry.path())?;
-            let (modules, graph, summary) = full_analysis(lang, &source)?;
-            total_summary.total_modules += summary.total_modules;
-            total_summary.total_structured_types += summary.total_structured_types;
-            total_summary.total_free_functions += summary.total_free_functions;
-            total_summary.resolved_refs += summary.resolved_refs;
-            total_summary.failed_refs += summary.failed_refs;
-            all_graphs.push(graph);
-            if debug_refs {
-                all_modules.extend(modules);
+            if let Ok(source) = fs::read_to_string(entry.path()) {
+                if let Ok((mut file_modules, file_primitives)) = parse_source(lang, &source) {
+                    all_modules.append(&mut file_modules);
+                    combined_primitives.merge(file_primitives);
+                }
             }
         }
     }
 
+    // Phase 2-4: Unified Resolution and Graph Building
+    let (resolved_modules, graph, summary) = analyze_project(all_modules, combined_primitives);
+
     println!("=== ANALISI CARTELLA {} ===", dir.display());
-    print_summary(&total_summary);
+    print_summary(&summary);
     
     if debug_refs {
-        print_references(&all_modules);
+        print_references(&resolved_modules);
     }
 
-    // Salva tutto (opzionale)
     if let Some(out) = json_out {
-        let json = serde_json::to_string_pretty(&all_graphs)?;
+        let json = serde_json::to_string_pretty(&graph)?;
         fs::write(out, json)?;
+        println!("Grafo dell'intero Workspace salvato in {}", out.display());
 
         // Esportazione automatica Cytoscape
         if let Some(parent) = out.parent() {
@@ -122,12 +125,12 @@ fn analyze_directory(
                 .and_then(|n| n.to_str())
                 .unwrap_or("graph.json");
             let cyto_path = parent.join(format!("cyto_{}", file_name));
-            language_agnostic_analyzer::export::cytoscape::export_graphs(&all_graphs, &cyto_path)?;
+            language_agnostic_analyzer::export::cytoscape::export_graphs(std::slice::from_ref(&graph), &cyto_path)?;
             println!("Grafo Cytoscape salvato in {}", cyto_path.display());
         }
     }
     if let Some(csv) = csv_out {
-        save_summary_csv(&total_summary, csv)?;
+        save_summary_csv(&summary, csv)?;
     }
     Ok(())
 }
