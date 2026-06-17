@@ -10,8 +10,20 @@
 </head>
 <body>
     <div id="info">
+        <h3>Control Panel</h3>
         <div id="status">Loading...</div>
         <select id="graph-selector" style="display: none;"></select>
+        
+        <div class="toggles-container" style="display: none;" id="toggles-panel">
+            <label class="toggle-row">
+                <input type="checkbox" id="toggle-structural" checked>
+                <span>Struttura (IsA, Uses)</span>
+            </label>
+            <label class="toggle-row">
+                <input type="checkbox" id="toggle-behavioral" checked>
+                <span>Comportamento (Calls, Instantiates)</span>
+            </label>
+        </div>
     </div>
 
     <div id="search-container">
@@ -83,6 +95,27 @@
                             cy.elements().removeClass('dimmed');
                         }
                     });
+
+                    // Semantic Toggles Logic
+                    document.getElementById('toggles-panel').style.display = 'flex';
+                    
+                    const toggleEdges = () => {
+                        const showStruct = document.getElementById('toggle-structural').checked;
+                        const showBehav = document.getElementById('toggle-behavioral').checked;
+                        
+                        cy.edges().style('display', 'element'); // Reset all
+
+                        if (!showStruct) {
+                            cy.edges('[label = "IsA"], [label ^= "Uses"]').style('display', 'none');
+                        }
+                        if (!showBehav) {
+                            cy.edges('[label = "Calls"], [label = "Instantiates"]').style('display', 'none');
+                        }
+                    };
+
+                    document.getElementById('toggle-structural').addEventListener('change', toggleEdges);
+                    document.getElementById('toggle-behavioral').addEventListener('change', toggleEdges);
+                    toggleEdges();
 
                     // Search Logic
                     const searchBox = document.getElementById('search-box');
