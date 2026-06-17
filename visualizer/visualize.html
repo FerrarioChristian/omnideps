@@ -14,6 +14,10 @@
         <select id="graph-selector" style="display: none;"></select>
     </div>
 
+    <div id="search-container">
+        <input type="text" id="search-box" placeholder="Cerca un nodo per nome" style="display: none;" autocomplete="off" spellcheck="false" />
+    </div>
+
     <a href="legend.html" target="_blank" class="legendBtn">?</a>
     <div id="cy"></div>
 
@@ -77,6 +81,30 @@
                     cy.on('tap', function(e) {
                         if (e.target === cy) {
                             cy.elements().removeClass('dimmed');
+                        }
+                    });
+
+                    // Search Logic
+                    const searchBox = document.getElementById('search-box');
+                    searchBox.style.display = 'block';
+                    searchBox.addEventListener('input', function(e) {
+                        const query = e.target.value.toLowerCase().trim();
+                        if (query === "") {
+                            cy.elements().removeClass('dimmed');
+                            return;
+                        }
+
+                        // Trova i nodi che matchano
+                        const matched = cy.nodes().filter(function(ele) {
+                            return ele.data('label') && ele.data('label').toLowerCase().includes(query);
+                        });
+
+                        if (matched.length > 0) {
+                            const context = matched.union(matched.ancestors());
+                            cy.elements().addClass('dimmed');
+                            context.removeClass('dimmed');
+                        } else {
+                            cy.elements().addClass('dimmed');
                         }
                     });
             })

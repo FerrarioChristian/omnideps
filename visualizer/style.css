@@ -53,3 +53,34 @@ select {
   background: #0a7af0;
   cursor: pointer;
 }
+
+#search-container {
+  position: absolute;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
+}
+
+#search-box {
+  padding: 12px 24px;
+  font-size: 16px;
+  width: 400px;
+  border-radius: 30px;
+  border: 1px solid #444;
+  background: rgba(30, 30, 30, 0.9);
+  color: white;
+  outline: none;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+  transition: all 0.2s ease;
+  backdrop-filter: blur(5px);
+}
+
+#search-box:focus {
+  border-color: #0969da;
+  box-shadow: 0 4px 20px rgba(9, 105, 218, 0.4);
+}
+
+#search-box::placeholder {
+  color: #888;
+}
