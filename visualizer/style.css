@@ -81,10 +81,105 @@ select:hover {
   accent-color: #0969da;
 }
 
+/* Accordion (Details) */
+details.advanced-filters {
+  margin-top: 15px;
+  border-top: 1px solid #444;
+  padding-top: 10px;
+}
+details.advanced-filters summary {
+  cursor: pointer;
+  font-size: 13px;
+  color: #bdc3c7;
+  font-weight: bold;
+  outline: none;
+  list-style: none;
+  display: flex;
+  align-items: center;
+}
+details.advanced-filters summary::-webkit-details-marker {
+  display: none;
+}
+details.advanced-filters summary::before {
+  content: ">";
+  font-size: 12px;
+  margin-right: 5px;
+  transition: transform 0.2s;
+}
+details.advanced-filters[open] summary::before {
+  transform: rotate(90deg);
+  display: inline-block;
+}
+.filters-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+  margin-top: 10px;
+  padding-left: 10px;
+}
+.filters-grid .toggle-row {
+  font-size: 12px;
+  color: #aab2bd;
+}
+
+/* Sidebar Dettagli */
+#sidebar {
+  position: absolute;
+  top: 20px;
+  right: -350px;
+  width: 280px;
+  background: rgba(30, 30, 30, 0.85);
+  color: #ecf0f1;
+  padding: 25px;
+  border-radius: 12px;
+  border: 1px solid #444;
+  z-index: 10;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(5px);
+  transition: right 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+#sidebar.active {
+  right: 20px;
+}
+#sidebar h2 {
+  margin: 0;
+  font-size: 22px;
+  color: #fff;
+  word-break: break-word;
+}
+#sidebar h3 {
+  font-size: 14px;
+  color: #bdc3c7;
+  text-transform: uppercase;
+  margin-bottom: 5px;
+  margin-top: -5px;
+}
+.sidebar-stat {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid #444;
+  padding: 10px 0;
+  font-size: 14px;
+}
+.sidebar-stat strong {
+  color: #0969da;
+  font-size: 20px;
+}
+#sb-extra {
+  margin-top: 20px;
+  font-size: 13px;
+  color: #95a5a6;
+  background: rgba(0, 0, 0, 0.3);
+  padding: 10px;
+  border-radius: 6px;
+  word-break: break-all;
+}
+
 .legendBtn {
   position: absolute;
-  top: 10px;
-  right: 10px;
+  bottom: 20px;
+  right: 20px;
   background: #0969da;
   color: white;
   width: 4rem;
