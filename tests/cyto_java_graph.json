@@ -1,0 +1,329 @@
+[
+  {
+    "data": {
+      "id": "root::Entity",
+      "label": "Entity",
+      "type": "Interface"
+    }
+  },
+  {
+    "data": {
+      "id": "root::Entity::getId",
+      "label": "getId()",
+      "type": "Function",
+      "parent": "root::Entity"
+    }
+  },
+  {
+    "data": {
+      "id": "root::LivingBeing",
+      "label": "LivingBeing",
+      "type": "Class"
+    }
+  },
+  {
+    "data": {
+      "id": "root::LivingBeing::breathe",
+      "label": "breathe()",
+      "type": "Function",
+      "parent": "root::LivingBeing"
+    }
+  },
+  {
+    "data": {
+      "id": "root::Animal",
+      "label": "Animal",
+      "type": "Class"
+    }
+  },
+  {
+    "data": {
+      "id": "root::Animal::getId",
+      "label": "getId()",
+      "type": "Function",
+      "parent": "root::Animal"
+    }
+  },
+  {
+    "data": {
+      "id": "root::Animal::breathe",
+      "label": "breathe()",
+      "type": "Function",
+      "parent": "root::Animal"
+    }
+  },
+  {
+    "data": {
+      "id": "root::Animal::Animal",
+      "label": "Animal",
+      "type": "Struct",
+      "parent": "root::Animal"
+    }
+  },
+  {
+    "data": {
+      "id": "root::Cat",
+      "label": "Cat",
+      "type": "Class"
+    }
+  },
+  {
+    "data": {
+      "id": "root::Cat::speak",
+      "label": "speak()",
+      "type": "Function",
+      "parent": "root::Cat"
+    }
+  },
+  {
+    "data": {
+      "id": "root::Cat::Cat",
+      "label": "Cat",
+      "type": "Struct",
+      "parent": "root::Cat"
+    }
+  },
+  {
+    "data": {
+      "id": "root::Cat::Cat::unnamed_type",
+      "label": "unnamed_type",
+      "type": "Struct",
+      "parent": "root::Cat::Cat"
+    }
+  },
+  {
+    "data": {
+      "id": "root::Cat::Breed",
+      "label": "Breed",
+      "type": "Class",
+      "parent": "root::Cat"
+    }
+  },
+  {
+    "data": {
+      "id": "root::Cat::Breed::Breed",
+      "label": "Breed",
+      "type": "Struct",
+      "parent": "root::Cat::Breed"
+    }
+  },
+  {
+    "data": {
+      "id": "root::Cat::MeowBehavior",
+      "label": "MeowBehavior",
+      "type": "Class",
+      "parent": "root::Cat"
+    }
+  },
+  {
+    "data": {
+      "id": "root::Cat::MeowBehavior::speak",
+      "label": "speak()",
+      "type": "Function",
+      "parent": "root::Cat::MeowBehavior"
+    }
+  },
+  {
+    "data": {
+      "id": "root::Chargeable",
+      "label": "Chargeable",
+      "type": "Interface"
+    }
+  },
+  {
+    "data": {
+      "id": "root::Chargeable::charge",
+      "label": "charge()",
+      "type": "Function",
+      "parent": "root::Chargeable"
+    }
+  },
+  {
+    "data": {
+      "id": "root::Robot",
+      "label": "Robot",
+      "type": "Class"
+    }
+  },
+  {
+    "data": {
+      "id": "root::Robot::getId",
+      "label": "getId()",
+      "type": "Function",
+      "parent": "root::Robot"
+    }
+  },
+  {
+    "data": {
+      "id": "root::Robot::charge",
+      "label": "charge()",
+      "type": "Function",
+      "parent": "root::Robot"
+    }
+  },
+  {
+    "data": {
+      "id": "root::Robot::startServer",
+      "label": "startServer()",
+      "type": "Function",
+      "parent": "root::Robot"
+    }
+  },
+  {
+    "data": {
+      "id": "root::Outer",
+      "label": "Outer",
+      "type": "Class"
+    }
+  },
+  {
+    "data": {
+      "id": "root::Outer::hello",
+      "label": "hello()",
+      "type": "Function",
+      "parent": "root::Outer"
+    }
+  },
+  {
+    "data": {
+      "id": "root::Outer::Inner",
+      "label": "Inner",
+      "type": "Class",
+      "parent": "root::Outer"
+    }
+  },
+  {
+    "data": {
+      "id": "root::Outer::Inner::hello",
+      "label": "hello()",
+      "type": "Function",
+      "parent": "root::Outer::Inner"
+    }
+  },
+  {
+    "data": {
+      "id": "root::Outer::Inner::DeepInner",
+      "label": "DeepInner",
+      "type": "Class",
+      "parent": "root::Outer::Inner"
+    }
+  },
+  {
+    "data": {
+      "id": "root::Outer::Inner::DeepInner::hello",
+      "label": "hello()",
+      "type": "Function",
+      "parent": "root::Outer::Inner::DeepInner"
+    }
+  },
+  {
+    "data": {
+      "id": "root::Outer::Inner::DeepInner::Local",
+      "label": "Local",
+      "type": "Class",
+      "parent": "root::Outer::Inner::DeepInner"
+    }
+  },
+  {
+    "data": {
+      "id": "e0",
+      "source": "root::Animal",
+      "target": "root::LivingBeing",
+      "label": "IsA"
+    }
+  },
+  {
+    "data": {
+      "id": "e1",
+      "source": "root::Cat",
+      "target": "root::Animal",
+      "label": "IsA"
+    }
+  },
+  {
+    "data": {
+      "id": "e2",
+      "source": "root::LivingBeing",
+      "target": "root::Entity",
+      "label": "IsA"
+    }
+  },
+  {
+    "data": {
+      "id": "e3",
+      "source": "root::Robot",
+      "target": "root::Chargeable",
+      "label": "IsA"
+    }
+  },
+  {
+    "data": {
+      "id": "e4",
+      "source": "root::Robot",
+      "target": "root::Entity",
+      "label": "IsA"
+    }
+  },
+  {
+    "data": {
+      "id": "root::Robot::myBreed",
+      "label": "myBreed",
+      "type": "External"
+    }
+  },
+  {
+    "data": {
+      "id": "e5",
+      "source": "root::Robot",
+      "target": "root::Robot::myBreed",
+      "label": "UsesFieldType"
+    }
+  },
+  {
+    "data": {
+      "id": "root::Robot::myCat",
+      "label": "myCat",
+      "type": "External"
+    }
+  },
+  {
+    "data": {
+      "id": "e6",
+      "source": "root::Robot",
+      "target": "root::Robot::myCat",
+      "label": "UsesFieldType"
+    }
+  },
+  {
+    "data": {
+      "id": "e7",
+      "source": "root::Robot::startServer",
+      "target": "root::Cat",
+      "label": "UsesLocalType"
+    }
+  },
+  {
+    "data": {
+      "id": "e8",
+      "source": "root::Robot::startServer",
+      "target": "root::Cat",
+      "label": "Instantiates"
+    }
+  },
+  {
+    "data": {
+      "id": "e9",
+      "source": "root::Robot::startServer",
+      "target": "root::Outer::Inner::DeepInner",
+      "label": "Calls"
+    }
+  },
+  {
+    "data": {
+      "id": "e10",
+      "source": "root::Robot::startServer",
+      "target": "root::Robot::myCat",
+      "label": "Calls"
+    }
+  }
+]

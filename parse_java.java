@@ -1,0 +1,1 @@
+class Animal extends LivingBeing {}

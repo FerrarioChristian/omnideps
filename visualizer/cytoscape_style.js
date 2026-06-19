@@ -24,9 +24,7 @@ const style = [
 			'text-valign': 'top',
 			'text-halign': 'center',
 			'background-opacity': 0.15,
-			'background-color': '#2c3e50',
 			'border-width': 2,
-			'border-color': '#7f8c8d',
 			'border-style': 'dashed',
 			'padding': '15px',
 			'color': '#ffffff',
@@ -34,6 +32,29 @@ const style = [
 			'font-size': '16px',
 			'font-weight': 'bold',
 			'text-margin-y': -8
+		}
+	},
+	{
+		selector: ':parent[type = "Module"]',
+		style: {
+			'background-color': '#d35400',
+			'border-color': '#d35400'
+		}
+	},
+	{
+		selector: ':parent[type = "Class"], :parent[type = "Struct"]',
+		style: {
+			'background-color': '#2980b9',
+			'border-color': '#2980b9',
+            'border-style': 'solid'
+		}
+	},
+	{
+		selector: ':parent[type = "Interface"], :parent[type = "Trait"]',
+		style: {
+			'background-color': '#27ae60',
+			'border-color': '#2ecc71',
+            'border-style': 'solid'
 		}
 	},
 	{

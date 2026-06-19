@@ -1,0 +1,2038 @@
+{
+  "nodes": [
+    {
+      "Module": {
+        "name": [
+          "root"
+        ],
+        "structured_types": [
+          {
+            "name": [
+              "root",
+              "Entity"
+            ],
+            "kind": "Interface",
+            "methods": [
+              {
+                "name": [
+                  "root",
+                  "Entity",
+                  "getId"
+                ],
+                "signature": {
+                  "return_type": {
+                    "Primitive": {
+                      "Other": "String"
+                    }
+                  }
+                },
+                "body": null
+              }
+            ]
+          },
+          {
+            "name": [
+              "root",
+              "LivingBeing"
+            ],
+            "kind": "Class",
+            "methods": [
+              {
+                "name": [
+                  "root",
+                  "LivingBeing",
+                  "breathe"
+                ],
+                "signature": {
+                  "return_type": {
+                    "Failed": []
+                  }
+                },
+                "body": null
+              }
+            ],
+            "super_types": [
+              {
+                "Resolved": [
+                  "root",
+                  "Entity"
+                ]
+              }
+            ]
+          },
+          {
+            "name": [
+              "root",
+              "Animal"
+            ],
+            "kind": "Class",
+            "fields": [
+              {
+                "name": "name",
+                "ty": {
+                  "Primitive": {
+                    "Other": "String"
+                  }
+                }
+              }
+            ],
+            "methods": [
+              {
+                "name": [
+                  "root",
+                  "Animal",
+                  "getId"
+                ],
+                "signature": {
+                  "return_type": {
+                    "Primitive": {
+                      "Other": "String"
+                    }
+                  }
+                },
+                "body": {}
+              },
+              {
+                "name": [
+                  "root",
+                  "Animal",
+                  "breathe"
+                ],
+                "signature": {
+                  "return_type": {
+                    "Failed": []
+                  }
+                },
+                "body": {
+                  "calls": [
+                    {
+                      "Failed": [
+                        "System"
+                      ]
+                    }
+                  ]
+                }
+              }
+            ],
+            "super_types": [
+              {
+                "Resolved": [
+                  "root",
+                  "LivingBeing"
+                ]
+              }
+            ],
+            "nested_types": [
+              {
+                "name": [
+                  "root",
+                  "Animal",
+                  "Animal"
+                ],
+                "kind": "Struct"
+              }
+            ]
+          },
+          {
+            "name": [
+              "root",
+              "Cat"
+            ],
+            "kind": "Class",
+            "fields": [
+              {
+                "name": "type",
+                "ty": {
+                  "Primitive": {
+                    "Other": "String"
+                  }
+                }
+              }
+            ],
+            "methods": [
+              {
+                "name": [
+                  "root",
+                  "Cat",
+                  "speak"
+                ],
+                "signature": {
+                  "return_type": {
+                    "Failed": []
+                  }
+                },
+                "body": {
+                  "calls": [
+                    {
+                      "Failed": [
+                        "System"
+                      ]
+                    }
+                  ]
+                }
+              }
+            ],
+            "super_types": [
+              {
+                "Resolved": [
+                  "root",
+                  "Animal"
+                ]
+              }
+            ],
+            "nested_types": [
+              {
+                "name": [
+                  "root",
+                  "Cat",
+                  "Cat"
+                ],
+                "kind": "Struct",
+                "nested_types": [
+                  {
+                    "name": [
+                      "root",
+                      "Cat",
+                      "Cat",
+                      "unnamed_type"
+                    ],
+                    "kind": "Struct"
+                  }
+                ]
+              },
+              {
+                "name": [
+                  "root",
+                  "Cat",
+                  "Breed"
+                ],
+                "kind": "Class",
+                "fields": [
+                  {
+                    "name": "type",
+                    "ty": {
+                      "Primitive": {
+                        "Other": "String"
+                      }
+                    }
+                  }
+                ],
+                "nested_types": [
+                  {
+                    "name": [
+                      "root",
+                      "Cat",
+                      "Breed",
+                      "Breed"
+                    ],
+                    "kind": "Struct"
+                  }
+                ]
+              },
+              {
+                "name": [
+                  "root",
+                  "Cat",
+                  "MeowBehavior"
+                ],
+                "kind": "Class",
+                "methods": [
+                  {
+                    "name": [
+                      "root",
+                      "Cat",
+                      "MeowBehavior",
+                      "speak"
+                    ],
+                    "signature": {
+                      "return_type": {
+                        "Failed": []
+                      }
+                    },
+                    "body": {
+                      "calls": [
+                        {
+                          "Failed": [
+                            "System"
+                          ]
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "name": [
+              "root",
+              "Chargeable"
+            ],
+            "kind": "Interface",
+            "methods": [
+              {
+                "name": [
+                  "root",
+                  "Chargeable",
+                  "charge"
+                ],
+                "signature": {
+                  "return_type": {
+                    "Failed": []
+                  }
+                },
+                "body": null
+              }
+            ]
+          },
+          {
+            "name": [
+              "root",
+              "Robot"
+            ],
+            "kind": "Class",
+            "fields": [
+              {
+                "name": "myCat",
+                "ty": {
+                  "Resolved": [
+                    "root",
+                    "Robot",
+                    "myCat"
+                  ]
+                }
+              },
+              {
+                "name": "myBreed",
+                "ty": {
+                  "Resolved": [
+                    "root",
+                    "Robot",
+                    "myBreed"
+                  ]
+                }
+              }
+            ],
+            "methods": [
+              {
+                "name": [
+                  "root",
+                  "Robot",
+                  "getId"
+                ],
+                "signature": {
+                  "return_type": {
+                    "Primitive": {
+                      "Other": "String"
+                    }
+                  }
+                },
+                "body": {}
+              },
+              {
+                "name": [
+                  "root",
+                  "Robot",
+                  "charge"
+                ],
+                "signature": {
+                  "return_type": {
+                    "Failed": []
+                  }
+                },
+                "body": {}
+              },
+              {
+                "name": [
+                  "root",
+                  "Robot",
+                  "startServer"
+                ],
+                "signature": {
+                  "return_type": {
+                    "Failed": []
+                  }
+                },
+                "body": {
+                  "declarations": [
+                    {
+                      "name": "myCat = new Cat",
+                      "ty": {
+                        "Resolved": [
+                          "root",
+                          "Cat"
+                        ]
+                      }
+                    },
+                    {
+                      "name": "myBreed = new Cat.Breed",
+                      "ty": {
+                        "Resolved": [
+                          "root",
+                          "Cat"
+                        ]
+                      }
+                    }
+                  ],
+                  "calls": [
+                    {
+                      "Resolved": [
+                        "root",
+                        "Robot",
+                        "myCat"
+                      ]
+                    },
+                    {
+                      "Resolved": [
+                        "root",
+                        "Outer",
+                        "Inner",
+                        "DeepInner"
+                      ]
+                    }
+                  ],
+                  "instantiates": [
+                    {
+                      "Resolved": [
+                        "root",
+                        "Cat"
+                      ]
+                    },
+                    {
+                      "Resolved": [
+                        "root",
+                        "Cat"
+                      ]
+                    }
+                  ]
+                }
+              }
+            ],
+            "super_types": [
+              {
+                "Resolved": [
+                  "root",
+                  "Entity"
+                ]
+              },
+              {
+                "Resolved": [
+                  "root",
+                  "Chargeable"
+                ]
+              }
+            ]
+          },
+          {
+            "name": [
+              "root",
+              "Outer"
+            ],
+            "kind": "Class",
+            "methods": [
+              {
+                "name": [
+                  "root",
+                  "Outer",
+                  "hello"
+                ],
+                "signature": {
+                  "return_type": {
+                    "Failed": []
+                  }
+                },
+                "body": {}
+              }
+            ],
+            "nested_types": [
+              {
+                "name": [
+                  "root",
+                  "Outer",
+                  "Inner"
+                ],
+                "kind": "Class",
+                "methods": [
+                  {
+                    "name": [
+                      "root",
+                      "Outer",
+                      "Inner",
+                      "hello"
+                    ],
+                    "signature": {
+                      "return_type": {
+                        "Failed": []
+                      }
+                    },
+                    "body": {}
+                  }
+                ],
+                "nested_types": [
+                  {
+                    "name": [
+                      "root",
+                      "Outer",
+                      "Inner",
+                      "DeepInner"
+                    ],
+                    "kind": "Class",
+                    "methods": [
+                      {
+                        "name": [
+                          "root",
+                          "Outer",
+                          "Inner",
+                          "DeepInner",
+                          "hello"
+                        ],
+                        "signature": {
+                          "return_type": {
+                            "Failed": []
+                          }
+                        },
+                        "body": {}
+                      }
+                    ],
+                    "nested_types": [
+                      {
+                        "name": [
+                          "root",
+                          "Outer",
+                          "Inner",
+                          "DeepInner",
+                          "Local"
+                        ],
+                        "kind": "Class"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "StructuredType": {
+        "name": [
+          "root",
+          "Entity"
+        ],
+        "kind": "Interface",
+        "methods": [
+          {
+            "name": [
+              "root",
+              "Entity",
+              "getId"
+            ],
+            "signature": {
+              "return_type": {
+                "Primitive": {
+                  "Other": "String"
+                }
+              }
+            },
+            "body": null
+          }
+        ]
+      }
+    },
+    {
+      "Function": {
+        "name": [
+          "root",
+          "Entity",
+          "getId"
+        ],
+        "signature": {
+          "return_type": {
+            "Primitive": {
+              "Other": "String"
+            }
+          }
+        },
+        "body": null
+      }
+    },
+    {
+      "StructuredType": {
+        "name": [
+          "root",
+          "LivingBeing"
+        ],
+        "kind": "Class",
+        "methods": [
+          {
+            "name": [
+              "root",
+              "LivingBeing",
+              "breathe"
+            ],
+            "signature": {
+              "return_type": {
+                "Failed": []
+              }
+            },
+            "body": null
+          }
+        ],
+        "super_types": [
+          {
+            "Resolved": [
+              "root",
+              "Entity"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "Function": {
+        "name": [
+          "root",
+          "LivingBeing",
+          "breathe"
+        ],
+        "signature": {
+          "return_type": {
+            "Failed": []
+          }
+        },
+        "body": null
+      }
+    },
+    {
+      "StructuredType": {
+        "name": [
+          "root",
+          "Animal"
+        ],
+        "kind": "Class",
+        "fields": [
+          {
+            "name": "name",
+            "ty": {
+              "Primitive": {
+                "Other": "String"
+              }
+            }
+          }
+        ],
+        "methods": [
+          {
+            "name": [
+              "root",
+              "Animal",
+              "getId"
+            ],
+            "signature": {
+              "return_type": {
+                "Primitive": {
+                  "Other": "String"
+                }
+              }
+            },
+            "body": {}
+          },
+          {
+            "name": [
+              "root",
+              "Animal",
+              "breathe"
+            ],
+            "signature": {
+              "return_type": {
+                "Failed": []
+              }
+            },
+            "body": {
+              "calls": [
+                {
+                  "Failed": [
+                    "System"
+                  ]
+                }
+              ]
+            }
+          }
+        ],
+        "super_types": [
+          {
+            "Resolved": [
+              "root",
+              "LivingBeing"
+            ]
+          }
+        ],
+        "nested_types": [
+          {
+            "name": [
+              "root",
+              "Animal",
+              "Animal"
+            ],
+            "kind": "Struct"
+          }
+        ]
+      }
+    },
+    {
+      "Function": {
+        "name": [
+          "root",
+          "Animal",
+          "getId"
+        ],
+        "signature": {
+          "return_type": {
+            "Primitive": {
+              "Other": "String"
+            }
+          }
+        },
+        "body": {}
+      }
+    },
+    {
+      "Function": {
+        "name": [
+          "root",
+          "Animal",
+          "breathe"
+        ],
+        "signature": {
+          "return_type": {
+            "Failed": []
+          }
+        },
+        "body": {
+          "calls": [
+            {
+              "Failed": [
+                "System"
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "StructuredType": {
+        "name": [
+          "root",
+          "Animal",
+          "Animal"
+        ],
+        "kind": "Struct"
+      }
+    },
+    {
+      "StructuredType": {
+        "name": [
+          "root",
+          "Cat"
+        ],
+        "kind": "Class",
+        "fields": [
+          {
+            "name": "type",
+            "ty": {
+              "Primitive": {
+                "Other": "String"
+              }
+            }
+          }
+        ],
+        "methods": [
+          {
+            "name": [
+              "root",
+              "Cat",
+              "speak"
+            ],
+            "signature": {
+              "return_type": {
+                "Failed": []
+              }
+            },
+            "body": {
+              "calls": [
+                {
+                  "Failed": [
+                    "System"
+                  ]
+                }
+              ]
+            }
+          }
+        ],
+        "super_types": [
+          {
+            "Resolved": [
+              "root",
+              "Animal"
+            ]
+          }
+        ],
+        "nested_types": [
+          {
+            "name": [
+              "root",
+              "Cat",
+              "Cat"
+            ],
+            "kind": "Struct",
+            "nested_types": [
+              {
+                "name": [
+                  "root",
+                  "Cat",
+                  "Cat",
+                  "unnamed_type"
+                ],
+                "kind": "Struct"
+              }
+            ]
+          },
+          {
+            "name": [
+              "root",
+              "Cat",
+              "Breed"
+            ],
+            "kind": "Class",
+            "fields": [
+              {
+                "name": "type",
+                "ty": {
+                  "Primitive": {
+                    "Other": "String"
+                  }
+                }
+              }
+            ],
+            "nested_types": [
+              {
+                "name": [
+                  "root",
+                  "Cat",
+                  "Breed",
+                  "Breed"
+                ],
+                "kind": "Struct"
+              }
+            ]
+          },
+          {
+            "name": [
+              "root",
+              "Cat",
+              "MeowBehavior"
+            ],
+            "kind": "Class",
+            "methods": [
+              {
+                "name": [
+                  "root",
+                  "Cat",
+                  "MeowBehavior",
+                  "speak"
+                ],
+                "signature": {
+                  "return_type": {
+                    "Failed": []
+                  }
+                },
+                "body": {
+                  "calls": [
+                    {
+                      "Failed": [
+                        "System"
+                      ]
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "Function": {
+        "name": [
+          "root",
+          "Cat",
+          "speak"
+        ],
+        "signature": {
+          "return_type": {
+            "Failed": []
+          }
+        },
+        "body": {
+          "calls": [
+            {
+              "Failed": [
+                "System"
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "StructuredType": {
+        "name": [
+          "root",
+          "Cat",
+          "Cat"
+        ],
+        "kind": "Struct",
+        "nested_types": [
+          {
+            "name": [
+              "root",
+              "Cat",
+              "Cat",
+              "unnamed_type"
+            ],
+            "kind": "Struct"
+          }
+        ]
+      }
+    },
+    {
+      "StructuredType": {
+        "name": [
+          "root",
+          "Cat",
+          "Cat",
+          "unnamed_type"
+        ],
+        "kind": "Struct"
+      }
+    },
+    {
+      "StructuredType": {
+        "name": [
+          "root",
+          "Cat",
+          "Breed"
+        ],
+        "kind": "Class",
+        "fields": [
+          {
+            "name": "type",
+            "ty": {
+              "Primitive": {
+                "Other": "String"
+              }
+            }
+          }
+        ],
+        "nested_types": [
+          {
+            "name": [
+              "root",
+              "Cat",
+              "Breed",
+              "Breed"
+            ],
+            "kind": "Struct"
+          }
+        ]
+      }
+    },
+    {
+      "StructuredType": {
+        "name": [
+          "root",
+          "Cat",
+          "Breed",
+          "Breed"
+        ],
+        "kind": "Struct"
+      }
+    },
+    {
+      "StructuredType": {
+        "name": [
+          "root",
+          "Cat",
+          "MeowBehavior"
+        ],
+        "kind": "Class",
+        "methods": [
+          {
+            "name": [
+              "root",
+              "Cat",
+              "MeowBehavior",
+              "speak"
+            ],
+            "signature": {
+              "return_type": {
+                "Failed": []
+              }
+            },
+            "body": {
+              "calls": [
+                {
+                  "Failed": [
+                    "System"
+                  ]
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "Function": {
+        "name": [
+          "root",
+          "Cat",
+          "MeowBehavior",
+          "speak"
+        ],
+        "signature": {
+          "return_type": {
+            "Failed": []
+          }
+        },
+        "body": {
+          "calls": [
+            {
+              "Failed": [
+                "System"
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "StructuredType": {
+        "name": [
+          "root",
+          "Chargeable"
+        ],
+        "kind": "Interface",
+        "methods": [
+          {
+            "name": [
+              "root",
+              "Chargeable",
+              "charge"
+            ],
+            "signature": {
+              "return_type": {
+                "Failed": []
+              }
+            },
+            "body": null
+          }
+        ]
+      }
+    },
+    {
+      "Function": {
+        "name": [
+          "root",
+          "Chargeable",
+          "charge"
+        ],
+        "signature": {
+          "return_type": {
+            "Failed": []
+          }
+        },
+        "body": null
+      }
+    },
+    {
+      "StructuredType": {
+        "name": [
+          "root",
+          "Robot"
+        ],
+        "kind": "Class",
+        "fields": [
+          {
+            "name": "myCat",
+            "ty": {
+              "Resolved": [
+                "root",
+                "Robot",
+                "myCat"
+              ]
+            }
+          },
+          {
+            "name": "myBreed",
+            "ty": {
+              "Resolved": [
+                "root",
+                "Robot",
+                "myBreed"
+              ]
+            }
+          }
+        ],
+        "methods": [
+          {
+            "name": [
+              "root",
+              "Robot",
+              "getId"
+            ],
+            "signature": {
+              "return_type": {
+                "Primitive": {
+                  "Other": "String"
+                }
+              }
+            },
+            "body": {}
+          },
+          {
+            "name": [
+              "root",
+              "Robot",
+              "charge"
+            ],
+            "signature": {
+              "return_type": {
+                "Failed": []
+              }
+            },
+            "body": {}
+          },
+          {
+            "name": [
+              "root",
+              "Robot",
+              "startServer"
+            ],
+            "signature": {
+              "return_type": {
+                "Failed": []
+              }
+            },
+            "body": {
+              "declarations": [
+                {
+                  "name": "myCat = new Cat",
+                  "ty": {
+                    "Resolved": [
+                      "root",
+                      "Cat"
+                    ]
+                  }
+                },
+                {
+                  "name": "myBreed = new Cat.Breed",
+                  "ty": {
+                    "Resolved": [
+                      "root",
+                      "Cat"
+                    ]
+                  }
+                }
+              ],
+              "calls": [
+                {
+                  "Resolved": [
+                    "root",
+                    "Robot",
+                    "myCat"
+                  ]
+                },
+                {
+                  "Resolved": [
+                    "root",
+                    "Outer",
+                    "Inner",
+                    "DeepInner"
+                  ]
+                }
+              ],
+              "instantiates": [
+                {
+                  "Resolved": [
+                    "root",
+                    "Cat"
+                  ]
+                },
+                {
+                  "Resolved": [
+                    "root",
+                    "Cat"
+                  ]
+                }
+              ]
+            }
+          }
+        ],
+        "super_types": [
+          {
+            "Resolved": [
+              "root",
+              "Entity"
+            ]
+          },
+          {
+            "Resolved": [
+              "root",
+              "Chargeable"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "Function": {
+        "name": [
+          "root",
+          "Robot",
+          "getId"
+        ],
+        "signature": {
+          "return_type": {
+            "Primitive": {
+              "Other": "String"
+            }
+          }
+        },
+        "body": {}
+      }
+    },
+    {
+      "Function": {
+        "name": [
+          "root",
+          "Robot",
+          "charge"
+        ],
+        "signature": {
+          "return_type": {
+            "Failed": []
+          }
+        },
+        "body": {}
+      }
+    },
+    {
+      "Function": {
+        "name": [
+          "root",
+          "Robot",
+          "startServer"
+        ],
+        "signature": {
+          "return_type": {
+            "Failed": []
+          }
+        },
+        "body": {
+          "declarations": [
+            {
+              "name": "myCat = new Cat",
+              "ty": {
+                "Resolved": [
+                  "root",
+                  "Cat"
+                ]
+              }
+            },
+            {
+              "name": "myBreed = new Cat.Breed",
+              "ty": {
+                "Resolved": [
+                  "root",
+                  "Cat"
+                ]
+              }
+            }
+          ],
+          "calls": [
+            {
+              "Resolved": [
+                "root",
+                "Robot",
+                "myCat"
+              ]
+            },
+            {
+              "Resolved": [
+                "root",
+                "Outer",
+                "Inner",
+                "DeepInner"
+              ]
+            }
+          ],
+          "instantiates": [
+            {
+              "Resolved": [
+                "root",
+                "Cat"
+              ]
+            },
+            {
+              "Resolved": [
+                "root",
+                "Cat"
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "StructuredType": {
+        "name": [
+          "root",
+          "Outer"
+        ],
+        "kind": "Class",
+        "methods": [
+          {
+            "name": [
+              "root",
+              "Outer",
+              "hello"
+            ],
+            "signature": {
+              "return_type": {
+                "Failed": []
+              }
+            },
+            "body": {}
+          }
+        ],
+        "nested_types": [
+          {
+            "name": [
+              "root",
+              "Outer",
+              "Inner"
+            ],
+            "kind": "Class",
+            "methods": [
+              {
+                "name": [
+                  "root",
+                  "Outer",
+                  "Inner",
+                  "hello"
+                ],
+                "signature": {
+                  "return_type": {
+                    "Failed": []
+                  }
+                },
+                "body": {}
+              }
+            ],
+            "nested_types": [
+              {
+                "name": [
+                  "root",
+                  "Outer",
+                  "Inner",
+                  "DeepInner"
+                ],
+                "kind": "Class",
+                "methods": [
+                  {
+                    "name": [
+                      "root",
+                      "Outer",
+                      "Inner",
+                      "DeepInner",
+                      "hello"
+                    ],
+                    "signature": {
+                      "return_type": {
+                        "Failed": []
+                      }
+                    },
+                    "body": {}
+                  }
+                ],
+                "nested_types": [
+                  {
+                    "name": [
+                      "root",
+                      "Outer",
+                      "Inner",
+                      "DeepInner",
+                      "Local"
+                    ],
+                    "kind": "Class"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "Function": {
+        "name": [
+          "root",
+          "Outer",
+          "hello"
+        ],
+        "signature": {
+          "return_type": {
+            "Failed": []
+          }
+        },
+        "body": {}
+      }
+    },
+    {
+      "StructuredType": {
+        "name": [
+          "root",
+          "Outer",
+          "Inner"
+        ],
+        "kind": "Class",
+        "methods": [
+          {
+            "name": [
+              "root",
+              "Outer",
+              "Inner",
+              "hello"
+            ],
+            "signature": {
+              "return_type": {
+                "Failed": []
+              }
+            },
+            "body": {}
+          }
+        ],
+        "nested_types": [
+          {
+            "name": [
+              "root",
+              "Outer",
+              "Inner",
+              "DeepInner"
+            ],
+            "kind": "Class",
+            "methods": [
+              {
+                "name": [
+                  "root",
+                  "Outer",
+                  "Inner",
+                  "DeepInner",
+                  "hello"
+                ],
+                "signature": {
+                  "return_type": {
+                    "Failed": []
+                  }
+                },
+                "body": {}
+              }
+            ],
+            "nested_types": [
+              {
+                "name": [
+                  "root",
+                  "Outer",
+                  "Inner",
+                  "DeepInner",
+                  "Local"
+                ],
+                "kind": "Class"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "Function": {
+        "name": [
+          "root",
+          "Outer",
+          "Inner",
+          "hello"
+        ],
+        "signature": {
+          "return_type": {
+            "Failed": []
+          }
+        },
+        "body": {}
+      }
+    },
+    {
+      "StructuredType": {
+        "name": [
+          "root",
+          "Outer",
+          "Inner",
+          "DeepInner"
+        ],
+        "kind": "Class",
+        "methods": [
+          {
+            "name": [
+              "root",
+              "Outer",
+              "Inner",
+              "DeepInner",
+              "hello"
+            ],
+            "signature": {
+              "return_type": {
+                "Failed": []
+              }
+            },
+            "body": {}
+          }
+        ],
+        "nested_types": [
+          {
+            "name": [
+              "root",
+              "Outer",
+              "Inner",
+              "DeepInner",
+              "Local"
+            ],
+            "kind": "Class"
+          }
+        ]
+      }
+    },
+    {
+      "Function": {
+        "name": [
+          "root",
+          "Outer",
+          "Inner",
+          "DeepInner",
+          "hello"
+        ],
+        "signature": {
+          "return_type": {
+            "Failed": []
+          }
+        },
+        "body": {}
+      }
+    },
+    {
+      "StructuredType": {
+        "name": [
+          "root",
+          "Outer",
+          "Inner",
+          "DeepInner",
+          "Local"
+        ],
+        "kind": "Class"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": [
+        "root"
+      ],
+      "to": [
+        "root",
+        "Animal"
+      ],
+      "kind": "ModuleContainment"
+    },
+    {
+      "from": [
+        "root"
+      ],
+      "to": [
+        "root",
+        "Cat"
+      ],
+      "kind": "ModuleContainment"
+    },
+    {
+      "from": [
+        "root"
+      ],
+      "to": [
+        "root",
+        "Chargeable"
+      ],
+      "kind": "ModuleContainment"
+    },
+    {
+      "from": [
+        "root"
+      ],
+      "to": [
+        "root",
+        "Entity"
+      ],
+      "kind": "ModuleContainment"
+    },
+    {
+      "from": [
+        "root"
+      ],
+      "to": [
+        "root",
+        "LivingBeing"
+      ],
+      "kind": "ModuleContainment"
+    },
+    {
+      "from": [
+        "root"
+      ],
+      "to": [
+        "root",
+        "Outer"
+      ],
+      "kind": "ModuleContainment"
+    },
+    {
+      "from": [
+        "root"
+      ],
+      "to": [
+        "root",
+        "Robot"
+      ],
+      "kind": "ModuleContainment"
+    },
+    {
+      "from": [
+        "root",
+        "Animal"
+      ],
+      "to": [
+        "root",
+        "Animal",
+        "Animal"
+      ],
+      "kind": "NestedIn"
+    },
+    {
+      "from": [
+        "root",
+        "Animal"
+      ],
+      "to": [
+        "root",
+        "Animal",
+        "breathe"
+      ],
+      "kind": "NestedIn"
+    },
+    {
+      "from": [
+        "root",
+        "Animal"
+      ],
+      "to": [
+        "root",
+        "Animal",
+        "getId"
+      ],
+      "kind": "NestedIn"
+    },
+    {
+      "from": [
+        "root",
+        "Animal"
+      ],
+      "to": [
+        "root",
+        "LivingBeing"
+      ],
+      "kind": "IsA"
+    },
+    {
+      "from": [
+        "root",
+        "Cat"
+      ],
+      "to": [
+        "root",
+        "Animal"
+      ],
+      "kind": "IsA"
+    },
+    {
+      "from": [
+        "root",
+        "Cat"
+      ],
+      "to": [
+        "root",
+        "Cat",
+        "Breed"
+      ],
+      "kind": "NestedIn"
+    },
+    {
+      "from": [
+        "root",
+        "Cat"
+      ],
+      "to": [
+        "root",
+        "Cat",
+        "Cat"
+      ],
+      "kind": "NestedIn"
+    },
+    {
+      "from": [
+        "root",
+        "Cat"
+      ],
+      "to": [
+        "root",
+        "Cat",
+        "MeowBehavior"
+      ],
+      "kind": "NestedIn"
+    },
+    {
+      "from": [
+        "root",
+        "Cat"
+      ],
+      "to": [
+        "root",
+        "Cat",
+        "speak"
+      ],
+      "kind": "NestedIn"
+    },
+    {
+      "from": [
+        "root",
+        "Cat",
+        "Breed"
+      ],
+      "to": [
+        "root",
+        "Cat",
+        "Breed",
+        "Breed"
+      ],
+      "kind": "NestedIn"
+    },
+    {
+      "from": [
+        "root",
+        "Cat",
+        "Cat"
+      ],
+      "to": [
+        "root",
+        "Cat",
+        "Cat",
+        "unnamed_type"
+      ],
+      "kind": "NestedIn"
+    },
+    {
+      "from": [
+        "root",
+        "Cat",
+        "MeowBehavior"
+      ],
+      "to": [
+        "root",
+        "Cat",
+        "MeowBehavior",
+        "speak"
+      ],
+      "kind": "NestedIn"
+    },
+    {
+      "from": [
+        "root",
+        "Chargeable"
+      ],
+      "to": [
+        "root",
+        "Chargeable",
+        "charge"
+      ],
+      "kind": "NestedIn"
+    },
+    {
+      "from": [
+        "root",
+        "Entity"
+      ],
+      "to": [
+        "root",
+        "Entity",
+        "getId"
+      ],
+      "kind": "NestedIn"
+    },
+    {
+      "from": [
+        "root",
+        "LivingBeing"
+      ],
+      "to": [
+        "root",
+        "Entity"
+      ],
+      "kind": "IsA"
+    },
+    {
+      "from": [
+        "root",
+        "LivingBeing"
+      ],
+      "to": [
+        "root",
+        "LivingBeing",
+        "breathe"
+      ],
+      "kind": "NestedIn"
+    },
+    {
+      "from": [
+        "root",
+        "Outer"
+      ],
+      "to": [
+        "root",
+        "Outer",
+        "Inner"
+      ],
+      "kind": "NestedIn"
+    },
+    {
+      "from": [
+        "root",
+        "Outer"
+      ],
+      "to": [
+        "root",
+        "Outer",
+        "hello"
+      ],
+      "kind": "NestedIn"
+    },
+    {
+      "from": [
+        "root",
+        "Outer",
+        "Inner"
+      ],
+      "to": [
+        "root",
+        "Outer",
+        "Inner",
+        "DeepInner"
+      ],
+      "kind": "NestedIn"
+    },
+    {
+      "from": [
+        "root",
+        "Outer",
+        "Inner"
+      ],
+      "to": [
+        "root",
+        "Outer",
+        "Inner",
+        "hello"
+      ],
+      "kind": "NestedIn"
+    },
+    {
+      "from": [
+        "root",
+        "Outer",
+        "Inner",
+        "DeepInner"
+      ],
+      "to": [
+        "root",
+        "Outer",
+        "Inner",
+        "DeepInner",
+        "Local"
+      ],
+      "kind": "NestedIn"
+    },
+    {
+      "from": [
+        "root",
+        "Outer",
+        "Inner",
+        "DeepInner"
+      ],
+      "to": [
+        "root",
+        "Outer",
+        "Inner",
+        "DeepInner",
+        "hello"
+      ],
+      "kind": "NestedIn"
+    },
+    {
+      "from": [
+        "root",
+        "Robot"
+      ],
+      "to": [
+        "root",
+        "Chargeable"
+      ],
+      "kind": "IsA"
+    },
+    {
+      "from": [
+        "root",
+        "Robot"
+      ],
+      "to": [
+        "root",
+        "Entity"
+      ],
+      "kind": "IsA"
+    },
+    {
+      "from": [
+        "root",
+        "Robot"
+      ],
+      "to": [
+        "root",
+        "Robot",
+        "charge"
+      ],
+      "kind": "NestedIn"
+    },
+    {
+      "from": [
+        "root",
+        "Robot"
+      ],
+      "to": [
+        "root",
+        "Robot",
+        "getId"
+      ],
+      "kind": "NestedIn"
+    },
+    {
+      "from": [
+        "root",
+        "Robot"
+      ],
+      "to": [
+        "root",
+        "Robot",
+        "myBreed"
+      ],
+      "kind": "UsesFieldType"
+    },
+    {
+      "from": [
+        "root",
+        "Robot"
+      ],
+      "to": [
+        "root",
+        "Robot",
+        "myCat"
+      ],
+      "kind": "UsesFieldType"
+    },
+    {
+      "from": [
+        "root",
+        "Robot"
+      ],
+      "to": [
+        "root",
+        "Robot",
+        "startServer"
+      ],
+      "kind": "NestedIn"
+    },
+    {
+      "from": [
+        "root",
+        "Robot",
+        "startServer"
+      ],
+      "to": [
+        "root",
+        "Cat"
+      ],
+      "kind": "UsesLocalType"
+    },
+    {
+      "from": [
+        "root",
+        "Robot",
+        "startServer"
+      ],
+      "to": [
+        "root",
+        "Cat"
+      ],
+      "kind": "Instantiates"
+    },
+    {
+      "from": [
+        "root",
+        "Robot",
+        "startServer"
+      ],
+      "to": [
+        "root",
+        "Outer",
+        "Inner",
+        "DeepInner"
+      ],
+      "kind": "Calls"
+    },
+    {
+      "from": [
+        "root",
+        "Robot",
+        "startServer"
+      ],
+      "to": [
+        "root",
+        "Robot",
+        "myCat"
+      ],
+      "kind": "Calls"
+    }
+  ]
+}
