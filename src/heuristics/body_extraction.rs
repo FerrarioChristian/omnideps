@@ -43,7 +43,20 @@ pub fn extract_block(node: Node, source: &str) -> crate::model::Block {
                 | "variable_declaration"
                 | "let_declaration"
         ) {
-            if let Some(name) = extract_identifier(child, source) {
+            let name_opt;
+            if let Some(decl_node) = child.child_by_field_name("declarator") {
+                if let Some(name_node) = decl_node.child_by_field_name("name") {
+                    name_opt = extract_identifier(name_node, source);
+                } else {
+                    name_opt = extract_identifier(decl_node, source);
+                }
+            } else if let Some(name_node) = child.child_by_field_name("name") {
+                name_opt = extract_identifier(name_node, source);
+            } else {
+                name_opt = extract_identifier(child, source);
+            }
+
+            if let Some(name) = name_opt {
                 // For declarations, check if there is an explicit type. 
                 // Using extract_type_ref on the whole declaration node can falsely extract the variable name as type.
                 let mut ty = if let Some(type_node) = child.child_by_field_name("type") {
@@ -147,10 +160,19 @@ fn find_behavioral_deps(
         }
     } else if kind == "method_invocation" {
         // Java
+        let mut parts = vec![];
         if let Some(obj) = node.child_by_field_name("object") {
-            calls.push(extract_type_ref(obj, source));
-        } else if let Some(name) = node.child_by_field_name("name") {
-            calls.push(extract_type_ref(name, source));
+            if let TypeRef::Unresolved(qn) = extract_type_ref(obj, source) {
+                parts.extend(qn);
+            }
+        }
+        if let Some(name) = node.child_by_field_name("name") {
+            if let TypeRef::Unresolved(qn) = extract_type_ref(name, source) {
+                parts.extend(qn);
+            }
+        }
+        if !parts.is_empty() {
+            calls.push(TypeRef::Unresolved(parts));
         }
     }
 

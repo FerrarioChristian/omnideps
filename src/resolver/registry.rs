@@ -11,7 +11,7 @@ use std::collections::HashMap;
 #[derive(Debug, Clone)]
 pub enum RegistryEntry {
     Module,
-    StructuredType,
+    StructuredType { super_types: Vec<TypeRef> },
     Function { return_type: TypeRef },
     Field { field_type: TypeRef },
 }
@@ -72,7 +72,7 @@ impl GlobalRegistry {
     /// Recursively registers a StructuredType, its methods, and any nested types.
     fn register_structured_type(&mut self, st: &StructuredType, mut prefix: QualifiedName) {
         prefix.extend(st.name.clone());
-        self.paths.insert(prefix.clone(), RegistryEntry::StructuredType);
+        self.paths.insert(prefix.clone(), RegistryEntry::StructuredType { super_types: st.super_types.clone() });
 
         for field in &st.fields {
             let mut f_prefix = prefix.clone();

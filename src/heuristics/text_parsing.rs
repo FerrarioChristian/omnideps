@@ -44,6 +44,11 @@ pub fn extract_name_from_text(text: &str) -> Option<QualifiedName> {
 
 /// Tries to extract a simple identifier (string) from common child field names.
 pub fn extract_identifier(node: Node, source: &str) -> Option<String> {
+    if matches!(node.kind(), "identifier" | "type_identifier" | "pattern" | "name" | "scoped_identifier") {
+        let text = node_text(node, source).trim().to_string();
+        if !text.is_empty() { return Some(text); }
+    }
+
     if let Some(n) = node
         .child_by_field_name("name")
         .or_else(|| node.child_by_field_name("type_identifier"))
@@ -59,9 +64,15 @@ pub fn extract_identifier(node: Node, source: &str) -> Option<String> {
             let text = node_text(n, source).trim().to_string();
             if !text.is_empty() { return Some(text); }
         }
+        
+        if let Some(n) = decl.child_by_field_name("name") {
+            let text = node_text(n, source).trim().to_string();
+            if !text.is_empty() { return Some(text); }
+        }
+
         let text = node_text(decl, source).trim().to_string();
-        // Take just the name before '('
-        let name_part = text.split('(').next().unwrap_or("").trim().to_string();
+        // Take just the name before '(' or '='
+        let name_part = text.split('(').next().unwrap_or(text.as_str()).split('=').next().unwrap_or("").trim().to_string();
         if !name_part.is_empty() { return Some(name_part); }
     }
 

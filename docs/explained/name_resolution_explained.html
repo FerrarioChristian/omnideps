@@ -825,17 +825,36 @@ block.instantiates = block.instantiates.into_iter().map(|i| substitute_type(ctx,
         <p style="margin-bottom: 0;">In molti linguaggi, il modulo principale del progetto si chiama "root" nell'IR. Se il prefix climbing non trova nulla, l'ultimo tentativo è cercare direttamente sotto root. Questo gestisce il caso in cui un tipo viene referenziato da un contesto il cui prefix non include "root" (es. perché il contesto è a livello globale con prefix vuoto <code>[]</code>).</p>
     </div>
 
-    <h4>7.3.2 <code>Query::Extract</code> — Discesa Senza Verifica</h4>
+    <h4>7.3.2 <code>Query::Extract</code> — Discesa e Method Resolution Order (MRO)</h4>
     <pre><code>Query::Extract(parent_query, member_name) =&gt; {
-    if let Some(mut parent_path) = evaluate_query(ctx, parent_query, true) {
-        parent_path.push(member_name.clone());
-        Some(parent_path)  // Restituisce SEMPRE, senza verificare esistenza!
-    } else { None }
+    let parent_path = evaluate_query(ctx, parent_query, true)?;
+    
+    // Funzione interna per ricerca ricorsiva
+    fn find_member(ctx, current_path, member) -&gt; Option&lt;QualifiedName&gt; {
+        let mut candidate = current_path.clone();
+        candidate.push(member.clone());
+        if ctx.registry.exists(&amp;candidate) { return Some(candidate); }
+        
+        // MRO: Depth-First, Left-to-Right
+        if let Some(RegistryEntry::StructuredType { super_types }) = ctx.registry.get(&amp;current_path) {
+            for sup in super_types {
+                if let TypeRef::ResolutionQuery(q) = sup {
+                    if let Some(sup_path) = evaluate_query(ctx, q, true) {
+                        if let Some(found) = find_member(ctx, sup_path, member) { return Some(found); }
+                    }
+                }
+            }
+        }
+        None
+    }
+    // ...
 }</code></pre>
-    <p><strong>Due scelte critiche:</strong></p>
+    <p>Questo operatore è il fulcro della <strong>Dynamic Dispatch statica</strong>. Implementa nativamente l'ereditarietà (Method Resolution Order):</p>
     <ol>
-        <li><strong><code>resolve_call_return: true</code> per il genitore:</strong> Se il genitore è un <code>Call(Q)</code>, vogliamo il tipo di ritorno della funzione, non la funzione stessa. Es: in <code>a.f().g()</code>, <code>Extract(Call(Extract(Find("A"),"f")), "g")</code> — il genitore <code>Call(…)</code> deve restituire il tipo di ritorno di <code>f</code> perché <code>g</code> va cercato <em>su quel tipo</em>.</li>
-        <li><strong>Nessuna verifica di esistenza:</strong> il path costruito non viene verificato contro il registry. Questo è intenzionale per supportare catene esterne come <code>std::vec::Vec</code> dove i segmenti intermedi non sono nel registry locale. La verifica avviene a monte in <code>evaluate_typeref</code>.</li>
+        <li>Se <code>Cat.breathe</code> esiste direttamente in <code>Cat</code>, viene restituito.</li>
+        <li>Se fallisce, cerca nei <code>super_types</code>. Valuta la query del genitore (es. <code>Animal</code>) e cerca <code>Animal::breathe</code>.</li>
+        <li>La ricorsione è Depth-First, Left-to-Right. Se una classe eredita da più padri (Diamond Problem in C++/Python), l'algoritmo si aggancia deterministicamente alla prima implementazione utile trovata, garantendo un grafo intatto.</li>
+        <li>Garantisce il corretto linking alle implementazioni di default dei Trait in Rust o Interfacce Java, comportandosi come un vero compilatore.</li>
     </ol>
 
     <h4>7.3.3 <code>Query::Call</code> — Il Comportamento Duale</h4>

@@ -121,16 +121,6 @@
                   "LivingBeing"
                 ]
               }
-            ],
-            "nested_types": [
-              {
-                "name": [
-                  "root",
-                  "Animal",
-                  "Animal"
-                ],
-                "kind": "Struct"
-              }
             ]
           },
           {
@@ -185,25 +175,6 @@
                 "name": [
                   "root",
                   "Cat",
-                  "Cat"
-                ],
-                "kind": "Struct",
-                "nested_types": [
-                  {
-                    "name": [
-                      "root",
-                      "Cat",
-                      "Cat",
-                      "unnamed_type"
-                    ],
-                    "kind": "Struct"
-                  }
-                ]
-              },
-              {
-                "name": [
-                  "root",
-                  "Cat",
                   "Breed"
                 ],
                 "kind": "Class",
@@ -215,17 +186,6 @@
                         "Other": "String"
                       }
                     }
-                  }
-                ],
-                "nested_types": [
-                  {
-                    "name": [
-                      "root",
-                      "Cat",
-                      "Breed",
-                      "Breed"
-                    ],
-                    "kind": "Struct"
                   }
                 ]
               },
@@ -291,28 +251,6 @@
               "Robot"
             ],
             "kind": "Class",
-            "fields": [
-              {
-                "name": "myCat",
-                "ty": {
-                  "Resolved": [
-                    "root",
-                    "Robot",
-                    "myCat"
-                  ]
-                }
-              },
-              {
-                "name": "myBreed",
-                "ty": {
-                  "Resolved": [
-                    "root",
-                    "Robot",
-                    "myBreed"
-                  ]
-                }
-              }
-            ],
             "methods": [
               {
                 "name": [
@@ -356,7 +294,7 @@
                 "body": {
                   "declarations": [
                     {
-                      "name": "myCat = new Cat",
+                      "name": "myCat",
                       "ty": {
                         "Resolved": [
                           "root",
@@ -365,7 +303,7 @@
                       }
                     },
                     {
-                      "name": "myBreed = new Cat.Breed",
+                      "name": "myBreed",
                       "ty": {
                         "Resolved": [
                           "root",
@@ -378,8 +316,8 @@
                     {
                       "Resolved": [
                         "root",
-                        "Robot",
-                        "myCat"
+                        "Animal",
+                        "breathe"
                       ]
                     },
                     {
@@ -387,7 +325,8 @@
                         "root",
                         "Outer",
                         "Inner",
-                        "DeepInner"
+                        "DeepInner",
+                        "hello"
                       ]
                     }
                   ],
@@ -492,18 +431,6 @@
                           }
                         },
                         "body": {}
-                      }
-                    ],
-                    "nested_types": [
-                      {
-                        "name": [
-                          "root",
-                          "Outer",
-                          "Inner",
-                          "DeepInner",
-                          "Local"
-                        ],
-                        "kind": "Class"
                       }
                     ]
                   }
@@ -666,16 +593,6 @@
               "LivingBeing"
             ]
           }
-        ],
-        "nested_types": [
-          {
-            "name": [
-              "root",
-              "Animal",
-              "Animal"
-            ],
-            "kind": "Struct"
-          }
         ]
       }
     },
@@ -717,16 +634,6 @@
             }
           ]
         }
-      }
-    },
-    {
-      "StructuredType": {
-        "name": [
-          "root",
-          "Animal",
-          "Animal"
-        ],
-        "kind": "Struct"
       }
     },
     {
@@ -782,25 +689,6 @@
             "name": [
               "root",
               "Cat",
-              "Cat"
-            ],
-            "kind": "Struct",
-            "nested_types": [
-              {
-                "name": [
-                  "root",
-                  "Cat",
-                  "Cat",
-                  "unnamed_type"
-                ],
-                "kind": "Struct"
-              }
-            ]
-          },
-          {
-            "name": [
-              "root",
-              "Cat",
               "Breed"
             ],
             "kind": "Class",
@@ -812,17 +700,6 @@
                     "Other": "String"
                   }
                 }
-              }
-            ],
-            "nested_types": [
-              {
-                "name": [
-                  "root",
-                  "Cat",
-                  "Breed",
-                  "Breed"
-                ],
-                "kind": "Struct"
               }
             ]
           },
@@ -889,38 +766,6 @@
         "name": [
           "root",
           "Cat",
-          "Cat"
-        ],
-        "kind": "Struct",
-        "nested_types": [
-          {
-            "name": [
-              "root",
-              "Cat",
-              "Cat",
-              "unnamed_type"
-            ],
-            "kind": "Struct"
-          }
-        ]
-      }
-    },
-    {
-      "StructuredType": {
-        "name": [
-          "root",
-          "Cat",
-          "Cat",
-          "unnamed_type"
-        ],
-        "kind": "Struct"
-      }
-    },
-    {
-      "StructuredType": {
-        "name": [
-          "root",
-          "Cat",
           "Breed"
         ],
         "kind": "Class",
@@ -933,29 +778,7 @@
               }
             }
           }
-        ],
-        "nested_types": [
-          {
-            "name": [
-              "root",
-              "Cat",
-              "Breed",
-              "Breed"
-            ],
-            "kind": "Struct"
-          }
         ]
-      }
-    },
-    {
-      "StructuredType": {
-        "name": [
-          "root",
-          "Cat",
-          "Breed",
-          "Breed"
-        ],
-        "kind": "Struct"
       }
     },
     {
@@ -1062,28 +885,6 @@
           "Robot"
         ],
         "kind": "Class",
-        "fields": [
-          {
-            "name": "myCat",
-            "ty": {
-              "Resolved": [
-                "root",
-                "Robot",
-                "myCat"
-              ]
-            }
-          },
-          {
-            "name": "myBreed",
-            "ty": {
-              "Resolved": [
-                "root",
-                "Robot",
-                "myBreed"
-              ]
-            }
-          }
-        ],
         "methods": [
           {
             "name": [
@@ -1127,7 +928,7 @@
             "body": {
               "declarations": [
                 {
-                  "name": "myCat = new Cat",
+                  "name": "myCat",
                   "ty": {
                     "Resolved": [
                       "root",
@@ -1136,7 +937,7 @@
                   }
                 },
                 {
-                  "name": "myBreed = new Cat.Breed",
+                  "name": "myBreed",
                   "ty": {
                     "Resolved": [
                       "root",
@@ -1149,8 +950,8 @@
                 {
                   "Resolved": [
                     "root",
-                    "Robot",
-                    "myCat"
+                    "Animal",
+                    "breathe"
                   ]
                 },
                 {
@@ -1158,7 +959,8 @@
                     "root",
                     "Outer",
                     "Inner",
-                    "DeepInner"
+                    "DeepInner",
+                    "hello"
                   ]
                 }
               ],
@@ -1242,7 +1044,7 @@
         "body": {
           "declarations": [
             {
-              "name": "myCat = new Cat",
+              "name": "myCat",
               "ty": {
                 "Resolved": [
                   "root",
@@ -1251,7 +1053,7 @@
               }
             },
             {
-              "name": "myBreed = new Cat.Breed",
+              "name": "myBreed",
               "ty": {
                 "Resolved": [
                   "root",
@@ -1264,8 +1066,8 @@
             {
               "Resolved": [
                 "root",
-                "Robot",
-                "myCat"
+                "Animal",
+                "breathe"
               ]
             },
             {
@@ -1273,7 +1075,8 @@
                 "root",
                 "Outer",
                 "Inner",
-                "DeepInner"
+                "DeepInner",
+                "hello"
               ]
             }
           ],
@@ -1365,18 +1168,6 @@
                     },
                     "body": {}
                   }
-                ],
-                "nested_types": [
-                  {
-                    "name": [
-                      "root",
-                      "Outer",
-                      "Inner",
-                      "DeepInner",
-                      "Local"
-                    ],
-                    "kind": "Class"
-                  }
                 ]
               }
             ]
@@ -1448,18 +1239,6 @@
                 },
                 "body": {}
               }
-            ],
-            "nested_types": [
-              {
-                "name": [
-                  "root",
-                  "Outer",
-                  "Inner",
-                  "DeepInner",
-                  "Local"
-                ],
-                "kind": "Class"
-              }
             ]
           }
         ]
@@ -1506,18 +1285,6 @@
             },
             "body": {}
           }
-        ],
-        "nested_types": [
-          {
-            "name": [
-              "root",
-              "Outer",
-              "Inner",
-              "DeepInner",
-              "Local"
-            ],
-            "kind": "Class"
-          }
         ]
       }
     },
@@ -1536,18 +1303,6 @@
           }
         },
         "body": {}
-      }
-    },
-    {
-      "StructuredType": {
-        "name": [
-          "root",
-          "Outer",
-          "Inner",
-          "DeepInner",
-          "Local"
-        ],
-        "kind": "Class"
       }
     }
   ],
@@ -1630,18 +1385,6 @@
       "to": [
         "root",
         "Animal",
-        "Animal"
-      ],
-      "kind": "NestedIn"
-    },
-    {
-      "from": [
-        "root",
-        "Animal"
-      ],
-      "to": [
-        "root",
-        "Animal",
         "breathe"
       ],
       "kind": "NestedIn"
@@ -1700,18 +1443,6 @@
       "to": [
         "root",
         "Cat",
-        "Cat"
-      ],
-      "kind": "NestedIn"
-    },
-    {
-      "from": [
-        "root",
-        "Cat"
-      ],
-      "to": [
-        "root",
-        "Cat",
         "MeowBehavior"
       ],
       "kind": "NestedIn"
@@ -1725,34 +1456,6 @@
         "root",
         "Cat",
         "speak"
-      ],
-      "kind": "NestedIn"
-    },
-    {
-      "from": [
-        "root",
-        "Cat",
-        "Breed"
-      ],
-      "to": [
-        "root",
-        "Cat",
-        "Breed",
-        "Breed"
-      ],
-      "kind": "NestedIn"
-    },
-    {
-      "from": [
-        "root",
-        "Cat",
-        "Cat"
-      ],
-      "to": [
-        "root",
-        "Cat",
-        "Cat",
-        "unnamed_type"
       ],
       "kind": "NestedIn"
     },
@@ -1881,22 +1584,6 @@
         "Outer",
         "Inner",
         "DeepInner",
-        "Local"
-      ],
-      "kind": "NestedIn"
-    },
-    {
-      "from": [
-        "root",
-        "Outer",
-        "Inner",
-        "DeepInner"
-      ],
-      "to": [
-        "root",
-        "Outer",
-        "Inner",
-        "DeepInner",
         "hello"
       ],
       "kind": "NestedIn"
@@ -1955,33 +1642,22 @@
       "to": [
         "root",
         "Robot",
-        "myBreed"
+        "startServer"
       ],
-      "kind": "UsesFieldType"
+      "kind": "NestedIn"
     },
     {
       "from": [
-        "root",
-        "Robot"
-      ],
-      "to": [
-        "root",
-        "Robot",
-        "myCat"
-      ],
-      "kind": "UsesFieldType"
-    },
-    {
-      "from": [
-        "root",
-        "Robot"
-      ],
-      "to": [
         "root",
         "Robot",
         "startServer"
       ],
-      "kind": "NestedIn"
+      "to": [
+        "root",
+        "Animal",
+        "breathe"
+      ],
+      "kind": "Calls"
     },
     {
       "from": [
@@ -2017,20 +1693,8 @@
         "root",
         "Outer",
         "Inner",
-        "DeepInner"
-      ],
-      "kind": "Calls"
-    },
-    {
-      "from": [
-        "root",
-        "Robot",
-        "startServer"
-      ],
-      "to": [
-        "root",
-        "Robot",
-        "myCat"
+        "DeepInner",
+        "hello"
       ],
       "kind": "Calls"
     }

@@ -229,9 +229,40 @@ fn evaluate_query(ctx: &ExecutorContext, query: &Query, resolve_type: bool) -> O
         }
         Query::Extract(parent_query, member_name) => {
             // Find-going-down
-            let mut target_path = evaluate_query(ctx, parent_query, true)?;
-            target_path.push(member_name.clone());
+            let parent_path = evaluate_query(ctx, parent_query, true)?;
             
+            // Function to recursively search for a member in a class and its super_types
+            fn find_member(ctx: &ExecutorContext, current_path: QualifiedName, member: &String) -> Option<QualifiedName> {
+                let mut candidate = current_path.clone();
+                candidate.push(member.clone());
+                
+                // 1. Direct match
+                if ctx.registry.exists(&candidate) {
+                    return Some(candidate);
+                }
+                
+                // 2. Inheritance fallback (MRO: Depth-First, Left-to-Right)
+                if let Some(crate::resolver::registry::RegistryEntry::StructuredType { super_types }) = ctx.registry.get(&current_path) {
+                    for sup in super_types {
+                        if let TypeRef::ResolutionQuery(q) = sup {
+                            if let Some(sup_path) = evaluate_query(ctx, q, true) {
+                                if let Some(found) = find_member(ctx, sup_path, member) {
+                                    return Some(found);
+                                }
+                            }
+                        }
+                    }
+                }
+                None
+            }
+
+            let mut target_path = parent_path.clone();
+            target_path.push(member_name.clone());
+
+            if let Some(found_path) = find_member(ctx, parent_path.clone(), member_name) {
+                target_path = found_path;
+            }
+
             if resolve_type {
                 // If we need the type of this field (e.g. chained access `a.b.c`), look up the field in the registry
                 if let Some(crate::resolver::registry::RegistryEntry::Field { field_type }) = ctx.registry.get(&target_path) {

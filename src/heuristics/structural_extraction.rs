@@ -29,11 +29,12 @@ where
     for child in node.children(&mut cursor) {
         if let Some(item) = parser(child, source) {
             items.push(item);
-        } else if child.kind().contains("body")
+        } else if !crate::heuristics::classifiers::is_function(child) && (
+            child.kind().contains("body")
             || child.kind().contains("list")
             || child.kind().contains("block")
             || child.kind().contains("declaration")
-        {
+        ) {
             items.extend(extract_list_of(child, source, parser));
         }
     }

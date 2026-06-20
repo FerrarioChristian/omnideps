@@ -54,14 +54,6 @@
   },
   {
     "data": {
-      "id": "root::Animal::Animal",
-      "label": "Animal",
-      "type": "Struct",
-      "parent": "root::Animal"
-    }
-  },
-  {
-    "data": {
       "id": "root::Cat",
       "label": "Cat",
       "type": "Class"
@@ -77,34 +69,10 @@
   },
   {
     "data": {
-      "id": "root::Cat::Cat",
-      "label": "Cat",
-      "type": "Struct",
-      "parent": "root::Cat"
-    }
-  },
-  {
-    "data": {
-      "id": "root::Cat::Cat::unnamed_type",
-      "label": "unnamed_type",
-      "type": "Struct",
-      "parent": "root::Cat::Cat"
-    }
-  },
-  {
-    "data": {
       "id": "root::Cat::Breed",
       "label": "Breed",
       "type": "Class",
       "parent": "root::Cat"
-    }
-  },
-  {
-    "data": {
-      "id": "root::Cat::Breed::Breed",
-      "label": "Breed",
-      "type": "Struct",
-      "parent": "root::Cat::Breed"
     }
   },
   {
@@ -218,14 +186,6 @@
   },
   {
     "data": {
-      "id": "root::Outer::Inner::DeepInner::Local",
-      "label": "Local",
-      "type": "Class",
-      "parent": "root::Outer::Inner::DeepInner"
-    }
-  },
-  {
-    "data": {
       "id": "e0",
       "source": "root::Animal",
       "target": "root::LivingBeing",
@@ -266,37 +226,15 @@
   },
   {
     "data": {
-      "id": "root::Robot::myBreed",
-      "label": "myBreed",
-      "type": "External"
-    }
-  },
-  {
-    "data": {
       "id": "e5",
-      "source": "root::Robot",
-      "target": "root::Robot::myBreed",
-      "label": "UsesFieldType"
-    }
-  },
-  {
-    "data": {
-      "id": "root::Robot::myCat",
-      "label": "myCat",
-      "type": "External"
+      "source": "root::Robot::startServer",
+      "target": "root::Animal::breathe",
+      "label": "Calls"
     }
   },
   {
     "data": {
       "id": "e6",
-      "source": "root::Robot",
-      "target": "root::Robot::myCat",
-      "label": "UsesFieldType"
-    }
-  },
-  {
-    "data": {
-      "id": "e7",
       "source": "root::Robot::startServer",
       "target": "root::Cat",
       "label": "UsesLocalType"
@@ -304,7 +242,7 @@
   },
   {
     "data": {
-      "id": "e8",
+      "id": "e7",
       "source": "root::Robot::startServer",
       "target": "root::Cat",
       "label": "Instantiates"
@@ -312,17 +250,9 @@
   },
   {
     "data": {
-      "id": "e9",
+      "id": "e8",
       "source": "root::Robot::startServer",
-      "target": "root::Outer::Inner::DeepInner",
-      "label": "Calls"
-    }
-  },
-  {
-    "data": {
-      "id": "e10",
-      "source": "root::Robot::startServer",
-      "target": "root::Robot::myCat",
+      "target": "root::Outer::Inner::DeepInner::hello",
       "label": "Calls"
     }
   }

@@ -60,14 +60,16 @@ La fase di \textit{Reference Resolution} effettiva si attua
 Questa netta separazione assicura che un componente non ancora
 dichiarato nel codice sorgente (forward reference) sia regolarmente tracciabile.
 
-Il motore di esecuzione naviga l'IR valutando algebricamente l'albero
-delle Query generate. Per evitare la naturale lentezza $O(N)$ del
-\textit{Find-going-up} lungo i rami del file system, l'algoritmo crea
-un indice piatto intermedio chiamato \textit{GlobalRegistry}. Questo
-indicizza a tempo zero il path di ogni modulo, classe, funzione e
-\textbf{campo} (per la validazione e \textit{type-inference} delle
-concatenazioni interne `a.b.f()`). La risoluzione diventa quindi un
-rapido match O(1) sui path aggregati generati dalla Query.
+Il motore di esecuzione naviga l'IR valutando algebricamente l'albero delle Query generate. Per evitare la naturale lentezza $O(N)$ del \textit{Find-going-up} lungo i rami del file system, l'algoritmo crea un indice piatto intermedio chiamato \textit{GlobalRegistry}. Questo indicizza a tempo zero il path di ogni modulo, classe, funzione e \textbf{campo} (per la validazione e \textit{type-inference} delle concatenazioni interne `a.b.f()`). La risoluzione diventa quindi un rapido match $O(1)$ sui path aggregati generati dalla Query.
+
+\subsection{L'Operatore Extract e il Method Resolution Order (MRO)}
+L'operatore algebrico $\texttt{Extract}(P, m)$ (che cerca il membro $m$ nel padre $P$) implementa una logica di \textit{Dynamic Dispatch Statica} tramite \textbf{Method Resolution Order}.
+Se il membro $m$ non viene trovato direttamente all'interno di $P$, l'esecutore interroga il Registro Globale per estrarre i \texttt{super\_types} di $P$. Viene quindi lanciata una ricerca ricorsiva \textit{Depth-First, Left-to-Right} (Profondità prima, da sinistra a destra) sui genitori di $P$. 
+Questo approccio neutrale permette all'analizzatore di:
+\begin{enumerate}
+    \item \textbf{Risolvere il Polimorfismo di Default}: Se $P$ implementa un'interfaccia Java o un Trait Rust che fornisce un'implementazione di default per $m$, la query restituisce l'indirizzo del Trait, generando l'arco di dipendenza concettualmente più corretto.
+    \item \textbf{Neutralizzare il Diamond Problem}: In linguaggi con ereditarietà multipla come C++ o Python, se più padri espongono lo stesso metodo $m$, l'algoritmo si aggancia deterministicamente al primo padre utile individuato nell'ordine sintattico della dichiarazione originale, garantendo l'integrità del grafo architetturale senza incorrere nei crash tipici dei compilatori.
+\end{enumerate}
 
 \subsection{Limiti di una Symbol Table Piatta}
 Nella prima formalizzazione dell'architettura, la \textit{Symbol

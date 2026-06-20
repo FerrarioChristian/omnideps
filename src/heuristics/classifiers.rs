@@ -34,6 +34,7 @@ pub fn is_structured_type(node: Node) -> bool {
         && !kind.contains("variant")
         && !kind.contains("super")
         && !kind.contains("base")
+        && !kind.contains("constructor")
 }
 
 /// Heuristically identifies free-standing functions or methods.
