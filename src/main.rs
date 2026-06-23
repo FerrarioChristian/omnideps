@@ -18,10 +18,17 @@ use cli::Cli;
 fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
 
+    let config = if let Some(config_path) = cli.config {
+        let content = fs::read_to_string(&config_path)?;
+        serde_json::from_str(&content)?
+    } else {
+        language_agnostic_analyzer::config::AnalyzerConfig::default_strategies()
+    };
+
     if cli.path.is_file() {
-        analyze_single_file(&cli.path, cli.output.as_deref(), cli.csv.as_deref(), cli.debug_refs)?;
+        analyze_single_file(&cli.path, cli.output.as_deref(), cli.csv.as_deref(), cli.debug_refs, &config)?;
     } else if cli.path.is_dir() {
-        analyze_directory(&cli.path, cli.output.as_deref(), cli.csv.as_deref(), cli.debug_refs)?;
+        analyze_directory(&cli.path, cli.output.as_deref(), cli.csv.as_deref(), cli.debug_refs, &config)?;
     } else {
         println!("Percorso non valido!");
     }
@@ -35,15 +42,16 @@ fn analyze_single_file(
     json_out: Option<&std::path::Path>,
     csv_out: Option<&std::path::Path>,
     debug_refs: bool,
+    config: &language_agnostic_analyzer::config::AnalyzerConfig,
 ) -> anyhow::Result<()> {
     let lang = SupportedLanguage::from_path(path)
         .ok_or_else(|| anyhow::anyhow!("Language not supported for file: {}", path.display()))?;
     let source = fs::read_to_string(path)?;
     
     // Phase 1: Parse
-    let (modules, primitives) = parse_source(lang, &source)?;
+    let (modules, primitives) = parse_source(lang, &source, path, config)?;
     // Phase 2-4: Resolve and Graph
-    let (resolved_modules, graph, summary) = analyze_project(modules, primitives);
+    let (resolved_modules, graph, summary) = analyze_project(modules, primitives, config);
 
     println!("=== ANALISI {} ===", path.display());
     print_summary(&summary);
@@ -85,6 +93,7 @@ fn analyze_directory(
     json_out: Option<&std::path::Path>,
     csv_out: Option<&std::path::Path>,
     debug_refs: bool,
+    config: &language_agnostic_analyzer::config::AnalyzerConfig,
 ) -> anyhow::Result<()> {
     let mut all_modules = vec![];
     let mut combined_primitives = PrimitiveRegistry::empty();
@@ -95,7 +104,7 @@ fn analyze_directory(
             && let Some(lang) = SupportedLanguage::from_path(entry.path())
         {
             if let Ok(source) = fs::read_to_string(entry.path()) {
-                if let Ok((mut file_modules, file_primitives)) = parse_source(lang, &source) {
+                if let Ok((mut file_modules, file_primitives)) = parse_source(lang, &source, entry.path(), config) {
                     all_modules.append(&mut file_modules);
                     combined_primitives.merge(file_primitives);
                 }
@@ -104,7 +113,7 @@ fn analyze_directory(
     }
 
     // Phase 2-4: Unified Resolution and Graph Building
-    let (resolved_modules, graph, summary) = analyze_project(all_modules, combined_primitives);
+    let (resolved_modules, graph, summary) = analyze_project(all_modules, combined_primitives, config);
 
     println!("=== ANALISI CARTELLA {} ===", dir.display());
     print_summary(&summary);

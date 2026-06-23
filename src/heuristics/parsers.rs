@@ -15,6 +15,8 @@ pub fn try_parse_module_node(node: Node, source: &str) -> Option<Module> {
     let name = extract_identifier(node, source).unwrap_or_else(|| "unnamed_module".to_string());
     Some(Module {
         name: vec![name],
+        language: None,
+        file_path: None,
         imports: vec![],
         sub_modules: vec![],
         structured_types: vec![],

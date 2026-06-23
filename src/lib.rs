@@ -1,4 +1,5 @@
 pub mod analyzer;
+pub mod config;
 pub mod export;
 pub mod heuristics;
 pub mod model;

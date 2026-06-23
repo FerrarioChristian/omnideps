@@ -7,9 +7,11 @@ pub struct ExecutorContext<'a> {
     pub imports_stack: Vec<Vec<Import>>,
     pub registry: &'a GlobalRegistry,
     pub primitives: &'a PrimitiveRegistry,
+    pub config: &'a crate::config::AnalyzerConfig,
+    pub current_lang: Option<String>,
 }
 
-pub fn execute_queries(modules: Vec<Module>, primitives: &PrimitiveRegistry) -> Vec<Module> {
+pub fn execute_queries(modules: Vec<Module>, primitives: &PrimitiveRegistry, config: &crate::config::AnalyzerConfig) -> Vec<Module> {
     let registry = GlobalRegistry::build(&modules);
     
     let ctx = ExecutorContext {
@@ -17,6 +19,8 @@ pub fn execute_queries(modules: Vec<Module>, primitives: &PrimitiveRegistry) -> 
         imports_stack: vec![],
         registry: &registry,
         primitives,
+        config,
+        current_lang: None,
     };
 
     modules.into_iter().map(|m| execute_module(&ctx, m)).collect()
@@ -35,6 +39,8 @@ fn execute_module(ctx: &ExecutorContext, mut m: Module) -> Module {
         imports_stack: new_imports,
         registry: ctx.registry,
         primitives: ctx.primitives,
+        config: ctx.config,
+        current_lang: m.language.clone().or_else(|| ctx.current_lang.clone()),
     };
 
     m.structured_types = m.structured_types.into_iter().map(|st| execute_structured_type(&new_ctx, st)).collect();
@@ -75,6 +81,8 @@ fn execute_structured_type(ctx: &ExecutorContext, mut st: StructuredType) -> Str
         imports_stack: ctx.imports_stack.clone(),
         registry: ctx.registry,
         primitives: ctx.primitives,
+        config: ctx.config,
+        current_lang: ctx.current_lang.clone(),
     };
 
     st.super_types = st.super_types.into_iter().map(|t| evaluate_typeref(&new_ctx, t)).collect();
@@ -95,6 +103,8 @@ fn execute_function(ctx: &ExecutorContext, mut f: Function) -> Function {
         imports_stack: ctx.imports_stack.clone(),
         registry: ctx.registry,
         primitives: ctx.primitives,
+        config: ctx.config,
+        current_lang: ctx.current_lang.clone(),
     };
 
     f.signature.parameters = f.signature.parameters.into_iter().map(|mut p| { p.ty = evaluate_typeref(&new_ctx, p.ty); p }).collect();
@@ -129,6 +139,8 @@ fn execute_impl_block(ctx: &ExecutorContext, mut ib: ImplBlock) -> ImplBlock {
         imports_stack: ctx.imports_stack.clone(),
         registry: ctx.registry,
         primitives: ctx.primitives,
+        config: ctx.config,
+        current_lang: ctx.current_lang.clone(),
     };
 
     ib.methods = ib.methods.into_iter().map(|m| execute_function(&new_ctx, m)).collect();

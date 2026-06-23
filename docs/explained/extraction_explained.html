@@ -315,6 +315,7 @@
             <li><a href="#type-extraction">Estrazione dei Tipi: <code>extract_type_ref</code></a></li>
             <li><a href="#body-deps">Estrazione Strutturata del Body: <code>extract_block</code></a></li>
             <li><a href="#full-example">Esempio Completo End-to-End</a></li>
+            <li><a href="#multi-file">Orchestrazione Multi-File (Workspace Extraction) e Configurazione Strategie</a></li>
         </ol>
     </div>
 
@@ -669,14 +670,14 @@ pub struct ImplBlock {
     &amp;&amp; !kind.contains("expression") &amp;&amp; !kind.contains("argument") &amp;&amp; !kind.contains("call")
     &amp;&amp; !kind.contains("identifier") &amp;&amp; !kind.contains("reference") &amp;&amp; !kind.contains("body")
     &amp;&amp; !kind.contains("mod") &amp;&amp; !kind.contains("variant")
+    &amp;&amp; !kind.contains("super") &amp;&amp; !kind.contains("base") &amp;&amp; !kind.contains("constructor")
 }</code></pre>
     <p>La logica è un <strong>pattern positivo</strong> (deve contenere "struct", "class", ecc.) con <strong>esclusioni negative</strong> per evitare falsi positivi. Ad esempio:</p>
     <ul>
         <li><code>"struct_item"</code> → ✓ match (contiene "struct")</li>
         <li><code>"struct_expression"</code> → ✗ escluso (contiene "expression") — è un'istanziazione, non una definizione</li>
         <li><code>"class_body"</code> → ✗ escluso (contiene "body") — è il corpo della classe, non la dichiarazione</li>
-        <li><code>"trait_bound"</code> → ✗ escluso (contiene "bound") — è un vincolo generico, non un trait</li>
-        <li><code>"enum_variant"</code> → ✗ escluso (contiene "variant") — è una variante, non l'enum</li>
+        <li><code>"constructor_declaration"</code> → ✗ escluso (contiene "constructor") — pur contenendo la parola "struct" (con<strong>struct</strong>or), viene escluso per evitare falsi positivi in Java/C++.</li>
     </ul>
 
     <h3>6.3 <code>is_function</code></h3>
@@ -886,14 +887,15 @@ where F: Fn(Node, &amp;str) -&gt; Option&lt;T&gt; + Copy
     for child in node.children(...) {
         if let Some(item) = parser(child, source) {
             items.push(item);
-        } else if child.kind().contains("body") || child.kind().contains("list")
-               || child.kind().contains("block") || child.kind().contains("declaration") {
+        } else if !crate::heuristics::classifiers::is_function(child) &amp;&amp; (
+               child.kind().contains("body") || child.kind().contains("list")
+               || child.kind().contains("block") || child.kind().contains("declaration")) {
             items.extend(extract_list_of(child, source, parser));  // Ricorsione!
         }
     }
     items
 }</code></pre>
-    <p>Funzione generica parametrizzata: riceve una funzione <code>parser</code> e la applica a tutti i figli del nodo. Se un figlio non viene riconosciuto dal parser ma è un nodo "contenitore" (body, list, block, declaration), <strong>scende ricorsivamente</strong> al suo interno. Questo gestisce la variazione nella profondità dell'albero CST tra linguaggi diversi.</p>
+    <p>Funzione generica parametrizzata: riceve una funzione <code>parser</code> e la applica a tutti i figli del nodo. Se un figlio non viene riconosciuto dal parser ma è un nodo "contenitore" (body, list, block, declaration), <strong>scende ricorsivamente</strong> al suo interno. Il controllo <code>!is_function(child)</code> è fondamentale: previene che l'estrattore scenda all'interno del corpo dei metodi per cercare campi, evitando di estrarre erroneamente variabili locali come campi della classe.</p>
     <p>Viene usata per estrarre:</p>
     <ul>
         <li><code>extract_fields(node, source)</code> → usa un parser inline per <code>field_declaration</code></li>
@@ -1306,6 +1308,32 @@ struct User {
            <span class="arrow">└──</span> <span class="symbol">sub_modules:</span> [ ]</div>
         <p>Questa struttura verrà poi passata alla <strong>Fase 2 (Name Resolution)</strong> che trasformerà tutti i <code>TypeRef::Unresolved</code> in <code>Resolved</code>, <code>External</code> o <code>Failed</code>.</p>
     </div>
+
+    <!-- ============================================================ -->
+    <!-- SEZIONE 12 -->
+    <!-- ============================================================ -->
+    <h2 id="multi-file">12. Orchestrazione Multi-File (Workspace Aggregation) e Configurazione Strategie</h2>
+    <p class="ref">Riferimento: <code>src/main.rs</code> (funzione <code>analyze_directory</code>)</p>
+
+    <p>Mentre <code>generic_extract</code> (e la Fase 1 vera e propria) opera sul singolo file sorgente, l'analizzatore architetturale è progettato per funzionare su interi progetti multi-file. Questo avviene attraverso una fase di orchestrazione pre-risoluzione che unifica i moduli.</p>
+
+    <p>Tutti i moduli estratti singolarmente da tutti i file vengono raggruppati in un unico, gigantesco <code>Vec&lt;Module&gt;</code> globale (il "Workspace"). Solo <strong>dopo</strong> che tutti i file sono stati estratti e unificati, viene invocato il Query Engine (Fase 2) sull'intero workspace. Questo elimina la barriera del singolo file: le dipendenze esterne al file locale diventeranno risolte magicamente perché il resolver opera su tutto il progetto contemporaneamente.</p>
+
+    <h3>12.1 Strategie Architetturali Basate su Configurazione</h3>
+    <p>L'architettura supporta un sistema di <strong>Configurazione Globale</strong> (<code>AnalyzerConfig</code>) che mappa il comportamento dell'estrazione e della risoluzione a seconda del linguaggio e delle strategie selezionate (ad esempio, tramite un file JSON passato via CLI o tramite default pre-impostati).</p>
+    <p>Una delle strategie architetturali più impattanti applicate durante la fase di estrazione (precisamente in <code>parse_source</code>) è la gestione del namespace, determinata dalla <code>ModuleStrategy</code>.</p>
+
+    <div class="info-box">
+        <strong>DirectoryBased Namespacing:</strong> Linguaggi come <em>Python</em> e <em>Rust</em> utilizzano spesso i percorsi delle cartelle e dei file come base implicita del loro namespace (es: <code>src/core/utils.py</code> diventa implicitamente il modulo <code>src::core::utils</code>).
+        Se il <code>LanguageConfig</code> associato al linguaggio in uso abilita la <code>ModuleStrategy::DirectoryBased</code>, la funzione <code>parse_source</code> applica una logica di "wrapping" automatica:
+        <br><br>
+        1. Prende i componenti top-level estratti originariamente dentro un modulo base <code>root</code>.<br>
+        2. Determina i segmenti del percorso del file rispetto alla directory di esecuzione.<br>
+        3. Costruisce una gerarchia di moduli IR nidificati, inserendo i componenti analizzati all'interno dell'ultimo nodo della gerarchia (che prende il nome del file senza estensione).<br>
+        4. Infine, incapsula il tutto sotto al generico nodo <code>root</code> del progetto, permettendo al Resolver Globale di navigare agevolmente tra i file del progetto partendo dalla medesima struttura logica.
+    </div>
+    
+    <p>Questo meccanismo permette di astrarre i dettagli fisici del filesystem mantenendo coerente il lexical scoping a livello di <em>Workspace Globale</em>. Nel momento in cui i moduli unificati passano alla Fase 2 (Name Resolution), i resolver navigheranno tra i moduli indipendentemente dal fatto che provenissero o meno dallo stesso file, rendendo il <em>Query Engine</em> interamente agnostico.</p>
 
 </body>
 </html>

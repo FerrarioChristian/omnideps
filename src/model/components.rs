@@ -95,6 +95,8 @@ pub struct Import {
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Module {
     pub name: QualifiedName,
+    pub language: Option<String>,
+    pub file_path: Option<String>,
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub imports: Vec<Import>,
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
