@@ -170,9 +170,11 @@
         </tbody>
     </table>
 
-    <h3>1.3 Posizione nella Pipeline</h3>
+    <h3>1.3 Posizione nella Pipeline (Workspace Aggregation)</h3>
     <div class="flowchart">
-        <span class="box">1. Estrazione CST→IR</span>
+        <span class="box">1. Estrazione CST→IR (Per File)</span>
+        <span class="sep">→</span>
+        <span class="box" style="background: var(--purple-subtle); border-color: var(--purple); color: var(--purple)">1.5 Workspace Aggregation</span>
         <span class="sep">→</span>
         <span class="box active">2a. Query Building</span>
         <span class="sep">→</span>
@@ -180,7 +182,9 @@
         <span class="sep">→</span>
         <span class="box">3. Dependency Graph</span>
     </div>
-    <p class="ref">Riferimento: <code>src/resolver/mod.rs:10-21</code></p>
+    <p class="ref">Riferimento: <code>src/resolver/mod.rs:10-21</code>, e <code>src/main.rs:55-66</code></p>
+    <p>Un aspetto architetturale cruciale è la <strong>Workspace Aggregation</strong>: la Fase 2 (Name Resolution) <strong>non viene eseguita su un singolo file alla volta</strong>. Nel loop principale in <code>main.rs</code>, i <code>Vec&lt;Module&gt;</code> estratti singolarmente da tutti i file del progetto vengono "fusi" (tramite <code>append</code>) in un unico gigantesco <code>Vec&lt;Module&gt;</code> globale, chiamato Workspace.</p>
+    <p>Solo dopo aver raccolto tutto il progetto, viene invocato il resolver globale:</p>
     <pre><code>pub fn resolve_type_refs(modules: Vec&lt;Module&gt;, primitives: &amp;PrimitiveRegistry) -&gt; Vec&lt;Module&gt; {
     // Fase 2a: Sostituzione lessicale — produce ResolutionQuery
     let modules_with_queries = builder::build_queries(modules);
@@ -188,7 +192,7 @@
     let resolved_modules = executor::execute_queries(modules_with_queries, primitives);
     resolved_modules
 }</code></pre>
-    <p>Da notare: la funzione prende ownership dei moduli (<code>Vec&lt;Module&gt;</code>, non <code>&amp;</code>) e li restituisce trasformati. Questo è un pattern "pipeline" che evita mutazioni in-place e semplifica il ragionamento sul flusso dei dati.</p>
+    <p>Questo approccio "Tutto-in-Uno" elimina i problemi di ordine di compilazione e consente alla risoluzione di attraversare file diversi come se fossero un unico grande documento sorgente.</p>
 
     <!-- ============================================================ -->
     <!-- SEZIONE 2 -->
@@ -705,7 +709,7 @@ block.instantiates = block.instantiates.into_iter().map(|i| substitute_type(ctx,
             <tr>
                 <td><code>current_prefix</code></td>
                 <td><code>Vec&lt;String&gt;</code></td>
-                <td>Il percorso assoluto dello scope corrente nel traversal. Es: <code>["root","core","Auto"]</code>. Usato da <code>Find</code> come punto di partenza per il prefix climbing.</td>
+                <td>Il percorso assoluto dello scope corrente nel traversal. Es: <code>["root","core","Auto"]</code>. Usato da <code>Find</code> come punto di partenza per il lexical scope climbing.</td>
                 <td>Ogni <code>execute_*</code> lo estende con il nome del componente</td>
             </tr>
             <tr>
@@ -770,7 +774,7 @@ block.instantiates = block.instantiates.into_iter().map(|i| substitute_type(ctx,
 
     <h3>7.3 <code>evaluate_query</code> — Il Motore Algebrico (Deep Dive)</h3>
 
-    <h4>7.3.1 <code>Query::Find</code> — L'Algoritmo di Prefix Climbing</h4>
+    <h4>7.3.1 <code>Query::Find</code> — L'Algoritmo di Lexical Scope Climbing</h4>
     <p>Questa è la funzione più complessa dell'Executor. Implementa il "find-going-up" — la risalita lessicale:</p>
     <pre><code>Query::Find(name) =&gt; {
     let mut prefix = ctx.current_prefix.clone();
@@ -822,25 +826,33 @@ block.instantiates = block.instantiates.into_iter().map(|i| substitute_type(ctx,
 
     <div class="warn-box">
         <h4 style="margin-top: 0; color: var(--warning);">Perché il fallback <code>["root", name]</code>?</h4>
-        <p style="margin-bottom: 0;">In molti linguaggi, il modulo principale del progetto si chiama "root" nell'IR. Se il prefix climbing non trova nulla, l'ultimo tentativo è cercare direttamente sotto root. Questo gestisce il caso in cui un tipo viene referenziato da un contesto il cui prefix non include "root" (es. perché il contesto è a livello globale con prefix vuoto <code>[]</code>).</p>
+        <p style="margin-bottom: 0;">In molti linguaggi, il modulo principale del progetto si chiama "root" nell'IR. Se il lexical scope climbing non trova nulla, l'ultimo tentativo è cercare direttamente sotto root. Questo gestisce il caso in cui un tipo viene referenziato da un contesto il cui prefix non include "root" (es. perché il contesto è a livello globale con prefix vuoto <code>[]</code>).</p>
     </div>
 
     <h4>7.3.2 <code>Query::Extract</code> — Discesa e Method Resolution Order (MRO)</h4>
     <pre><code>Query::Extract(parent_query, member_name) =&gt; {
     let parent_path = evaluate_query(ctx, parent_query, true)?;
     
-    // Funzione interna per ricerca ricorsiva
-    fn find_member(ctx, current_path, member) -&gt; Option&lt;QualifiedName&gt; {
+    // Funzione interna per ricerca ricorsiva (con cycle detection)
+    fn find_member(ctx, current_path, member, visited) -&gt; Option&lt;QualifiedName&gt; {
         let mut candidate = current_path.clone();
         candidate.push(member.clone());
         if ctx.registry.exists(&amp;candidate) { return Some(candidate); }
         
+        // Cycle check per evitare loop infiniti in MRO ciclici
+        let check_cycles = ctx.current_lang.as_deref()
+            .map(|l| ctx.config.get_for(l).cyclic_mro_check)
+            .unwrap_or(true);
+        if check_cycles &amp;&amp; !visited.insert(current_path.clone()) {
+            return None; // Ciclo rilevato
+        }
+
         // MRO: Depth-First, Left-to-Right
         if let Some(RegistryEntry::StructuredType { super_types }) = ctx.registry.get(&amp;current_path) {
             for sup in super_types {
                 if let TypeRef::ResolutionQuery(q) = sup {
                     if let Some(sup_path) = evaluate_query(ctx, q, true) {
-                        if let Some(found) = find_member(ctx, sup_path, member) { return Some(found); }
+                        if let Some(found) = find_member(ctx, sup_path, member, visited) { return Some(found); }
                     }
                 }
             }
@@ -849,11 +861,12 @@ block.instantiates = block.instantiates.into_iter().map(|i| substitute_type(ctx,
     }
     // ...
 }</code></pre>
-    <p>Questo operatore è il fulcro della <strong>Dynamic Dispatch statica</strong>. Implementa nativamente l'ereditarietà (Method Resolution Order):</p>
+    <p>Questo operatore è il fulcro della <strong>Dynamic Dispatch statica</strong>. Implementa nativamente l'ereditarietà (Method Resolution Order) con protezione attiva contro i cicli:</p>
     <ol>
         <li>Se <code>Cat.breathe</code> esiste direttamente in <code>Cat</code>, viene restituito.</li>
         <li>Se fallisce, cerca nei <code>super_types</code>. Valuta la query del genitore (es. <code>Animal</code>) e cerca <code>Animal::breathe</code>.</li>
-        <li>La ricorsione è Depth-First, Left-to-Right. Se una classe eredita da più padri (Diamond Problem in C++/Python), l'algoritmo si aggancia deterministicamente alla prima implementazione utile trovata, garantendo un grafo intatto.</li>
+        <li>La ricorsione è Depth-First, Left-to-Right. Se una classe eredita da più padri (Diamond Problem in C++/Python), l'algoritmo si aggancia deterministicamente alla prima implementazione utile trovata.</li>
+        <li><strong>Cycle Detection:</strong> Nei linguaggi complessi e nei progetti di grandi dimensioni, possono verificarsi dichiarazioni di ereditarietà circolari a livello strutturale. Tramite l'uso dell'opzione <code>cyclic_mro_check</code> nella configurazione e un set locale <code>visited</code>, l'algoritmo traccia i percorsi di navigazione dell'MRO e abortisce anticipatamente la discesa se incontra un percorso già esplorato, impedendo lo stack overflow dell'Executor.</li>
         <li>Garantisce il corretto linking alle implementazioni di default dei Trait in Rust o Interfacce Java, comportandosi come un vero compilatore.</li>
     </ol>
 
@@ -1096,7 +1109,7 @@ struct User { name: String }</code></pre>
     <div class="step">
         <h3><code>Find("Db")</code> dal contesto <code>["root","core","Auto"]</code></h3>
         <div class="tree-container">
-  prefix climbing: nessun match nel registry a nessun livello
+  lexical scope climbing: nessun match nel registry a nessun livello
   <span class="import">Controlla imports_stack:</span>
     level 0 (root): [{ path: ["external","db","Database"], alias: "Db" }]
     alias "Db" == "Db" → <span class="green">✅ match!</span> → path = ["external","db","Database"]
@@ -1107,7 +1120,7 @@ struct User { name: String }</code></pre>
     <div class="step">
         <h3><code>Find("String")</code> — Decoppiamento Primitivo</h3>
         <div class="tree-container">
-  prefix climbing: nessun match
+  lexical scope climbing: nessun match
   imports: nessun match
   fallback: ["String"] → <span class="node">❌</span>, ["root","String"] → <span class="node">❌</span>
   → evaluate_query restituisce <span class="node">None</span>

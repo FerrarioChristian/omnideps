@@ -12,6 +12,7 @@ pub enum ModuleStrategy {
 pub struct LanguageConfig {
     pub module_strategy: ModuleStrategy,
     pub transitive_imports: bool,
+    pub cyclic_mro_check: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -35,34 +36,40 @@ impl AnalyzerConfig {
         languages.insert("python".to_string(), LanguageConfig {
             module_strategy: ModuleStrategy::DirectoryBased,
             transitive_imports: true,
+            cyclic_mro_check: true,
         });
 
         // Rust: Directory Based, no transitive imports
         languages.insert("rust".to_string(), LanguageConfig {
             module_strategy: ModuleStrategy::DirectoryBased,
             transitive_imports: false,
+            cyclic_mro_check: true,
         });
 
         // Java: Package Based
         languages.insert("java".to_string(), LanguageConfig {
             module_strategy: ModuleStrategy::PackageBased,
             transitive_imports: false,
+            cyclic_mro_check: true,
         });
 
         // C++ / C: Package/Namespace Based
         languages.insert("cpp".to_string(), LanguageConfig {
             module_strategy: ModuleStrategy::PackageBased,
             transitive_imports: false,
+            cyclic_mro_check: true,
         });
         languages.insert("c".to_string(), LanguageConfig {
             module_strategy: ModuleStrategy::PackageBased,
             transitive_imports: false,
+            cyclic_mro_check: true,
         });
 
         Self {
             default_config: LanguageConfig {
                 module_strategy: ModuleStrategy::SingleRoot,
                 transitive_imports: false,
+                cyclic_mro_check: true,
             },
             languages,
         }
