@@ -55,3 +55,37 @@ Questo documento traccia lo stato di implementazione e riconoscimento dei vari c
 - **Bug Ereditarietà (Super Types) in Java/C++/Python**: L'euristica non riconosceva i nomi dei campi CST specifici dei linguaggi non-Rust. Aggiornata `extract_super_types` in `heuristics.rs` per interrogare esplicitamente `superclass`, `interfaces`, `superclasses` e `base_class_clause`.
 - **Bug Falso Positivo Tipi di Ritorno**: In caso di mancato `return_type` esplicito (come nei costruttori Python o C++), l'analizzatore prendeva per sbaglio l'identificatore della funzione come tipo di ritorno. Aggiornata l'euristica per restituire `TypeRef::Primitive(PrimitiveType::Void)` in maniera sicura se fallisce il parse esplicito o tramite la sintassi `->`.
 - **Fix conteggio Nested Types nel Summary**: Il resoconto `AnalysisSummary` riportava zero `StructuredType` per Python e C++ nonostante comparissero nel grafo, a causa del fatto che il parser del summary non navigava ricorsivamente nei sottomoduli né contava i `nested_types`. Aggiornato `build_analysis_summary` per scansionare ricorsivamente tutto l'albero.
+
+## Aggiustamenti post incontro (Pianificazione)
+
+A seguito dell'incontro con il relatore, sono emersi alcuni punti fondamentali da implementare o rifinire prima di procedere. Di seguito l'analisi punto per punto:
+
+### 1. Gestione Differenziata dei Moduli (Namespace)
+- **Problema**: Lingue diverse usano logiche diverse per raggruppare i file (directory-based per Python/Rust vs package/module-based per Java/C++).
+- **Strategia decisa**: Implementeremo diverse strategie di risoluzione dei moduli all'interno dell'analizzatore. L'abilitazione della strategia corretta avverrà in base al linguaggio analizzato, governata da un file di configurazione (es. `config.json` o tramite flag/opzioni). Questo approccio diventerà lo standard per gestire tutte le peculiarità comportamentali tra i linguaggi, mantenendo il core *language-agnostic* e delegando la specificità alla configurazione.
+
+### 2. Import Transitivi (Python)
+- **Problema**: In Python (e potenzialmente altri linguaggi), se il modulo `A` importa `B`, e `B` importa `C`, il modulo `A` può accedere a componenti di `C` attraverso `B` (es. `B.C.Componente`). Altri linguaggi non permettono questo comportamento di default.
+- **Azione**: Dovremo estendere il sistema di `ExecutorContext` per gestire la visibilità e la transitività degli import, probabilmente permettendo di interrogare le esportazioni (e gli import ri-esportati) di un modulo durante la risoluzione, attivando questa funzione solo se la configurazione del linguaggio lo richiede.
+
+### 3. Ereditarietà Ciclica nel MRO (Method Resolution Order)
+- **Problema**: L'algoritmo attuale di MRO (usato in `Extract` per cercare i metodi nelle superclassi) potrebbe andare in loop infinito se il codice sorgente presenta ereditarietà ciclica (es. `class A(B)` e `class B(A)`).
+- **Soluzioni proposte**:
+  1. Forzare l'antisimmetria (rimuovere i cicli) già a livello di IR durante l'estrazione.
+  2. Implementare un controllo a runtime durante la risoluzione (es. tenere traccia dei nodi visitati).
+- **Scelta/Pianificazione**: L'opzione 2 (tenere traccia dei nodi visitati nella funzione `find_member` dell'executor tramite un parametro `visited: HashSet<QualifiedName>`) è l'approccio più sicuro e robusto, in quanto evita di dover implementare complesse logiche di normalizzazione o graph coloring in fase di parsing iniziale.
+
+### 4. Il termine "Prefix Climbing"
+- **Feedback**: Il relatore era dubbioso sull'uso del termine "prefix climbing" nel capitolo dell'Algebra delle Query.
+- **Analisi**: Ha ragione. Il termine attuale crea confusione perché mischia l'operazione tecnica su stringhe (la rimozione di un suffisso dal path corrente) con il concetto semantico di risoluzione. In realtà, l'operazione che eseguiamo in `Query::Find` è nota come **Lexical Scope Climbing** (o **Lexical Ascending** / Risalita dello scope lessicale). Questo è il termine corretto nella teoria dei compilatori, dove l'interprete risale la gerarchia degli scope per trovare una dichiarazione. Provvederò ad aggiornare la documentazione e i commenti nel codice per usare la nomenclatura corretta.
+
+### 5. Ottimizzazione del Global Registry (String operations)
+- **Feedback**: Manipolare e clonare frequentemente array di stringhe (`Vec<String>`, ossia i `QualifiedName`) per verificare l'esistenza di un percorso nel registro globale può essere pesante dal punto di vista computazionale.
+- **Possibile soluzione**: Attualmente il registro è una flat `HashMap<QualifiedName, RegistryEntry>`. Per evitare di manipolare array e stringhe ad ogni lookup, il registro potrebbe essere trasformato in un **Trie** (albero dei prefissi). In questo modo, le query potrebbero navigare i nodi dell'albero direttamente. Alternativamente, si potrebbe utilizzare uno *String Interning* in modo da confrontare interi al posto di stringhe. Segnerò questo punto come un potenziale task di ottimizzazione, utilissimo da riportare in tesi per discutere le scelte architetturali di performance.
+
+### 6. Riconoscimento di `self` e `this`
+- **Feedback**: Verificare come l'implementazione gestisce `self` (spesso parametro esplicito come in Python/Rust) vs `this` (spesso implicito come in Java/C++), e se avviene *ahead-of-time* o durante la risoluzione.
+- **Verifica effettuata**: L'attuale implementazione in `src/resolver/builder.rs` gestisce **entrambe le convenzioni in modo automatico**, e lo fa *ahead-of-time* (nella Fase 2a di Query Building).
+  - Quando si entra nello scope di una `StructuredType`, il Builder inietta *sia* `self` che `this` nello `SymbolStack`, associandoli a una query che punta alla classe corrente. Questo risolve il caso **implicito** (tipico di Java e C++).
+  - Quando si entra in una funzione, i suoi parametri vengono analizzati e messi in cima allo `SymbolStack`. Se la funzione ha un parametro esplicito chiamato `self` (tipico di Python e Rust), questo farà *shadowing* del `self` inserito precedentemente dalla struct. Dato che il lookup (`iter().rev()`) cerca sempre dal frame più interno a quello più esterno, prenderà il parametro formale anziché il riferimento implicito della classe.
+  - **Conclusione**: L'architettura a scope concentrici supporta naturalmente entrambi i comportamenti senza la necessità di write-code aggiuntivi per casi speciali!

@@ -2,216 +2,184 @@
 \label{ch:name_resolution}
 
 La fase di \textit{Reference Resolution} (Risoluzione dei
-Riferimenti) è il cuore
-logico dell'analizzatore architetturale. Il suo scopo è trasformare
-riferimenti astratti ed esposti ad ambiguità testuali (i nomi grezzi
-estratti dall'albero sintattico) in identificatori univoci e globalmente validi.
+Riferimenti) è il cuore logico dell'analizzatore architetturale. Il
+suo scopo è trasformare riferimenti astratti ed esposti ad ambiguità
+testuali (i nomi grezzi estratti dall'albero sintattico) in
+identificatori univoci e globalmente validi, creando i collegamenti
+necessari per il grafo delle dipendenze.
 
-Seguendo un paradigma mutuato dalla teoria dei compilatori, questa
-fase non agisce
-come un'operazione monolitica, bensì separa in modo netto lo
-scandaglio del codice
-dalla valutazione delle dipendenze, sfruttando un'algebra di \textit{Query}.
+Nelle prime iterazioni del sistema, la risoluzione operava in un
+singolo passaggio sincrono (eseguendo il \textit{lookup} non appena
+il nodo veniva incontrato). Tale approccio si è rivelato inadeguato
+per due motivi fondamentali: l'impossibilità di risolvere i
+\textit{forward references} (tipi dichiarati testualmente dopo il
+loro utilizzo) e l'incapacità di analizzare catene di chiamate di
+metodi (es. \texttt{a.f().g()}).
+Per allinearci alla teoria dei compilatori, abbiamo riprogettato la
+risoluzione introducendo un \textbf{Query Engine Bifase}, basato sul
+principio della \textit{lazy evaluation} (valutazione pigra).
 
-\section{Fase 1: Costruzione delle Query (Substitution Phase)}
-Le variabili locali, sebbene fondamentali per il tracciamento del
-flusso dei dati,
-\textbf{non} costituiscono componenti architetturali (sono inoltre
-soggette a \textit{variable shadowing}).
-Per mantenere l'astrazione scalabile, l'analizzatore utilizza il
-\textit{Symbol Stack} ($\rho$)
-esclusivamente come artefatto intermedio e temporaneo di sostituzione.
+\section{Fase 2a: Costruzione delle Query (Substitution Phase)}
 
-Quando il parser incontra una dichiarazione come \texttt{let i:
-a.b.T}, il Symbol Stack registra
-la regola di sostituzione temporanea per il \textit{typename}.
-Nel momento in cui si riscontra un utilizzo di variabile, come
-\texttt{i.f()}, l'analizzatore
-esegue una sostituzione sintattica, producendo nell'IR una query
-matematica algebrica,
-espressa nel tipo \texttt{ResolutionQuery($\mathcal{Q}$)}.
+Nella prima sotto-fase ($R_{build}$), l'obiettivo non è scoprire
+\textit{dove} si trovi un componente, ma formalizzare
+\textit{l'intento logico} della ricerca.
+
+Le variabili locali (es. \texttt{let v: a.b.T}) sono essenziali per
+il tracciamento del flusso di controllo, ma non costituiscono nodi
+architetturali nel grafo finale. Vengono utilizzate esclusivamente in
+questa fase come ponte logico. L'analizzatore attraversa l'IR
+avvalendosi di un ambiente lessicale effimero, il \textbf{Symbol
+Stack} ($\rho$).
+Quando viene dichiarata una variabile locale, l'ambiente $\rho$ ne
+registra l'associazione testuale. Quando la variabile viene
+utilizzata, il sistema consuma il riferimento sostituendo
+sintatticamente il nome locale con la formula matematica
+corrispondente al suo tipo, generando un costrutto intermedio
+chiamato \texttt{ResolutionQuery($\mathcal{Q}$)}.
 
 \subsection{L'Algebra delle Query ($\mathcal{Q}$)}
-Tutte le operazioni manipolano l'IR (ovvero navigano il grafo dei componenti).
-Le query generate sono combinazioni delle seguenti primitive:
+
+Per garantire la massima astrazione, ogni operazione di accesso o
+invocazione in qualsiasi linguaggio di programmazione è stata ridotta
+alla combinazione di sole tre primitive matematiche. Queste primitive
+catturano le direzioni di navigazione (salita e discesa) nel grafo
+gerarchico dei moduli.
+
 \begin{itemize}
-  \item \texttt{Find(name)} (\textit{find-going-up}): Trova un punto
-    di partenza risalendo l'albero dei componenti.
-  \item \texttt{Extract(query, name)} (\textit{find-going-down}):
-    Ricevuto un punto di partenza, discende di un passo verso la
-    destinazione indicata (es. \texttt{T.x}), attraversando
-    opzionalmente la catena di ereditarietà.
-  \item \texttt{Call(query)}: Dato un componente "chiamabile" (come
-    una funzione o metodo), restituisce il suo tipo di ritorno (o
-    \texttt{Void}).
+  \item \texttt{Find(name)} (\textit{Ricerca Ascendente}): Definisce
+    il \textbf{punto di partenza assoluto} dell'espressione. È
+    necessario perché un'espressione come \texttt{T.x} non ha
+    significato finché non si stabilisce a quale \texttt{T} si faccia
+    riferimento nell'albero dei moduli. Il \texttt{Find} ordina al
+    motore di risoluzione di agganciarsi al contesto lessicale
+    corrente e "risalire" progressivamente la gerarchia degli scope
+    (Lexical Scope Climbing) finché non individua la prima entità chiamata
+    \texttt{name}.
+  \item \texttt{Extract(query, name)} (\textit{Discesa Strutturale}):
+    Rappresenta l'operatore di accesso ai membri (es. il punto
+    \texttt{.} o i due punti \texttt{::}). L'operatore riceve in
+    input una sub-query (il contesto padre) e il nome del membro
+    figlio da cercare. Valuta la sub-query per ottenere l'indirizzo
+    del genitore, dopodiché discende di un livello al suo interno
+    alla ricerca del membro indicato, attraversando opzionalmente la
+    catena di ereditarietà.
+  \item \texttt{Call(query)} (\textit{Invocazione Transitiva}):
+    Rappresenta l'esecuzione di un blocco di codice. Indica al
+    valutatore che la sub-query passata in input identifica una
+    funzione (o metodo), ma che l'espressione corrente necessita del
+    suo \textbf{tipo di ritorno} per poter proseguire. È la primitiva
+    fondamentale che abilita la concatenazione di metodi (es. in
+      \texttt{a.f().g()}, il tipo di ritorno di \texttt{f()} diventa il
+    \texttt{Find} di partenza per \texttt{g()}).
 \end{itemize}
 
-L'espressione \texttt{i.f()} (con \texttt{i} di tipo \texttt{a.b.T})
-viene così espansa nella query innestata:
+Attraverso questa algebra, un'espressione testuale complessa come
+\texttt{i.f()} (con \texttt{i} di tipo \texttt{a.b.T}) viene espansa
+nella query innestata:
 $$ \texttt{Call(Extract(Extract(Extract(Find('a'), 'b'), 'T'), 'f'))} $$
 
-Terminata la lettura della funzione, il Symbol Stack viene
-\textbf{distrutto}. Le variabili locali vengono obliate, purificate
-in pure dipendenze architetturali.
+Al termine dell'attraversamento, l'ambiente lessicale $\rho$ viene
+completamente distrutto, lasciando l'IR popolato unicamente da
+espressioni algebriche pure.
 
-\section{Fase 2: Risoluzione delle Query (Navigation Phase)}
-La fase di \textit{Reference Resolution} effettiva si attua
-\textbf{solo dopo} aver letto tutto il codice.
-Questa netta separazione assicura che un componente non ancora
-dichiarato nel codice sorgente (forward reference) sia regolarmente tracciabile.
+\section{Fase 2b: Esecuzione delle Query (Navigation Phase)}
 
-Il motore di esecuzione naviga l'IR valutando algebricamente l'albero delle Query generate. Per evitare la naturale lentezza $O(N)$ del \textit{Find-going-up} lungo i rami del file system, l'algoritmo crea un indice piatto intermedio chiamato \textit{GlobalRegistry}. Questo indicizza a tempo zero il path di ogni modulo, classe, funzione e \textbf{campo} (per la validazione e \textit{type-inference} delle concatenazioni interne `a.b.f()`). La risoluzione diventa quindi un rapido match $O(1)$ sui path aggregati generati dalla Query.
+La fase di navigazione ($R_{exec}$) si attua \textbf{solo dopo} aver
+letto e tradotto tutto il codice dell'intero Workspace. Questa
+posticipazione garantisce che l'ordine di dichiarazione delle classi
+nei file sorgenti sia ininfluente.
 
-\subsection{L'Operatore Extract e il Method Resolution Order (MRO)}
-L'operatore algebrico $\texttt{Extract}(P, m)$ (che cerca il membro $m$ nel padre $P$) implementa una logica di \textit{Dynamic Dispatch Statica} tramite \textbf{Method Resolution Order}.
-Se il membro $m$ non viene trovato direttamente all'interno di $P$, l'esecutore interroga il Registro Globale per estrarre i \texttt{super\_types} di $P$. Viene quindi lanciata una ricerca ricorsiva \textit{Depth-First, Left-to-Right} (Profondità prima, da sinistra a destra) sui genitori di $P$. 
-Questo approccio neutrale permette all'analizzatore di:
-\begin{enumerate}
-    \item \textbf{Risolvere il Polimorfismo di Default}: Se $P$ implementa un'interfaccia Java o un Trait Rust che fornisce un'implementazione di default per $m$, la query restituisce l'indirizzo del Trait, generando l'arco di dipendenza concettualmente più corretto.
-    \item \textbf{Neutralizzare il Diamond Problem}: In linguaggi con ereditarietà multipla come C++ o Python, se più padri espongono lo stesso metodo $m$, l'algoritmo si aggancia deterministicamente al primo padre utile individuato nell'ordine sintattico della dichiarazione originale, garantendo l'integrità del grafo architetturale senza incorrere nei crash tipici dei compilatori.
-\end{enumerate}
-
-\subsection{Limiti di una Symbol Table Piatta}
-Nella prima formalizzazione dell'architettura, la \textit{Symbol
-Table} globale ($\Sigma$) era modellata come una mappa piatta:
-$$\Sigma : \mathcal{QN} \to \mathcal{C}$$
-Questo approccio, seppur semplice, presentava due gravi criticità
-architetturali e algoritmiche in un contesto
-\textit{language-agnostic} su larga scala:
-
-\begin{enumerate}
-  \item \textbf{Decadimento delle Performance $O(L)$:} L'hashing di
-    una chiave di tipo $\mathcal{QN}$ (una tupla di stringhe di
-    lunghezza variabile) degrada le performance di lookup.
-    L'operazione non è più rigorosamente $O(1)$, bensì $O(L)$, dove
-    $L$ è la lunghezza cumulativa del percorso testuale. Nei
-    tentativi di risoluzione tramite \textit{climbing} degli
-    \textit{enclosing scopes}, le continue clonazioni e
-    concatenazioni di stringhe comportano un Memory Allocation
-    Overhead proibitivo.
-  \item \textbf{Violazione del Lexical Scoping e Name Clashing:} Una
-    tabella piatta non modella correttamente lo \textit{scope} locale
-    di un programma. Due classi con lo stesso nome definite in
-    blocchi funzionali o moduli diversi rischiano collisioni (Name
-    Clashing). Inoltre, nei linguaggi C-like, ogni coppia di
-    parentesi graffe \texttt{\{\}} genera uno scope, rendendo
-    l'approccio piatto inadeguato per la corretta inferenza comportamentale.
-\end{enumerate}
-
-\section{Il Modello Dinamico: Environment ($\rho$) tramite Symbol Stack}
-Per allinearci rigorosamente alla teoria classica della progettazione
-dei compilatori, abbiamo sostituito l'approccio statico con una
-modellazione dinamica dell'ambiente lessicale. Definiamo l'ambiente
-(Environment) $\rho$ come uno \textbf{Stack (pila) di Tabelle dei Simboli}.
-
-L'Environment $\rho$ cresce e decresce in tempo reale durante
-l'attraversamento dell'AST (o dell'IR):
-$$ \rho = \langle \Sigma_0, \Sigma_1, \dots, \Sigma_n \rangle $$
-
-Ogni \textit{frame} dello stack $\Sigma_k$ rappresenta un singolo
-livello di annidamento lessicale (un modulo, un tipo strutturato, o
-un blocco if/while) ed è definito come:
-$$ \Sigma_k = \langle \text{Symbols}, \mathcal{I}_{imports} \rangle $$
-
-L'API matematica del nostro \textit{Symbol Stack} supporta
-nativamente le operazioni di mutazione dell'ambiente:
+Per valutare le query in modo deterministico e senza stati mutabili,
+l'algoritmo si avvale di un \textbf{Contesto di Esecuzione
+Immutabile} ($\Gamma$). Esso racchiude la conoscenza globale del
+progetto e lo stato della traversata, ed è formalmente definito come la tupla:
+$$ \Gamma = \langle \mathcal{P}_{curr}, \mathcal{I}_{stack},
+\mathcal{GR}, \mathcal{PR} \rangle $$
+dove:
 \begin{itemize}
-  \item \texttt{push()}: Inizializza un nuovo frame $\Sigma_{n+1}$
-    vuoto in cima allo stack ogni volta che l'analizzatore accede a
-    uno scope più profondo. ($\rho' = \rho \cup \{ \Sigma_{n+1} \}$)
-  \item \texttt{pop()}: Distrugge il frame $\Sigma_n$ in cima allo
-    stack all'uscita dal blocco lessicale, prevenendo il leakage di
-    simboli locali. ($\rho' = \text{tail}(\rho)$)
-  \item \texttt{define(name, path)}: Registra un simbolo locale e il
-    suo percorso assoluto (sia esso uno stato \texttt{Resolved}
-    locale o un riferimento \texttt{External}) all'interno della
-    mappa $\text{Symbols}$
-    del frame corrente in cima allo stack.
+  \item $\mathcal{P}_{curr}$ è il prefisso gerarchico corrente (il
+      percorso $\mathcal{QN}$ del componente in cui ci si trova, es.
+    \texttt{root::core}).
+  \item $\mathcal{I}_{stack}$ è la pila gerarchica degli import
+    accessibili dallo scope attuale (i cosiddetti \textit{Jump Points}).
+  \item $\mathcal{GR}$ è il \textbf{Global Registry}: un indice
+    piatto creato a tempo zero, appena prima dell'esecuzione. Mappa
+    ogni percorso assoluto ($\mathcal{QN}$) ai suoi metadati
+    architetturali (es. tipi di ritorno e firme ereditate). È il
+    motore che garantisce tempi di accesso costanti $\mathcal{O}(1)$,
+    eliminando il degrado prestazionale delle navigazioni ad albero.
+  \item $\mathcal{PR}$ è il \textbf{Primitive Registry}, il
+    dizionario data-driven contenente le parole chiave dei tipi base
+    del linguaggio in uso.
 \end{itemize}
 
-\section{Algoritmo di Risoluzione Lexical Scoping ($R_\tau$)}
+\subsection{Formalizzazione del Global Registry ($\mathcal{GR}$)}
+Per permettere alla risoluzione di abbandonare l'oneroso approccio di
+ricerca ad albero  in favore di un lookup piú leggero,  il
+\textbf{Global Registry} è formalizzato come una mappa matematica
+iniettiva tra i percorsi assoluti e i metadati strutturali essenziali.
 
-Dato un riferimento irrisolto $\text{Unresolved}(\langle i_1, i_2,
-\dots, i_n \rangle)$ e un Environment corrente $\rho$, l'algoritmo di
-risoluzione naviga lo stack \textit{top-down} (dalla cima al fondo):
+$$ \mathcal{GR} : \mathcal{QN} \to E_{reg} $$
+Dove $E_{reg}$ rappresenta il tipo somma delle entità architetturali
+registrabili:
+$$ E_{reg} = \text{Module} \mid \text{StructuredType} \mid
+\text{Function}(\tau_{ret} \mid \mathcal{Q}_{ret}) \mid \text{ImplBlock} $$
 
-\subsection{1. Lexical Climb e Punti di Salto}
-Se il riferimento non è nella Cache (vedi Sezione
-\ref{sec:memoization}), l'algoritmo itera sui frame $\Sigma_k$
-partendo da $k=n$ scendendo fino a $k=0$:
+L'intuizione architetturale fondamentale che distingue il
+$\mathcal{GR}$ da un banale *hash set* di stringhe risiede nel
+salvataggio del \textbf{tipo di ritorno} ($\tau_{ret}$ o la sua query
+non risolta $\mathcal{Q}_{ret}$) per le entità funzionali.
+Questa struttura dati permette al valutatore, incontrando l'operatore
+di invocazione $\texttt{Call(F)}$, di non limitarsi a validare
+l'esistenza della funzione $F$, ma di recuperarne istantaneamente il
+tipo di ritorno interrogando $\mathcal{GR}(F)$. Ciò costituisce la
+base algoritmica indispensabile per l'inferenza di tipo transitiva e
+la validazione delle catene di metodi (es. $\texttt{a.f().g()}$).
+
+\subsection{Lexical Scope Climbing e Punti di Salto}
+Per valutare un operatore \texttt{Find}, il contesto di esecuzione
+$\Gamma$ applica l'algoritmo di \textit{Lexical Scope Climbing}. Partendo
+dal prefisso gerarchico corrente in cui la query è stata generata
+(es. \texttt{root::core}), l'algoritmo accoda il nome cercato e
+interroga il $\mathcal{GR}$.
+Se la risorsa non viene trovata, il prefisso viene "tagliato" (pop)
+risalendo di un livello (es. \texttt{root}), e il controllo viene
+ripetuto. Contestualmente, a ogni livello risalito, l'algoritmo
+ispeziona i \textbf{Jump Points} (le clausole di \texttt{import} o
+\texttt{use}), verificando se il nome è un \textit{alias} che punta a
+una risorsa esterna. Questo meccanismo riproduce fedelmente le regole
+di \textit{Lexical Scoping} presenti nei compilatori reali.
+
+\subsection{Method Resolution Order (MRO)}
+L'operatore \texttt{Extract(P, m)} implementa nativamente la logica
+di \textit{Dynamic Dispatch Statica}. Se il membro $m$ non esiste
+direttamente nel perimetro del padre $P$, il valutatore estrae i
+super-tipi (\texttt{super\_types}) di $P$ dal $\mathcal{GR}$ e lancia
+una ricerca ricorsiva \textit{Depth-First, Left-to-Right} (Profondità
+prima, da sinistra a destra) lungo l'albero genealogico.
+Questo approccio risolve due problematiche architetturali:
 \begin{enumerate}
-  \item \textbf{Ricerca Locale}: Verifica se $i_1 \in
-    \Sigma_k.\text{Symbols}$. Se esiste, l'algoritmo calcola
-    l'identificatore globale unendo il path trovato con il suffisso
-    rimanente e convalida se tale risorsa esiste effettivamente nel
-    \textit{Global Registry} (generato nel Pass 1 dell'analisi
-      indicizzando ricorsivamente moduli, tipi strutturati e tutti i loro
-    tipi annidati o blocchi implementativi).
-  \item \textbf{Jump Points}: Se $i_1 \notin
-    \Sigma_k.\text{Symbols}$, verifica se $i_1$ coincide con un alias
-    tra gli import definiti nel frame
-    $\Sigma_k.\mathcal{I}_{imports}$. Se esiste un match, l'algoritmo
-    applica la sostituzione e valuta se si tratta di un nodo
-    \texttt{Local} o se deve transitare in un boundary
-    \texttt{External} verso terze parti.
+  \item \textbf{Polimorfismo di Default}: Garantisce il corretto
+    aggancio ai metodi definiti come default all'interno di Trait
+    (Rust) o Interfacce (Java).
+  \item \textbf{Diamond Problem}: Nei linguaggi che consentono
+    l'ereditarietà multipla (C++, Python), se più padri espongono la
+    stessa funzione, la discesa deterministica assicura l'estrazione
+    della prima implementazione valida, salvaguardando l'integrità del grafo.
 \end{enumerate}
-Se l'intero stack viene esaurito senza che alcun frame fornisca un
-match per il primo token $i_1$, l'algoritmo tenta una ricerca di
-fallback globale (Absolute Fallback) prima di dichiarare il
-riferimento \texttt{Failed}.
 
-\subsection{2. Risoluzione Comportamentale e Inferenza Semantica}
-L'architettura del \textit{Symbol Stack} esprime il suo massimo
-potenziale nella risoluzione dei blocchi comportamentali $\mathcal{B}$.
-Durante la traversata di un metodo, il sistema applica le seguenti
-euristiche di inferenza semantica per garantire il corretto
-funzionamento del Lexical Scoping:
-\begin{itemize}
-  \item \textbf{Auto-Registrazione di \texttt{self} e \texttt{this}}:
-    All'ingresso di un \textit{Structured Type}, l'ambiente $\rho$ inietta
-    implicitamente nel frame locale i lessemi \texttt{self} e
-    \texttt{this}, facendoli
-    puntare al percorso assoluto del tipo strutturato corrente. Questo
-    permette di risolvere in $O(1)$ le chiamate a metodi di classe
-    (es. \texttt{self.get\_id()}).
-  \item \textbf{Inferenza di Tipo Best-Effort}: Nel caso in cui il
-    linguaggio permetta l'omissione del tipo a sinistra di una dichiarazione
-    di variabile (es. tramite \texttt{let} o \texttt{auto}),
-    l'algoritmo analizza
-    il lato destro dell'espressione (l'inizializzatore). Se viene
-    intercettata un'istanza esplicita (es. \texttt{new\_expression}),
-    il tipo dedotto
-    viene formalizzato come $\tau$ e registrato nell'ambiente tramite
-    \texttt{define(id, $\tau$)}.
-  \item \textbf{Decoppiamento Primitivo}: Al termine della catena di fallback,
-    prima di contrassegnare definitivamente un riferimento come \texttt{Failed},
-    il contesto interroga il \textit{Primitive Registry} (popolato
-      con le keyword
-    del linguaggio corrente, es. \texttt{int}, \texttt{String}). Se
-    vi è corrispondenza,
-    il riferimento viene declassato a \texttt{Prim}, evitando falsi negativi
-    sulla valutazione dell'architettura.
-\end{itemize}
-
-\section{Ottimizzazione tramite Cache Tree (Memoization)}
-\label{sec:memoization}
-Poiché l'Environment $\rho$ è effimero e si distrugge col procedere
-dell'analisi (tramite chiamate \texttt{pop()}), non possiamo
-sfruttarlo per memorizzare a lungo termine l'esito di lookup
-complessi e preservare cicli di CPU per scope fratelli.
-
-Per garantire la massima efficienza e annullare il degrado
-prestazionale causato dalla profonda navigazione \textit{top-down}
-dello stack, il contesto di risoluzione introduce un \textbf{Cache
-Tree}. Tale albero di mappe mima la ramificazione dei path
-qualificati, isolando la memoria per ogni specifico livello architetturale.
-$$\mathcal{C}_{tree} : (\text{ScopePath}) \to (\mathcal{QN} \to
-\text{ResolutionResult})$$
-
-Ogni volta che l'algoritmo di Lexical Scoping affronta il costo per
-risolvere con successo un percorso in uno specifico blocco, il
-risultato viene registrato nell'albero della Cache al corrispettivo
-path (es. \texttt{"root::core::Auto"}). Nelle successive
-interrogazioni, l'analizzatore intercetta e restituisce direttamente
-la reference precedentemente associata al blocco lessicale, senza
-dover risolvere nuovamente il simbolo.
+\subsection{Inferenza Semantica e Decoppiamento Primitivo}
+Durante l'esecuzione, il valutatore si avvale di ulteriori euristiche.
+All'ingresso di un tipo strutturato, inietta le query relative ai
+lessemi \texttt{self} e \texttt{this}, permettendo la risoluzione
+immediata delle chiamate a metodi di classe. Inoltre, affronta il
+problema dei falsi negativi operando un \textbf{Decoppiamento
+Primitivo}: qualora un'intera query fallisca la sua valutazione nel
+$\mathcal{GR}$, il sistema interroga il \textit{Primitive Registry}
+(un dizionario data-driven caricato a compile-time). Se il nome base
+coincide con una parola chiave del linguaggio (es. \texttt{int},
+\texttt{String}), il riferimento viene declassato allo stato
+\texttt{Prim}, evitando di contrassegnarlo come dipendenza
+\texttt{Failed} o \texttt{External} e garantendo la pulizia semantica
+del grafo architetturale finale.

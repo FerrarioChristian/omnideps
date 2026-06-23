@@ -815,39 +815,49 @@ fn flatten_structured_type(st: &amp;StructuredType) -&gt; Vec&lt;Component&gt; {
     </div>
 
     <!-- ============================================================ -->
-    <h2 id="cytoscape">8. Esportazione Cytoscape</h2>
+    <h2 id="cytoscape">8. Esportazione Cytoscape e Nodi Composti (Compound Nodes)</h2>
     <p class="ref">Riferimento: <code>export/cytoscape.rs</code></p>
 
-    <p>Il formato <strong>Cytoscape</strong> è uno standard per la visualizzazione interattiva di grafi. L'esportazione trasforma il <code>DependencyGraph</code> in un array JSON di elementi Cytoscape.</p>
+    <p>Il formato <strong>Cytoscape</strong> è uno standard per la visualizzazione interattiva di grafi. L'esportazione trasforma il <code>DependencyGraph</code> in un array JSON di elementi Cytoscape, sfruttando la funzionalità dei <strong>Compound Nodes</strong> (nodi che contengono altri nodi) per rappresentare la gerarchia.</p>
 
     <h3>8.1 Formato di output</h3>
-    <p>Ogni elemento è un nodo o un arco:</p>
-    <pre><code>// Nodo
-{ "data": { "id": "root::core::Veicolo", "label": "Veicolo", "type": "Struct" } }
+    <p>Ogni elemento è un nodo o un arco. I nodi possono avere una proprietà <code>parent</code>:</p>
+    <pre><code>// Nodo Modulo (Padre)
+{ "data": { "id": "src::core", "label": "core", "type": "Module" } }
 
-// Arco
-{ "data": { "id": "e0", "source": "root::core::Auto", "target": "root::core::Veicolo",
+// Nodo Struct (Figlio)
+{ "data": { "id": "src::core::Veicolo", "label": "Veicolo", "type": "Struct", "parent": "src::core" } }
+
+// Arco (Dipendenza architetturale)
+{ "data": { "id": "e0", "source": "src::core::Auto", "target": "src::core::Veicolo",
             "label": "UsesFieldType" } }</code></pre>
 
     <h3>8.2 Processo di esportazione</h3>
     <ol>
+        <li><strong>Analisi degli archi strutturali:</strong> Prima di esportare, il sistema analizza tutti gli archi di tipo <code>ModuleContainment</code> e <code>NestedIn</code> per mappare le relazioni genitore-figlio.
+            <ul>
+                <li>Se il nodo padre è <code>"root"</code>, la parentela viene <strong>ignorata</strong>. Questo evita che l'intero grafo venga racchiuso in una scatola gigante e inutile, migliorando il layout.</li>
+            </ul>
+        </li>
         <li><strong>Nodi:</strong> Per ogni <code>Component</code> nel grafo, crea un nodo Cytoscape con:
             <ul>
-                <li><code>id</code> — Il <code>QualifiedName</code> unito con <code>::</code> (es. <code>"root::core::Veicolo"</code>)</li>
+                <li><code>id</code> — Il <code>QualifiedName</code> unito con <code>::</code> (es. <code>"src::core::Veicolo"</code>)</li>
                 <li><code>label</code> — L'ultimo segmento del nome (es. <code>"Veicolo"</code>)</li>
                 <li><code>type</code> — Il tipo di componente (<code>"Module"</code>, <code>"Struct"</code>, <code>"Class"</code>, <code>"Function"</code>)</li>
+                <li><code>parent</code> — L'ID del nodo genitore (se presente e non root)</li>
             </ul>
         </li>
         <li><strong>Archi:</strong> Per ogni <code>Dependency</code>, crea un arco con source e target.
             <ul>
-                <li>Se il source o target non esiste come nodo, viene creato automaticamente come nodo di tipo <code>"External"</code>.</li>
+                <li>Gli archi <code>ModuleContainment</code> e <code>NestedIn</code> vengono <strong>scartati</strong>, poiché la loro informazione è già stata convertita nella gerarchia <code>parent</code> dei nodi.</li>
+                <li>Se il source o target non esiste come nodo (es. dipendenze esterne), viene creato automaticamente come nodo di tipo <code>"External"</code>.</li>
                 <li>Archi duplicati (stessa sorgente, stesso target, stesso tipo) vengono <strong>deduplicati</strong>.</li>
             </ul>
         </li>
     </ol>
 
     <div class="info-box">
-        <strong>Creazione automatica di nodi External:</strong> Quando un arco punta a un nodo che non è nella lista dei componenti (perché è un tipo <code>External</code>, ad esempio una libreria), il sistema crea automaticamente un nodo con tipo <code>"External"</code>. Questo garantisce che il grafo Cytoscape sia sempre valido e completo — ogni arco ha un nodo sorgente e un nodo target.
+        <strong>Vantaggio dei Compound Nodes:</strong> Trasformare le dipendenze gerarchiche in proprietà <code>parent</code> (invece di usare frecce tradizionali) permette agli algoritmi fisici come <code>fcose</code> di disegnare scatole (bounding boxes) per i moduli e le classi. Gli archi visibili rimangono solo quelli puramente architetturali (dipendenze di tipo e di comportamento), riducendo drasticamente il disordine visivo.
     </div>
 
     <!-- ============================================================ -->
@@ -957,20 +967,23 @@ fn count_refs_in_block(block: &amp;Block, resolved: &amp;mut usize, failed: &amp
     </div>
 
     <div class="step">
-        <h3>Risultato: Grafo Visivo</h3>
+        <h3>Risultato: Grafo Visivo con Nodi Composti</h3>
         <div class="tree-container">
-<span class="node">[root]</span> ──<span class="edge-badge edge-structural">ModuleContainment</span>──→ <span class="green">[User]</span>
+<span class="node">[src::core]</span> <span class="dim">(Compound Node)</span>
   <span class="arrow">│</span>
-  <span class="arrow">└</span>──<span class="edge-badge edge-structural">ModuleContainment</span>──→ <span class="node">[core]</span> ──<span class="edge-badge edge-structural">ModuleContainment</span>──→ <span class="green">[Veicolo]</span>
-                                  <span class="arrow">│</span>                               <span class="arrow">↑</span>
-                                  <span class="arrow">├</span>──<span class="edge-badge edge-structural">ModuleContainment</span>──→ <span class="green">[Auto]</span> ─┤
-                                  <span class="arrow">│</span>           <span class="edge-badge edge-type">UsesFieldType</span> ────────────┘
-                                  <span class="arrow">│</span>           <span class="edge-badge edge-type">UsesFieldType</span> ──→ <span class="dim">[external::db::Database]</span>
-                                  <span class="arrow">│</span>
-                                  <span class="arrow">└</span>──<span class="edge-badge edge-structural">ModuleContainment</span>──→ <span class="purple">[calcola()]</span>
-                                                 <span class="edge-badge edge-type">UsesReturnType</span> ──→ Auto
-                                                 <span class="edge-badge edge-behavior">Calls</span> ──→ Veicolo
-                                                 <span class="edge-badge edge-behavior">Instantiates</span> ──→ Auto</div>
+  <span class="arrow">├──</span> <span class="green">[Veicolo]</span> <span class="dim">← parent: "src::core"</span>
+  <span class="arrow">│</span>      <span class="arrow">↑</span>
+  <span class="arrow">├──</span> <span class="green">[Auto]</span> ── <span class="edge-badge edge-type">UsesFieldType</span> ──┘
+  <span class="arrow">│</span>      <span class="arrow">│</span>
+  <span class="arrow">│</span>      <span class="arrow">└──</span> <span class="edge-badge edge-type">UsesFieldType</span> ──→ <span class="dim">[external::db::Database]</span>
+  <span class="arrow">│</span>
+  <span class="arrow">└──</span> <span class="purple">[calcola()]</span>
+         <span class="edge-badge edge-type">UsesReturnType</span> ──→ Auto
+         <span class="edge-badge edge-behavior">Calls</span> ───────────→ Veicolo
+         <span class="edge-badge edge-behavior">Instantiates</span> ────→ Auto
+
+<span class="green">[User]</span> <span class="dim">(Nodo Top-Level, parent="root" ignorato)</span></div>
+        <p>Nota come le relazioni strutturali (<code>ModuleContainment</code>, <code>NestedIn</code>) non appaiono più come frecce orizzontali, ma come relazioni di annidamento visivo spaziale, ripulendo l'architettura per concentrarsi solo sugli accoppiamenti di tipo e di comportamento.</p>
     </div>
 
 </body>

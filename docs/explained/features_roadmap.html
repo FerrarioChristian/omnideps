@@ -94,7 +94,7 @@
 struct Data { } // C, Rust
 trait Walk { } // Rust
 interface Fly { } // Java</pre>
-                <div class="notes">Riconoscimento unificato. Estrazione perfetta in Rust. In C++ estrae le classi. In Java estrae Classi e Interfacce. In Python le dichiarazioni non hanno keyword rigide come struct, ma `class` viene estratto. In C le struct vengono riconosciute correttamente includendo il parsing ricorsivo. Tipi locali (all'interno dei body delle funzioni) vengono annidati correttamente.</div>
+                <div class="notes">Riconoscimento unificato. Estrazione perfetta in Rust. In C++ estrae le classi. In Java estrae Classi e Interfacce. In Python le dichiarazioni non hanno keyword rigide come struct, ma `class` viene estratto. In C le struct vengono riconosciute correttamente includendo il parsing ricorsivo. Tipi locali (all'interno dei body delle funzioni) vengono annidati correttamente. Ricerca raffinata per evitare falsi positivi (es. esclusi i costruttori `constructor_declaration` in Java/C++ che contengono la stringa 'struct').</div>
             </td>
             <td>Nodo: <span class="ir-node">StructuredType</span><br>Grafico: Vertice primario</td>
             <td><span class="function-ref">try_parse_structured_type</span><br>Riconosce i nodi CST (class_declaration, struct_specifier, ecc.).</td>
@@ -106,7 +106,7 @@ interface Fly { } // Java</pre>
                 <pre>private String name; // Java
             pub age: u8, // Rust
             char *id; // C</pre>
-                <div class="notes">Riscontrato in Rust e Java. In C le struct annidate o i puntatori `struct Type` generano failed refs a causa degli spazi nel nome.</div>
+                <div class="notes">Supportato per tutti i linguaggi. L'estrattore strutturale naviga la gerarchia della classe bloccandosi intenzionalmente all'ingresso dei metodi (<code>!is_function(child)</code>), garantendo che le variabili locali dichiarate all'interno delle funzioni non vengano erroneamente promosse a campi della classe.</div>
             </td>
             <td>Campo: <span class="ir-node">Field</span> dentro <span class="ir-node">StructuredType</span><br>Arco: <code>UsesFieldType</code></td>
             <td><span class="function-ref">extract_fields</span></td>
@@ -280,7 +280,7 @@ User() // Python</pre>
 System.out;</pre>
             </td>
             <td>
-                <div class="implementation-idea"><strong>Idea di implementazione:</strong> Estendere <code>traverse_for_body_deps</code> per catturare i nodi di tipo <code>member_access</code> o <code>scoped_identifier</code> *anche* fuori dalle espressioni di chiamata. Il prefisso (es. `Math`) andrebbe salvato in un nuovo array <code>accesses</code> in <code>Function</code>, e risolto dal builder in un arco <code>AccessesStatic</code>.</div>
+                <div class="implementation-idea"><strong>Idea di implementazione:</strong> Estendere <code>find_behavioral_deps</code> per catturare i nodi di tipo <code>member_access</code> o <code>scoped_identifier</code> *anche* fuori dalle espressioni di chiamata. Il prefisso (es. `Math`) andrebbe salvato in un nuovo array <code>accesses</code> in <code>Block</code>, e risolto dal builder in un arco <code>AccessesStatic</code>.</div>
             </td>
             <td>-</td>
         </tr>
@@ -401,7 +401,7 @@ class A : public B // C++</pre></td>
             <td><span class="status-no">No</span></td>
             <td><pre>catch (IOException e)</pre></td>
             <td>
-                <div class="implementation-idea"><strong>Idea di implementazione:</strong> Aggiungere `catches: Vec&lt;TypeRef&gt;` in `Function`. In `traverse_for_body_deps`, mappare il nodo `catch_clause`, estrarne il tipo dell'eccezione, e poi generare un arco <code>CatchesException</code> nel grafo.</div>
+                <div class="implementation-idea"><strong>Idea di implementazione:</strong> Aggiungere `catches: Vec&lt;TypeRef&gt;` in `Block`. In `extract_block`, intercettare i nodi `catch_clause`, estrarne il tipo dell'eccezione, e poi generare un arco <code>CatchesException</code> nel grafo.</div>
             </td>
             <td>-</td>
         </tr>
@@ -410,9 +410,9 @@ class A : public B // C++</pre></td>
             <td><span class="status-partial">Parz</span></td>
             <td><pre>throw new MyException()</pre></td>
             <td>
-                <div class="implementation-idea"><strong>Idea di implementazione:</strong> Attualmente l'istanza interna <code>new</code> viene catturata in `instantiates`. Per differenziarla, `traverse_for_body_deps` dovrebbe controllare se il genitore dell'espressione è un nodo `throw_statement`. Se sì, aggiungere il tipo in un vettore dedicato `throws` piuttosto che `instantiates`.</div>
+                <div class="implementation-idea"><strong>Idea di implementazione:</strong> Attualmente l'istanza interna <code>new</code> viene catturata in `instantiates` da `find_behavioral_deps`. Per differenziarla, `find_behavioral_deps` dovrebbe controllare se il genitore dell'espressione è un nodo `throw_statement`. Se sì, aggiungere il tipo in un vettore dedicato `throws` in `Block` piuttosto che `instantiates`.</div>
             </td>
-            <td><span class="function-ref">traverse_for_body_deps</span></td>
+            <td><span class="function-ref">find_behavioral_deps</span></td>
         </tr>
     </table>
 
@@ -463,13 +463,16 @@ class A : public B // C++</pre></td>
         </tr>
         <tr>
             <td>NameSpaces / Modules Usage</td>
-            <td><span class="status-yes">Sì</span></td>
+            <td><span class="status-partial">Parz</span></td>
             <td><pre>mod core { } // Rust
-        namespace math { } // C++</pre>
-                <div class="notes">Annidamento ricorsivo di <code>Module</code>. Funziona bene in Rust (mod) e C++ (namespace). In Java (packages) e Python (moduli/file) attualmente non produce moduli annidati ma inserisce tutto nel modulo root. <strong>Da sistemare per un supporto language-agnostic completo.</strong></div>
+        namespace math { } // C++
+        package com.api; // Java</pre>
+                <div class="notes">Annidamento ricorsivo supportato. Funziona perfettamente in Rust (<code>mod</code>) e C++ (<code>namespace</code>) perché la gerarchia è definita da blocchi CST espliciti. In Java e Python i file vengono attualmente appiattiti nel modulo <code>root</code>. È stato scelto di <strong>non</strong> forzare l'uso del percorso del File System come namespace per tutti i linguaggi, poiché violerebbe la semantica di linguaggi come Java (dove i package sono slegati dal disco).</div>
             </td>
-            <td>Annidamento ricorsivo di <code>Module</code>.<br>Arco: <code>ModuleContainment</code></td>
-            <td><span class="function-ref">try_parse_module_node</span></td>
+            <td>Annidamento ricorsivo di <code>Module</code>.<br>Arco: Mappato come gerarchia <code>parent</code> in Cytoscape.</td>
+            <td><span class="function-ref">try_parse_module_node</span>
+                <div class="implementation-idea"><strong>Task Aperto:</strong> Implementare estrattori specifici per la dichiarazione di `package` nell'AST di Java, permettendo al resolver di mappare nativamente i file Java ai loro veri moduli senza affidarsi ad hack sul File System.</div>
+            </td>
         </tr>
         <tr>
             <td>Dynamic Imports</td>
