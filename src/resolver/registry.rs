@@ -10,7 +10,7 @@ use std::collections::HashMap;
 /// Denotes the type of component registered, used for type inference.
 #[derive(Debug, Clone)]
 pub enum RegistryEntry {
-    Module,
+    Module { imports: Vec<crate::model::Import> },
     StructuredType { super_types: Vec<TypeRef> },
     Function { return_type: TypeRef },
     Field { field_type: TypeRef },
@@ -34,7 +34,7 @@ impl GlobalRegistry {
     /// Recursively registers a Module, its functions, structured types, and Impl blocks.
     fn register_module(&mut self, m: &Module, mut prefix: QualifiedName) {
         prefix.extend(m.name.clone());
-        self.paths.insert(prefix.clone(), RegistryEntry::Module);
+        self.paths.insert(prefix.clone(), RegistryEntry::Module { imports: m.imports.clone() });
 
         for st in &m.structured_types {
             self.register_structured_type(st, prefix.clone());

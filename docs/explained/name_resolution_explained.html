@@ -837,8 +837,9 @@ block.instantiates = block.instantiates.into_iter().map(|i| substitute_type(ctx,
     fn find_member(ctx, current_path, member, visited) -&gt; Option&lt;QualifiedName&gt; {
         let mut candidate = current_path.clone();
         candidate.push(member.clone());
+        // 1. Match diretto
         if ctx.registry.exists(&amp;candidate) { return Some(candidate); }
-        
+
         // Cycle check per evitare loop infiniti in MRO ciclici
         let check_cycles = ctx.current_lang.as_deref()
             .map(|l| ctx.config.get_for(l).cyclic_mro_check)
@@ -847,8 +848,28 @@ block.instantiates = block.instantiates.into_iter().map(|i| substitute_type(ctx,
             return None; // Ciclo rilevato
         }
 
-        // MRO: Depth-First, Left-to-Right
-        if let Some(RegistryEntry::StructuredType { super_types }) = ctx.registry.get(&amp;current_path) {
+        let entry = ctx.registry.get(&amp;current_path);
+
+        // 2. Transitive Imports Fallback (se il target è un modulo)
+        let allow_transitive = ctx.current_lang.as_deref()
+            .map(|l| ctx.config.get_for(l).transitive_imports)
+            .unwrap_or(false);
+        if allow_transitive {
+            if let Some(RegistryEntry::Module { imports }) = entry {
+                for imp in imports {
+                    if imp.is_wildcard {
+                        if let Some(found) = find_member(ctx, imp.path.clone(), member, visited) { return Some(found); }
+                    } else if let Some(alias) = &amp;imp.alias {
+                        if alias == member { return Some(imp.path.clone()); }
+                    } else if let Some(last) = imp.path.last() {
+                        if last == member { return Some(imp.path.clone()); }
+                    }
+                }
+            }
+        }
+
+        // 3. MRO: Depth-First, Left-to-Right
+        if let Some(RegistryEntry::StructuredType { super_types }) = entry {
             for sup in super_types {
                 if let TypeRef::ResolutionQuery(q) = sup {
                     if let Some(sup_path) = evaluate_query(ctx, q, true) {
@@ -861,12 +882,11 @@ block.instantiates = block.instantiates.into_iter().map(|i| substitute_type(ctx,
     }
     // ...
 }</code></pre>
-    <p>Questo operatore è il fulcro della <strong>Dynamic Dispatch statica</strong>. Implementa nativamente l'ereditarietà (Method Resolution Order) con protezione attiva contro i cicli:</p>
+    <p>Questo operatore è il fulcro della <strong>Dynamic Dispatch statica</strong> e della <strong>Transitive Resolution</strong>. Svolge i seguenti compiti gerarchici:</p>
     <ol>
-        <li>Se <code>Cat.breathe</code> esiste direttamente in <code>Cat</code>, viene restituito.</li>
-        <li>Se fallisce, cerca nei <code>super_types</code>. Valuta la query del genitore (es. <code>Animal</code>) e cerca <code>Animal::breathe</code>.</li>
-        <li>La ricorsione è Depth-First, Left-to-Right. Se una classe eredita da più padri (Diamond Problem in C++/Python), l'algoritmo si aggancia deterministicamente alla prima implementazione utile trovata.</li>
-        <li><strong>Cycle Detection:</strong> Nei linguaggi complessi e nei progetti di grandi dimensioni, possono verificarsi dichiarazioni di ereditarietà circolari a livello strutturale. Tramite l'uso dell'opzione <code>cyclic_mro_check</code> nella configurazione e un set locale <code>visited</code>, l'algoritmo traccia i percorsi di navigazione dell'MRO e abortisce anticipatamente la discesa se incontra un percorso già esplorato, impedendo lo stack overflow dell'Executor.</li>
+        <li>Se <code>module.Foo</code> o <code>Cat.breathe</code> esiste direttamente, viene restituito.</li>
+        <li><strong>Transitive Imports:</strong> Se il percorso esplorato è un <code>Module</code> e il linguaggio supporta gli import transitivi (es. Python), si ispezionano gli import esportati dal modulo (compresi quelli wildcard tramite ricorsione sicura controllata dal <code>visited</code> set) per trovare un match per il nome cercato, ri-mappando virtualmente il percorso a quello originale.</li>
+        <li><strong>Method Resolution Order:</strong> Se il percorso esplorato è un <code>StructuredType</code> (e la ricerca diretta è fallita), cerca nei <code>super_types</code>. Valuta la query del genitore (es. <code>Animal</code>) e cerca <code>Animal::breathe</code>. La ricorsione è Depth-First, Left-to-Right, bloccata su cicli in caso di MRO complessi.</li>
         <li>Garantisce il corretto linking alle implementazioni di default dei Trait in Rust o Interfacce Java, comportandosi come un vero compilatore.</li>
     </ol>
 

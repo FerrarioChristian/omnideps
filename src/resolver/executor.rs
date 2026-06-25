@@ -253,7 +253,7 @@ fn evaluate_query(ctx: &ExecutorContext, query: &Query, resolve_type: bool) -> O
                     return Some(candidate);
                 }
 
-                // Cycle check for MRO
+                // Cycle check for MRO and Transitive Imports
                 let check_cycles = ctx.current_lang.as_deref().map(|l| ctx.config.get_for(l).cyclic_mro_check).unwrap_or(true);
                 if check_cycles {
                     if !visited.insert(current_path.clone()) {
@@ -261,8 +261,33 @@ fn evaluate_query(ctx: &ExecutorContext, query: &Query, resolve_type: bool) -> O
                     }
                 }
                 
-                // 2. Inheritance fallback (MRO: Depth-First, Left-to-Right)
-                if let Some(crate::resolver::registry::RegistryEntry::StructuredType { super_types }) = ctx.registry.get(&current_path) {
+                let entry = ctx.registry.get(&current_path);
+
+                // 2. Transitive Imports Fallback (if current_path is a Module)
+                let allow_transitive = ctx.current_lang.as_deref().map(|l| ctx.config.get_for(l).transitive_imports).unwrap_or(false);
+                if allow_transitive {
+                    if let Some(crate::resolver::registry::RegistryEntry::Module { imports }) = entry {
+                        for imp in imports {
+                            if imp.is_wildcard {
+                                // Wildcard import: search recursively in the imported module
+                                if let Some(found) = find_member(ctx, imp.path.clone(), member, visited) {
+                                    return Some(found);
+                                }
+                            } else if let Some(alias) = &imp.alias {
+                                if alias == member {
+                                    return Some(imp.path.clone());
+                                }
+                            } else if let Some(last) = imp.path.last() {
+                                if last == member {
+                                    return Some(imp.path.clone());
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // 3. Inheritance fallback (MRO: Depth-First, Left-to-Right)
+                if let Some(crate::resolver::registry::RegistryEntry::StructuredType { super_types }) = entry {
                     for sup in super_types {
                         if let TypeRef::ResolutionQuery(q) = sup {
                             if let Some(sup_path) = evaluate_query(ctx, q, true) {
