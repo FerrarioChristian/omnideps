@@ -25,6 +25,25 @@ pub fn try_parse_module_node(node: Node, source: &str) -> Option<Module> {
     })
 }
 
+/// Attempts to parse a file-level package declaration and returns its qualified name path.
+pub fn try_parse_package_declaration(node: Node, source: &str) -> Option<Vec<String>> {
+    if !is_package_declaration(node) {
+        return None;
+    }
+    
+    // The package_declaration contains the package name as its first named child 
+    // (e.g. `identifier` or `scoped_identifier` in Java, or `package_clause` in Go)
+    if let Some(child) = node.named_child(0) {
+        let text = super::text_parsing::node_text(child, source);
+        let parts = super::text_parsing::split_qualified_name(&text);
+        if !parts.is_empty() {
+            return Some(parts);
+        }
+    }
+    
+    None
+}
+
 pub fn try_parse_structured_type(node: Node, source: &str) -> Option<StructuredType> {
     if !is_structured_type(node) {
         return None;
