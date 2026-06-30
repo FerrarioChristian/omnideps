@@ -116,7 +116,7 @@ fn verify_graph_adherence(graph: &DependencyGraph, manifest: &TestManifest) -> T
         let sink_exists = nodes_map.contains_key(&edge.sink);
         
         let mut edge_exists = false;
-        if source_exists && sink_exists {
+        if source_exists {
             if let Some(sinks) = edges_map.get(&edge.source) {
                 if sinks.contains(&edge.sink) {
                     edge_exists = true;

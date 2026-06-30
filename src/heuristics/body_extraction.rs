@@ -23,6 +23,7 @@ pub fn extract_block(node: Node, source: &str) -> crate::model::Block {
     let mut declarations = vec![];
     let mut calls = vec![];
     let mut instantiates = vec![];
+    let mut accesses = vec![];
     let mut sub_blocks = vec![];
 
     let mut cursor = node.walk();
@@ -82,15 +83,17 @@ pub fn extract_block(node: Node, source: &str) -> crate::model::Block {
             // WE MUST ALSO check the right-hand side (initializer/value) for behavioral deps!
             let mut inner_calls = vec![];
             let mut inner_inst = vec![];
+            let mut inner_accesses = vec![];
             if let Some(val) = child.child_by_field_name("value").or_else(|| child.child_by_field_name("declarator")) {
-                find_behavioral_deps(val, source, &mut inner_calls, &mut inner_inst);
+                find_behavioral_deps(val, source, &mut inner_calls, &mut inner_inst, &mut inner_accesses);
             } else {
                 // If there's no clear value field, scan the whole declaration just in case (excluding the type/name to avoid false positives)
                 // Actually, find_behavioral_deps is safe to run on the whole node because it looks for call_expression / new_expression
-                find_behavioral_deps(child, source, &mut inner_calls, &mut inner_inst);
+                find_behavioral_deps(child, source, &mut inner_calls, &mut inner_inst, &mut inner_accesses);
             }
             calls.extend(inner_calls);
             instantiates.extend(inner_inst);
+            accesses.extend(inner_accesses);
         }
         // 2. Nested Blocks
         else if kind.contains("body") || kind.contains("block") || kind == "compound_statement" {
@@ -100,9 +103,11 @@ pub fn extract_block(node: Node, source: &str) -> crate::model::Block {
         else {
             let mut inner_calls = vec![];
             let mut inner_inst = vec![];
-            find_behavioral_deps(child, source, &mut inner_calls, &mut inner_inst);
+            let mut inner_accesses = vec![];
+            find_behavioral_deps(child, source, &mut inner_calls, &mut inner_inst, &mut inner_accesses);
             calls.extend(inner_calls);
             instantiates.extend(inner_inst);
+            accesses.extend(inner_accesses);
         }
     }
 
@@ -110,6 +115,7 @@ pub fn extract_block(node: Node, source: &str) -> crate::model::Block {
         declarations,
         calls,
         instantiates,
+        accesses,
         sub_blocks,
     }
 }
@@ -122,6 +128,7 @@ fn find_behavioral_deps(
     source: &str,
     calls: &mut Vec<TypeRef>,
     instantiates: &mut Vec<TypeRef>,
+    accesses: &mut Vec<TypeRef>,
 ) {
     let kind = node.kind();
 
@@ -176,9 +183,14 @@ fn find_behavioral_deps(
         }
     }
 
+    // --- Accesses ---
+    if matches!(kind, "field_access" | "member_expression" | "property_identifier" | "member_access") {
+        accesses.push(extract_type_ref(node, source));
+    }
+
     let mut cursor = node.walk();
     for child in node.children(&mut cursor) {
-        find_behavioral_deps(child, source, calls, instantiates);
+        find_behavioral_deps(child, source, calls, instantiates, accesses);
     }
 }
 

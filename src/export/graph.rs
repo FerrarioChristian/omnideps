@@ -160,6 +160,15 @@ fn add_block_edges(ff: &Function, block: &Block, edges: &mut Vec<Dependency>) {
             });
         }
     }
+    for acc in &block.accesses {
+        if let Some(to) = type_ref_target(acc) {
+            edges.push(Dependency {
+                from: ff.name.clone(),
+                to: to.clone(),
+                kind: DependencyEdgeKind::AccessesField,
+            });
+        }
+    }
 
     // 3. Recurse into sub-blocks
     for sub in &block.sub_blocks {

@@ -12,6 +12,7 @@ pub enum DependencyEdgeKind {
     ModuleContainment,
     Calls,
     Instantiates,
+    AccessesField,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize)]

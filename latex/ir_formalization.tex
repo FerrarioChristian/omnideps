@@ -100,12 +100,12 @@ elegantemente come un vettore di $F$. Il blocco traccia le proprie
 dipendenze comportamentali e può annidare ricorsivamente ulteriori
 blocchi (come nei costrutti \texttt{if} o \texttt{while}):
 $$\mathcal{B} = \langle \vec{F}_{local}, \vec{\tau}_{calls},
-\vec{\tau}_{inst}, \vec{\mathcal{B}}_{sub} \rangle$$
+\vec{\tau}_{inst}, \vec{\tau}_{accesses}, \vec{\mathcal{B}}_{sub} \rangle$$
 dove $\vec{\tau}_{calls}$ rappresenta l'insieme dei riferimenti ai
 tipi (classi, moduli o altre funzioni libere) le cui funzioni vengono
-esplicitamente invocate nel blocco, mentre $\vec{\tau}_{inst}$
+esplicitamente invocate nel blocco, $\vec{\tau}_{inst}$
 rappresenta i tipi strutturati esplicitamente istanziati (es. tramite
-operatori come \texttt{new}).
+operatori come \texttt{new}), e $\vec{\tau}_{accesses}$ rappresenta i riferimenti diretti in lettura o scrittura allo stato di un componente (es. accesso a variabili di istanza o campi statici).
 
 Definiamo infine il tipo universale \textbf{Function}
 ($\mathcal{F}$) come contenitore che lega un nome qualificato a una

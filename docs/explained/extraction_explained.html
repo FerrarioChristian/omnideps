@@ -1021,14 +1021,15 @@ if let Some(arrow_pos) = text.find("->") { ... }</code></pre>
     <p>L'analisi del corpo di una funzione è gestita dalla funzione <code>extract_block</code>, che sostituisce la precedente <code>traverse_for_body_deps</code>. Il nuovo approccio produce un <code>Block</code> strutturato che modella la gerarchia degli scope del codice, separando dichiarazioni locali, dipendenze comportamentali e blocchi annidati. Durante la visita, <code>infer_variable_type</code> compensa le variabili omesse tipizzando dal lato destro dell'espressione.</p>
 
     <h3>10.1 <code>extract_block</code> — Estrazione strutturata</h3>
-    <pre><code>pub fn extract_block(node: Node, source: &amp;str) -&gt; Block {
+    <pre><code>pub fn extract_block(node: Node, source: &str) -> Block {
     let mut declarations = vec![];
     let mut calls = vec![];
     let mut instantiates = vec![];
+    let mut accesses = vec![];
     let mut sub_blocks = vec![];
     let mut cursor = node.walk();
 
-    for child in node.children(&amp;mut cursor) {
+    for child in node.children(&mut cursor) {
         let kind = child.kind();
 
         // 1. Dichiarazioni di variabili locali
@@ -1052,13 +1053,15 @@ if let Some(arrow_pos) = text.find("->") { ... }</code></pre>
         else {
             let mut inner_calls = vec![];
             let mut inner_inst = vec![];
-            find_behavioral_deps(child, source, &amp;mut inner_calls, &amp;mut inner_inst);
+            let mut inner_acc = vec![];
+            find_behavioral_deps(child, source, &mut inner_calls, &mut inner_inst, &mut inner_acc);
             calls.extend(inner_calls);
             instantiates.extend(inner_inst);
+            accesses.extend(inner_acc);
         }
     }
 
-    Block { declarations, calls, instantiates, sub_blocks }
+    Block { declarations, calls, instantiates, accesses, sub_blocks }
 }</code></pre>
 
     <p>La funzione opera sui figli diretti del nodo body, classificandoli in tre categorie:</p>
@@ -1147,6 +1150,16 @@ else if kind == "method_invocation" {
             <tr><td><code>obj.method()</code> (Java)</td><td><code>method_invocation</code></td><td>L'"object" o il "name"</td></tr>
         </tbody>
     </table>
+
+    <h4>Accessi a stato (<code>accesses</code>)</h4>
+    <pre><code>// Accesso a campi o costanti: obj.field, Class.CONSTANT
+if matches!(kind, "field_access" | "member_expression" | "scoped_identifier") {
+    // Si estrae l'oggetto o la classe su cui avviene l'accesso
+    if let Some(obj) = node.child_by_field_name("object").or_else(|| node.child_by_field_name("path")) {
+        accesses.push(extract_type_ref(obj, source));
+    }
+}</code></pre>
+    <p>Questo permette di intercettare l'accoppiamento verso campi statici, variabili di istanza e costanti (come gli Enum) catturando il prefisso dell'espressione.</p>
 
     <div class="warn-box">
         <strong>Differenza chiave rispetto al vecchio <code>traverse_for_body_deps</code>:</strong> La vecchia funzione attraversava ricorsivamente <strong>tutti</strong> i figli senza distinzione, raccogliendo chiamate e istanziazioni in liste piatte. Il nuovo approccio con <code>extract_block</code> + <code>find_behavioral_deps</code> separa le dipendenze per livello di scope: <code>find_behavioral_deps</code> <strong>salta</strong> i nodi blocco (che vengono gestiti da <code>extract_block</code> come <code>sub_blocks</code>), evitando così il double-counting.

@@ -118,6 +118,7 @@ fn execute_block(ctx: &ExecutorContext, mut b: Block) -> Block {
     b.declarations = b.declarations.into_iter().map(|mut d| { d.ty = evaluate_typeref(ctx, d.ty); d }).collect();
     b.calls = b.calls.into_iter().map(|c| evaluate_typeref(ctx, c)).collect();
     b.instantiates = b.instantiates.into_iter().map(|i| evaluate_typeref(ctx, i)).collect();
+    b.accesses = b.accesses.into_iter().map(|a| evaluate_typeref(ctx, a)).collect();
     b.sub_blocks = b.sub_blocks.into_iter().map(|sub| execute_block(ctx, sub)).collect();
     b
 }
