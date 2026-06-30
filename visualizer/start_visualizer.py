@@ -1,8 +1,8 @@
-import os
-import json
-import threading
 import http.server
+import json
+import os
 import socketserver
+import threading
 import webbrowser
 
 # Cambiamo directory nella root del progetto per far sì che il webserver possa servire
@@ -14,6 +14,13 @@ os.chdir(project_root)
 OUTPUT_DIR = "tests/outputs"
 
 class CustomHandler(http.server.SimpleHTTPRequestHandler):
+
+    def end_headers(self):
+        self.send_header('Cache-Control', 'no-cache, no-store, must-revalidate')
+        self.send_header('Pragma', 'no-cache')
+        self.send_header('Expires', '0')
+        super().end_headers()
+
     def do_GET(self):
         if self.path == '/api/list_graphs':
             self.send_response(200)

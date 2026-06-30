@@ -32,6 +32,9 @@ pub fn is_structured_type(node: Node) -> bool {
         && !kind.contains("body")
         && !kind.contains("mod")
         && !kind.contains("variant")
+        && !kind.contains("super")
+        && !kind.contains("base")
+        && !kind.contains("constructor")
 }
 
 /// Heuristically identifies free-standing functions or methods.
@@ -40,11 +43,11 @@ pub fn is_function(node: Node) -> bool {
         return false;
     }
     let kind = node.kind();
-    kind.contains("function")
+    (kind.contains("function")
         || kind.contains("method")
         || kind.contains("fn_item")
-        || kind.contains("def")
-        || kind.contains("func")
+        || kind.contains("func"))
+        && !kind.contains("class")
 }
 
 /// Identifies implementation blocks commonly found in Rust.
@@ -52,7 +55,8 @@ pub fn is_impl_block(node: Node) -> bool {
     if !node.is_named() {
         return false;
     }
-    node.kind().contains("impl")
+    let kind = node.kind();
+    kind == "impl_item" || kind == "impl_block"
 }
 
 /// Identifies import or use statements.

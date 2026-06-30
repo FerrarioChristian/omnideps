@@ -1,0 +1,48 @@
+[
+  {
+    "data": {
+      "id": "root::Controller",
+      "label": "Controller",
+      "type": "Struct"
+    }
+  },
+  {
+    "data": {
+      "id": "root::Controller::do_something",
+      "label": "do_something()",
+      "type": "Function",
+      "parent": "root::Controller"
+    }
+  },
+  {
+    "data": {
+      "id": "root::User",
+      "label": "User",
+      "type": "Struct"
+    }
+  },
+  {
+    "data": {
+      "id": "root::User::get_name",
+      "label": "get_name()",
+      "type": "Function",
+      "parent": "root::User"
+    }
+  },
+  {
+    "data": {
+      "id": "e0",
+      "source": "root::Controller",
+      "target": "root::User",
+      "label": "UsesFieldType"
+    }
+  },
+  {
+    "data": {
+      "id": "e1",
+      "source": "root::Controller::do_something",
+      "target": "root::User::get_name",
+      "label": "Calls"
+    }
+  }
+]

@@ -1,4 +1,4 @@
-use crate::ir::*;
+use crate::model::*;
 
 /// Constructs a dependency graph linking components based on inheritance, types used in fields, parameters, etc.
 pub fn build_dependency_graph(modules: &[Module]) -> DependencyGraph {
@@ -8,6 +8,10 @@ pub fn build_dependency_graph(modules: &[Module]) -> DependencyGraph {
     for m in modules {
         traverse_module_for_edges(m, None, &mut edges);
     }
+    
+    // Deduplicate edges to prevent inflated coupling metrics
+    edges.sort();
+    edges.dedup();
 
     DependencyGraph { nodes, edges }
 }
@@ -43,15 +47,6 @@ fn traverse_module_for_edges(
         add_function_edges(ff, edges);
     }
 
-    for ib in &m.impl_blocks {
-        edges.push(Dependency {
-            from: m.name.clone(),
-            to: ib.name.clone(),
-            kind: DependencyEdgeKind::ModuleContainment,
-        });
-        add_impl_edges(ib, edges);
-    }
-
     for sub in &m.sub_modules {
         traverse_module_for_edges(sub, Some(&m.name), edges);
     }
@@ -80,121 +75,95 @@ fn traverse_structured_type_edges(st: &StructuredType, edges: &mut Vec<Dependenc
     }
 }
 
+fn type_ref_target(tr: &TypeRef) -> Option<&QualifiedName> {
+    match tr {
+        TypeRef::Resolved(to) | TypeRef::External(to) => Some(to),
+        _ => None,
+    }
+}
+
 fn add_super_edges(st: &StructuredType, edges: &mut Vec<Dependency>) {
     for sup in &st.super_types {
-        match sup {
-            TypeRef::Resolved(to) | TypeRef::External(to) => {
-                edges.push(Dependency {
-                    from: st.name.clone(),
-                    to: to.clone(),
-                    kind: DependencyEdgeKind::Inherits,
-                });
-            }
-            _ => {}
+        if let Some(to) = type_ref_target(sup) {
+            edges.push(Dependency {
+                from: st.name.clone(),
+                to: to.clone(),
+                kind: DependencyEdgeKind::IsA,
+            });
         }
     }
 }
 
 fn add_field_edges(st: &StructuredType, edges: &mut Vec<Dependency>) {
     for f in &st.fields {
-        match &f.ty {
-            TypeRef::Resolved(to) | TypeRef::External(to) => {
-                edges.push(Dependency {
-                    from: st.name.clone(),
-                    to: to.clone(),
-                    kind: DependencyEdgeKind::UsesFieldType,
-                });
-            }
-            _ => {}
+        if let Some(to) = type_ref_target(&f.ty) {
+            edges.push(Dependency {
+                from: st.name.clone(),
+                to: to.clone(),
+                kind: DependencyEdgeKind::UsesFieldType,
+            });
         }
     }
 }
 
 fn add_function_edges(ff: &Function, edges: &mut Vec<Dependency>) {
     for p in &ff.signature.parameters {
-        match &p.ty {
-            TypeRef::Resolved(to) | TypeRef::External(to) => {
-                edges.push(Dependency {
-                    from: ff.name.clone(),
-                    to: to.clone(),
-                    kind: DependencyEdgeKind::UsesParamType,
-                });
-            }
-            _ => {}
-        }
-    }
-    match &ff.signature.return_type {
-        TypeRef::Resolved(to) | TypeRef::External(to) => {
+        if let Some(to) = type_ref_target(&p.ty) {
             edges.push(Dependency {
                 from: ff.name.clone(),
                 to: to.clone(),
-                kind: DependencyEdgeKind::UsesReturnType,
+                kind: DependencyEdgeKind::UsesParamType,
             });
         }
-        _ => {}
     }
-    for call in &ff.calls {
-        match call {
-            TypeRef::Resolved(to) | TypeRef::External(to) => {
-                edges.push(Dependency {
-                    from: ff.name.clone(),
-                    to: to.clone(),
-                    kind: DependencyEdgeKind::Calls,
-                });
-            }
-            _ => {}
-        }
+    if let Some(to) = type_ref_target(&ff.signature.return_type) {
+        edges.push(Dependency {
+            from: ff.name.clone(),
+            to: to.clone(),
+            kind: DependencyEdgeKind::UsesReturnType,
+        });
     }
-    for inst in &ff.instantiates {
-        match inst {
-            TypeRef::Resolved(to) | TypeRef::External(to) => {
-                edges.push(Dependency {
-                    from: ff.name.clone(),
-                    to: to.clone(),
-                    kind: DependencyEdgeKind::Instantiates,
-                });
-            }
-            _ => {}
-        }
+
+    if let Some(body) = &ff.body {
+        add_block_edges(ff, body, edges);
     }
 }
 
-fn add_impl_edges(ib: &ImplBlock, edges: &mut Vec<Dependency>) {
-    match &ib.impl_for {
-        TypeRef::Resolved(to) | TypeRef::External(to) => {
+fn add_block_edges(ff: &Function, block: &Block, edges: &mut Vec<Dependency>) {
+    // 1. Declarations (Local variables)
+    for decl in &block.declarations {
+        if let Some(to) = type_ref_target(&decl.ty) {
             edges.push(Dependency {
-                from: ib.name.clone(),
+                from: ff.name.clone(),
                 to: to.clone(),
-                kind: DependencyEdgeKind::Implements,
+                kind: DependencyEdgeKind::UsesLocalType,
             });
         }
-        _ => {}
     }
-    match &ib.implements_trait {
-        Some(TypeRef::Resolved(to)) | Some(TypeRef::External(to)) => {
+
+    // 2. Behavioral dependencies
+    for call in &block.calls {
+        if let Some(to) = type_ref_target(call) {
             edges.push(Dependency {
-                from: ib.name.clone(),
+                from: ff.name.clone(),
                 to: to.clone(),
-                kind: DependencyEdgeKind::Implements,
+                kind: DependencyEdgeKind::Calls,
             });
         }
-        _ => {}
     }
-    for m in &ib.methods {
-        edges.push(Dependency {
-            from: ib.name.clone(),
-            to: m.name.clone(),
-            kind: DependencyEdgeKind::NestedIn,
-        });
-        add_function_edges(m, edges);
+    for inst in &block.instantiates {
+        if let Some(to) = type_ref_target(inst) {
+            edges.push(Dependency {
+                from: ff.name.clone(),
+                to: to.clone(),
+                kind: DependencyEdgeKind::Instantiates,
+            });
+        }
     }
-    for nested in &ib.nested_types {
-        edges.push(Dependency {
-            from: ib.name.clone(),
-            to: nested.name.clone(),
-            kind: DependencyEdgeKind::NestedIn,
-        });
-        traverse_structured_type_edges(nested, edges);
+
+    // 3. Recurse into sub-blocks
+    for sub in &block.sub_blocks {
+        add_block_edges(ff, sub, edges);
     }
 }
 

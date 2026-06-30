@@ -34,9 +34,46 @@
         .implementation-idea { margin-top: 0.5rem; padding: 8px; background-color: #f0f7ff; border-left: 4px solid #0066cc; font-size: 0.9em; }
         .ir-node { color: #0056b3; font-weight: 500; }
         .function-ref { color: #c7254e; font-family: monospace; font-size: 0.9em; }
+        .wiki-nav {
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+            padding: 0.7rem 1rem;
+            margin-bottom: 2rem;
+            background: #f6f8fa;
+            border: 1px solid #d0d7de;
+            border-radius: 8px;
+            font-size: 0.88em;
+            flex-wrap: wrap;
+        }
+        .wiki-nav a {
+            color: #0969da;
+            text-decoration: none;
+            padding: 0.25rem 0.6rem;
+            border-radius: 4px;
+            transition: background 0.15s;
+        }
+        .wiki-nav a:hover { background: #ddf4ff; }
+        .wiki-nav a.active {
+            background: #0969da;
+            color: #fff;
+            font-weight: 600;
+        }
+        .wiki-nav .sep { color: #d0d7de; font-size: 1.1em; }
+        .wiki-nav .label { color: #57606a; font-weight: 600; margin-right: 0.2rem; }
     </style>
 </head>
 <body>
+    <nav class="wiki-nav">
+        <span class="label">📖 Wiki:</span>
+        <a href="extraction_explained.html">Fase 1 — Estrazione</a>
+        <span class="sep">·</span>
+        <a href="name_resolution_explained.html">Fase 2 — Name Resolution</a>
+        <span class="sep">·</span>
+        <a href="dependency_graph_explained.html">Fase 3 — Dependency Graph</a>
+        <span class="sep">·</span>
+        <a href="features_roadmap.html" class="active">Features &amp; Roadmap</a>
+    </nav>
     <h1>Language-Agnostic Analyzer: Features & Roadmap</h1>
     <p>Questo documento funge da piano di lavoro, report di stato e vetrina delle potenzialità del nostro analizzatore architetturale multi-linguaggio. Traccia i costrutti del linguaggio supportati, come vengono modellati nell'Intermediate Representation (IR), e quali euristiche se ne occupano.</p>
 
@@ -57,7 +94,7 @@
 struct Data { } // C, Rust
 trait Walk { } // Rust
 interface Fly { } // Java</pre>
-                <div class="notes">Riconoscimento unificato. Estrazione perfetta in Rust. In C++ estrae le classi. In Java estrae Classi e Interfacce. In Python le dichiarazioni non hanno keyword rigide come struct, ma `class` viene estratto. In C le struct vengono riconosciute correttamente includendo il parsing ricorsivo. Tipi locali (all'interno dei body delle funzioni) vengono annidati correttamente.</div>
+                <div class="notes">Riconoscimento unificato. Estrazione perfetta in Rust. In C++ estrae le classi. In Java estrae Classi e Interfacce. In Python le dichiarazioni non hanno keyword rigide come struct, ma `class` viene estratto. In C le struct vengono riconosciute correttamente includendo il parsing ricorsivo. Tipi locali (all'interno dei body delle funzioni) vengono annidati correttamente. Ricerca raffinata per evitare falsi positivi (es. esclusi i costruttori `constructor_declaration` in Java/C++ che contengono la stringa 'struct').</div>
             </td>
             <td>Nodo: <span class="ir-node">StructuredType</span><br>Grafico: Vertice primario</td>
             <td><span class="function-ref">try_parse_structured_type</span><br>Riconosce i nodi CST (class_declaration, struct_specifier, ecc.).</td>
@@ -69,7 +106,7 @@ interface Fly { } // Java</pre>
                 <pre>private String name; // Java
             pub age: u8, // Rust
             char *id; // C</pre>
-                <div class="notes">Riscontrato in Rust e Java. In C le struct annidate o i puntatori `struct Type` generano failed refs a causa degli spazi nel nome.</div>
+                <div class="notes">Supportato per tutti i linguaggi. L'estrattore strutturale naviga la gerarchia della classe bloccandosi intenzionalmente all'ingresso dei metodi (<code>!is_function(child)</code>), garantendo che le variabili locali dichiarate all'interno delle funzioni non vengano erroneamente promosse a campi della classe.</div>
             </td>
             <td>Campo: <span class="ir-node">Field</span> dentro <span class="ir-node">StructuredType</span><br>Arco: <code>UsesFieldType</code></td>
             <td><span class="function-ref">extract_fields</span></td>
@@ -131,9 +168,20 @@ Union[str, int] // Python</pre>
                 <pre>&lt;T extends Serializable&gt;</pre>
             </td>
             <td>
-                <div class="implementation-idea"><strong>Idea di implementazione:</strong> Molto complesso in un'architettura agnostica. Si potrebbe modellare introducendo un "nodo fantasma" nel modulo per rappresentare <code>T</code>, per poi fargli ereditare (`Inherits`) da <code>Serializable</code>. I parametri generici punterebbero quindi a questo nodo fittizio.</div>
+                <div class="implementation-idea"><strong>Idea di implementazione:</strong> Molto complesso in un'architettura agnostica. Si potrebbe modellare introducendo un "nodo fantasma" nel modulo per rappresentare <code>T</code>, per poi fargli ereditare (`IsA`) da <code>Serializable</code>. I parametri generici punterebbero quindi a questo nodo fittizio.</div>
             </td>
             <td>-</td>
+        </tr>
+        <tr>
+            <td>Inferenza Tipi Locali (auto/let)</td>
+            <td><span class="status-yes">Sì</span></td>
+            <td>
+                <pre>let db = Database::new(); // Rust
+auto repo = new Repository(); // C++</pre>
+                <div class="notes">L'analizzatore supporta un'inferenza "best-effort": se la dichiarazione non esplicita il tipo (es. <code>let x = ...</code>), il sistema scruta l'inizializzatore. Se è un'istanziazione esplicita, il tipo viene dedotto e salvato correttamente nel SymbolStack.</div>
+            </td>
+            <td>Costrutto <span class="ir-node">Field</span> nel <span class="ir-node">Block</span></td>
+            <td><span class="function-ref">infer_variable_type</span></td>
         </tr>
         <tr>
             <td>Return Type Impliciti / Inferenziali</td>
@@ -159,15 +207,16 @@ Union[str, int] // Python</pre>
         </tr>
         <tr>
             <td>Function / Method Calls</td>
-            <td><span class="status-partial">Parz</span></td>
+            <td><span class="status-yes">Sì</span></td>
             <td>
                 <pre>foo(); // OK
 User.create(); // OK
-myVar.run(); // Ignorato (Failed)</pre>
-                <div class="notes">L'estrattore intercetta i nomi dai body (Best-Effort). L'agnosticismo del risolutore scarta saggiamente le chiamate su variabili locali che non esistono come classi nel Global Scope.</div>
+myVar.run(); // OK
+self.get_id(); // OK</pre>
+                <div class="notes">Supporto completo grazie al <strong>Lexical Scoping Comportamentale</strong>. Le variabili locali (incluse le elisioni inferite tramite <code>infer_variable_type</code>) vengono estratte in un albero di blocchi e registrate nel <code>SymbolStack</code> per risolvere infallibilmente l'oggetto chiamante. Inclusa l'auto-registrazione in scope per <code>self</code> e <code>this</code>.</div>
             </td>
-            <td>Vettore: <code>calls</code> in <code>Function</code><br>Arco: <code>Calls</code></td>
-            <td><span class="function-ref">traverse_for_body_deps</span><br>Navigazione di <code>call_expression</code> e affini.</td>
+            <td>Gerarchia di <code>Block</code> dentro <code>Function</code><br>Archi: <code>Calls</code>, <code>UsesLocalType</code></td>
+            <td><span class="function-ref">extract_block</span>, <span class="function-ref">resolve_block</span></td>
         </tr>
         <tr>
             <td>Factory / Static Methods</td>
@@ -187,8 +236,8 @@ DatabaseFactory.build(); // Java</pre>
 User {} // Rust
 User() // Python</pre>
             </td>
-            <td>Vettore: <code>instantiates</code> in <code>Function</code><br>Arco: <code>Instantiates</code></td>
-            <td><span class="function-ref">traverse_for_body_deps</span><br>Ricerca di <code>object_creation_expression</code> o <code>struct_expression</code>.</td>
+            <td>Vettore: <code>instantiates</code> nel <code>Block</code> di una <code>Function</code><br>Arco: <code>Instantiates</code></td>
+            <td><span class="function-ref">extract_block</span><br>Ricerca di <code>object_creation_expression</code> o <code>struct_expression</code>.</td>
         </tr>
         <tr>
             <td>Operator Overloading</td>
@@ -231,7 +280,7 @@ User() // Python</pre>
 System.out;</pre>
             </td>
             <td>
-                <div class="implementation-idea"><strong>Idea di implementazione:</strong> Estendere <code>traverse_for_body_deps</code> per catturare i nodi di tipo <code>member_access</code> o <code>scoped_identifier</code> *anche* fuori dalle espressioni di chiamata. Il prefisso (es. `Math`) andrebbe salvato in un nuovo array <code>accesses</code> in <code>Function</code>, e risolto dal builder in un arco <code>AccessesStatic</code>.</div>
+                <div class="implementation-idea"><strong>Idea di implementazione:</strong> Estendere <code>find_behavioral_deps</code> per catturare i nodi di tipo <code>member_access</code> o <code>scoped_identifier</code> *anche* fuori dalle espressioni di chiamata. Il prefisso (es. `Math`) andrebbe salvato in un nuovo array <code>accesses</code> in <code>Block</code>, e risolto dal builder in un arco <code>AccessesStatic</code>.</div>
             </td>
             <td>-</td>
         </tr>
@@ -301,14 +350,14 @@ System.out;</pre>
             <td><span class="status-yes">Sì</span></td>
             <td><pre>class A extends B // Java
 class A : public B // C++</pre></td>
-            <td>Vettore: <code>super_types</code><br>Arco: <code>Inherits</code></td>
+            <td>Vettore: <code>super_types</code><br>Arco: <code>IsA</code></td>
             <td><span class="function-ref">extract_super_types</span></td>
         </tr>
         <tr>
             <td>Implementation</td>
             <td><span class="status-yes">Sì</span></td>
             <td><pre>class C implements D // Java</pre></td>
-            <td>Unificato nel vettore: <code>super_types</code><br>Arco: <code>Inherits</code> (unificato in modo agnostico per semplicità)</td>
+            <td>Unificato nel vettore: <code>super_types</code><br>Arco: <code>IsA</code> (unificato in modo agnostico per semplicità)</td>
             <td><span class="function-ref">extract_super_types</span></td>
         </tr>
         <tr>
@@ -323,7 +372,7 @@ class A : public B // C++</pre></td>
             <td><span class="status-no">No</span></td>
             <td><pre>class A with B</pre></td>
             <td>
-                <div class="implementation-idea"><strong>Idea di implementazione:</strong> Aggiungere i nodi sintattici tipici dei mixin (es. `with_clause`) a `extract_super_types`. Una volta estratti in `super_types`, l'analizzatore creerà naturalmente l'arco <code>Inherits</code>.</div>
+                <div class="implementation-idea"><strong>Idea di implementazione:</strong> Aggiungere i nodi sintattici tipici dei mixin (es. `with_clause`) a `extract_super_types`. Una volta estratti in `super_types`, l'analizzatore creerà naturalmente l'arco <code>IsA</code>.</div>
             </td>
             <td>-</td>
         </tr>
@@ -332,7 +381,7 @@ class A : public B // C++</pre></td>
             <td><span class="status-partial">Parz</span></td>
             <td><pre>@Override void do()</pre></td>
             <td>
-                <div class="implementation-idea"><strong>Idea di implementazione:</strong> Per tracciare esplicitamente un arco <code>Overrides</code>, il risolutore finale dovrebbe navigare l'arco <code>Inherits</code> della classe corrente, ispezionare la classe padre in &Sigma;, verificare se esiste una funzione con la stessa firma &sigma;, e in caso affermativo generare l'arco aggiuntivo.</div>
+                <div class="implementation-idea"><strong>Idea di implementazione:</strong> Per tracciare esplicitamente un arco <code>Overrides</code>, il risolutore finale dovrebbe navigare l'arco <code>IsA</code> della classe corrente, ispezionare la classe padre in &Sigma;, verificare se esiste una funzione con la stessa firma &sigma;, e in caso affermativo generare l'arco aggiuntivo.</div>
             </td>
             <td>-</td>
         </tr>
@@ -352,7 +401,7 @@ class A : public B // C++</pre></td>
             <td><span class="status-no">No</span></td>
             <td><pre>catch (IOException e)</pre></td>
             <td>
-                <div class="implementation-idea"><strong>Idea di implementazione:</strong> Aggiungere `catches: Vec&lt;TypeRef&gt;` in `Function`. In `traverse_for_body_deps`, mappare il nodo `catch_clause`, estrarne il tipo dell'eccezione, e poi generare un arco <code>CatchesException</code> nel grafo.</div>
+                <div class="implementation-idea"><strong>Idea di implementazione:</strong> Aggiungere `catches: Vec&lt;TypeRef&gt;` in `Block`. In `extract_block`, intercettare i nodi `catch_clause`, estrarne il tipo dell'eccezione, e poi generare un arco <code>CatchesException</code> nel grafo.</div>
             </td>
             <td>-</td>
         </tr>
@@ -361,9 +410,9 @@ class A : public B // C++</pre></td>
             <td><span class="status-partial">Parz</span></td>
             <td><pre>throw new MyException()</pre></td>
             <td>
-                <div class="implementation-idea"><strong>Idea di implementazione:</strong> Attualmente l'istanza interna <code>new</code> viene catturata in `instantiates`. Per differenziarla, `traverse_for_body_deps` dovrebbe controllare se il genitore dell'espressione è un nodo `throw_statement`. Se sì, aggiungere il tipo in un vettore dedicato `throws` piuttosto che `instantiates`.</div>
+                <div class="implementation-idea"><strong>Idea di implementazione:</strong> Attualmente l'istanza interna <code>new</code> viene catturata in `instantiates` da `find_behavioral_deps`. Per differenziarla, `find_behavioral_deps` dovrebbe controllare se il genitore dell'espressione è un nodo `throw_statement`. Se sì, aggiungere il tipo in un vettore dedicato `throws` in `Block` piuttosto che `instantiates`.</div>
             </td>
-            <td><span class="function-ref">traverse_for_body_deps</span></td>
+            <td><span class="function-ref">find_behavioral_deps</span></td>
         </tr>
     </table>
 
@@ -414,13 +463,16 @@ class A : public B // C++</pre></td>
         </tr>
         <tr>
             <td>NameSpaces / Modules Usage</td>
-            <td><span class="status-yes">Sì</span></td>
+            <td><span class="status-partial">Parz</span></td>
             <td><pre>mod core { } // Rust
-        namespace math { } // C++</pre>
-                <div class="notes">Annidamento ricorsivo di <code>Module</code>. Funziona bene in Rust (mod) e C++ (namespace). In Java (packages) e Python (moduli/file) attualmente non produce moduli annidati ma inserisce tutto nel modulo root. <strong>Da sistemare per un supporto language-agnostic completo.</strong></div>
+        namespace math { } // C++
+        package com.api; // Java</pre>
+                <div class="notes">Annidamento ricorsivo supportato. Funziona perfettamente in Rust (<code>mod</code>) e C++ (<code>namespace</code>) perché la gerarchia è definita da blocchi CST espliciti. In Java e Python i file vengono attualmente appiattiti nel modulo <code>root</code>. È stato scelto di <strong>non</strong> forzare l'uso del percorso del File System come namespace per tutti i linguaggi, poiché violerebbe la semantica di linguaggi come Java (dove i package sono slegati dal disco).</div>
             </td>
-            <td>Annidamento ricorsivo di <code>Module</code>.<br>Arco: <code>ModuleContainment</code></td>
-            <td><span class="function-ref">try_parse_module_node</span></td>
+            <td>Annidamento ricorsivo di <code>Module</code>.<br>Arco: Mappato come gerarchia <code>parent</code> in Cytoscape.</td>
+            <td><span class="function-ref">try_parse_module_node</span>
+                <div class="implementation-idea"><strong>Task Aperto:</strong> Implementare estrattori specifici per la dichiarazione di `package` nell'AST di Java, permettendo al resolver di mappare nativamente i file Java ai loro veri moduli senza affidarsi ad hack sul File System.</div>
+            </td>
         </tr>
         <tr>
             <td>Dynamic Imports</td>

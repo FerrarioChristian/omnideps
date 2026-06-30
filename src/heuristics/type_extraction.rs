@@ -1,0 +1,99 @@
+//! Responsible for converting raw AST nodes into formal TypeRef structures.
+//! 
+//! This module attempts to heuristically deduce types from nodes representing
+//! variables, fields, or return values, returning an `Unresolved` reference
+//! that will later be processed by the Name Resolution engine.
+
+use crate::model::{StructuredTypeKind, TypeRef};
+use tree_sitter::Node;
+
+use super::text_parsing::{node_text, split_qualified_name};
+
+/// Determines the structural classification (Class, Struct, Interface, Trait)
+/// of a parsed node based on its AST kind or raw textual representation.
+///
+/// # Arguments
+/// * `kind` - The AST kind string (e.g., "class_declaration").
+/// * `text` - The raw text of the node, used as a fallback mechanism.
+pub fn determine_structured_kind(kind: &str, text: &str) -> StructuredTypeKind {
+    if kind.contains("interface") || text.contains("interface") {
+        StructuredTypeKind::Interface
+    } else if kind.contains("trait") || text.contains("trait") {
+        StructuredTypeKind::Trait
+    } else if kind.contains("struct") || text.contains("struct") {
+        StructuredTypeKind::Struct
+    } else {
+        StructuredTypeKind::Class
+    }
+}
+
+/// A core heuristic function that attempts to extract a Type Reference (`TypeRef`)
+/// from a given AST node. 
+///
+/// It employs a multi-tier fallback strategy:
+/// 1. Checks if the node is inherently a direct identifier or access path.
+/// 2. Inspects common Tree-sitter named fields (`type`, `return_type`).
+/// 3. Scans child nodes for known type identifiers.
+/// 4. Analyzes the raw text for colons (`:`) or arrows (`->`).
+///
+/// # Arguments
+/// * `node` - The AST node potentially containing type information.
+/// * `source` - The complete source code string.
+pub fn extract_type_ref(node: Node, source: &str) -> TypeRef {
+    let kind = node.kind();
+    // 0. Handle direct access and identifiers
+    if matches!(
+        kind,
+        "field_access" | "scoped_identifier" | "qualified_identifier" | "identifier" | "type_identifier" | "attribute" | "field_expression"
+    ) {
+        let text = node_text(node, source);
+        if !text.is_empty() {
+            return TypeRef::Unresolved(split_qualified_name(&text));
+        }
+    }
+
+    // 1. Try with common Tree-sitter fields
+    if let Some(type_node) = node
+        .child_by_field_name("type")
+        .or_else(|| node.child_by_field_name("return_type"))
+        .or_else(|| node.child_by_field_name("field_type"))
+        .or_else(|| node.child_by_field_name("value_type"))
+    {
+        let text = node_text(type_node, source);
+        if !text.is_empty() {
+            return TypeRef::Unresolved(split_qualified_name(&text));
+        }
+    }
+
+    // 2. Fallback: look for generic identifier types
+    let mut cursor = node.walk();
+    for child in node.children(&mut cursor) {
+        let child_kind = child.kind();
+        if matches!(
+            child_kind,
+            "type_identifier" | "primitive_type" | "identifier" | "type"
+        ) {
+            let text = node_text(child, source);
+            if !text.is_empty() && !text.contains(" ") {
+                return TypeRef::Unresolved(split_qualified_name(&text));
+            }
+        }
+    }
+
+    // 3. Last fallback: text matching after colons or arrows
+    let text = node_text(node, source);
+    if let Some(colon_pos) = text.find(':') {
+        let after = text[colon_pos + 1..].trim();
+        if !after.is_empty() {
+            return TypeRef::Unresolved(split_qualified_name(after));
+        }
+    }
+    if let Some(arrow_pos) = text.find("->") {
+        let after = text[arrow_pos + 2..].trim();
+        if !after.is_empty() {
+            return TypeRef::Unresolved(split_qualified_name(after));
+        }
+    }
+
+    TypeRef::Failed(vec![])
+}

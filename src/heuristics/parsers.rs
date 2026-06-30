@@ -1,8 +1,11 @@
-use crate::ir::{Function, ImplBlock, Import, Module, StructuredType};
+use crate::model::{Function, ImplBlock, Import, Module, StructuredType};
 use tree_sitter::Node;
 
 use super::classifiers::*;
-use super::extractors::*;
+use super::text_parsing::*;
+use super::type_extraction::*;
+use super::structural_extraction::*;
+use super::body_extraction::*;
 
 pub fn try_parse_module_node(node: Node, source: &str) -> Option<Module> {
     if !is_module(node) {
@@ -12,6 +15,8 @@ pub fn try_parse_module_node(node: Node, source: &str) -> Option<Module> {
     let name = extract_identifier(node, source).unwrap_or_else(|| "unnamed_module".to_string());
     Some(Module {
         name: vec![name],
+        language: None,
+        file_path: None,
         imports: vec![],
         sub_modules: vec![],
         structured_types: vec![],
@@ -52,20 +57,19 @@ pub fn try_parse_function(node: Node, source: &str) -> Option<Function> {
     let parameters = extract_parameters(node, source);
     let return_type = extract_return_type(node, source);
 
-    let mut calls = vec![];
-    let mut instantiates = vec![];
-    if let Some(body) = node.child_by_field_name("body") {
-        traverse_for_body_deps(body, source, &mut calls, &mut instantiates);
-    }
+    let body = if let Some(body_node) = node.child_by_field_name("body") {
+        Some(extract_block(body_node, source))
+    } else {
+        None
+    };
 
     Some(Function {
         name: vec![name],
-        signature: crate::ir::Signature {
+        signature: crate::model::Signature {
             parameters,
             return_type,
         },
-        calls,
-        instantiates,
+        body,
     })
 }
 
@@ -108,7 +112,8 @@ pub fn try_parse_import(node: Node, source: &str) -> Option<Import> {
     }
 
     // Try to extract path using tree-sitter fields, fallback to regex-like
-    let path = if let Some(p_node) = node.child_by_field_name("name")
+    let path = if let Some(p_node) = node.child_by_field_name("argument")
+        .or_else(|| node.child_by_field_name("name"))
         .or_else(|| node.child_by_field_name("path")) 
         .or_else(|| node.child_by_field_name("module_name"))
     {

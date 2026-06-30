@@ -1,4 +1,4 @@
-use crate::ir::{Component, DependencyGraph, QualifiedName};
+use crate::model::{Component, DependencyGraph, QualifiedName};
 use serde::Serialize;
 use std::collections::HashSet;
 use std::fs;
@@ -17,6 +17,8 @@ enum CytoscapeData {
         label: String,
         #[serde(rename = "type")]
         ty: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        parent: Option<String>,
     },
     Edge {
         id: String,
@@ -30,6 +32,19 @@ fn qn_to_id(qn: &QualifiedName) -> String {
     qn.join("::")
 }
 
+fn get_parent_id(qn: &QualifiedName) -> Option<String> {
+    if qn.len() > 1 {
+        let parent_qn = qn[..qn.len() - 1].to_vec();
+        if parent_qn == vec!["root".to_string()] {
+            None
+        } else {
+            Some(qn_to_id(&parent_qn))
+        }
+    } else {
+        None
+    }
+}
+
 pub fn export_graphs(graphs: &[DependencyGraph], out_path: &Path) -> anyhow::Result<()> {
     let mut elements = Vec::new();
     let mut added_nodes = HashSet::new();
@@ -41,11 +56,12 @@ pub fn export_graphs(graphs: &[DependencyGraph], out_path: &Path) -> anyhow::Res
                         added_nodes: &mut HashSet<String>,
                         id: String,
                         label: String,
-                        ty: String| {
+                        ty: String,
+                        parent: Option<String>| {
         if !added_nodes.contains(&id) {
             added_nodes.insert(id.clone());
             elements.push(CytoscapeElement {
-                data: CytoscapeData::Node { id, label, ty },
+                data: CytoscapeData::Node { id, label, ty, parent },
             });
         }
     };
@@ -56,19 +72,25 @@ pub fn export_graphs(graphs: &[DependencyGraph], out_path: &Path) -> anyhow::Res
             match node {
                 Component::Module(m) => {
                     let id = qn_to_id(&m.name);
+                    if id == "root" {
+                        continue;
+                    }
                     let label = m.name.last().cloned().unwrap_or_else(|| "root".to_string());
-                    add_node(&mut elements, &mut added_nodes, id, label, "Module".to_string());
+                    let parent = get_parent_id(&m.name);
+                    add_node(&mut elements, &mut added_nodes, id, label, "Module".to_string(), parent);
                 }
                 Component::StructuredType(st) => {
                     let id = qn_to_id(&st.name);
                     let label = st.name.last().cloned().unwrap_or_else(|| "Unknown".to_string());
-                    add_node(&mut elements, &mut added_nodes, id, label, format!("{:?}", st.kind));
+                    let parent = get_parent_id(&st.name);
+                    add_node(&mut elements, &mut added_nodes, id, label, format!("{:?}", st.kind), parent);
                 }
                 Component::Function(f) => {
                     let id = qn_to_id(&f.name);
                     let name = f.name.last().cloned().unwrap_or_else(|| "".to_string());
                     let label = format!("{}()", name);
-                    add_node(&mut elements, &mut added_nodes, id, label, "Function".to_string());
+                    let parent = get_parent_id(&f.name);
+                    add_node(&mut elements, &mut added_nodes, id, label, "Function".to_string(), parent);
                 }
             }
         }
@@ -79,6 +101,11 @@ pub fn export_graphs(graphs: &[DependencyGraph], out_path: &Path) -> anyhow::Res
             let target_id = qn_to_id(&edge.to);
             let label = format!("{:?}", edge.kind);
 
+            // Skip structural edges that are now implicitly represented by Compound Nodes
+            if label == "ModuleContainment" || label == "NestedIn" {
+                continue;
+            }
+
             if source_id.is_empty() || target_id.is_empty() {
                 continue;
             }
@@ -86,12 +113,12 @@ pub fn export_graphs(graphs: &[DependencyGraph], out_path: &Path) -> anyhow::Res
             // Ensure source node exists
             if !added_nodes.contains(&source_id) {
                 let node_label = source_id.split("::").last().unwrap_or("").to_string();
-                add_node(&mut elements, &mut added_nodes, source_id.clone(), node_label, "External".to_string());
+                add_node(&mut elements, &mut added_nodes, source_id.clone(), node_label, "External".to_string(), None);
             }
             // Ensure target node exists
             if !added_nodes.contains(&target_id) {
                 let node_label = target_id.split("::").last().unwrap_or("").to_string();
-                add_node(&mut elements, &mut added_nodes, target_id.clone(), node_label, "External".to_string());
+                add_node(&mut elements, &mut added_nodes, target_id.clone(), node_label, "External".to_string(), None);
             }
 
             let edge_sig = format!("{}->{}:{}", source_id, target_id, label);

@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Legenda Architetturale - Language Agnostic Analyzer</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background-color: #1e1e1e;
+            color: #ecf0f1;
+            line-height: 1.6;
+            padding: 40px;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        h1 {
+            font-size: 2.2em;
+            border-bottom: 2px solid #444;
+            padding-bottom: 10px;
+            margin-bottom: 30px;
+            color: #fff;
+        }
+        h2 {
+            font-size: 1.5em;
+            color: #3498db;
+            margin-top: 40px;
+            margin-bottom: 20px;
+        }
+        .legend-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+            gap: 20px;
+        }
+        .legend-card {
+            background: rgba(30, 30, 30, 0.85);
+            border: 1px solid #444;
+            border-radius: 12px;
+            padding: 20px;
+            display: flex;
+            align-items: flex-start;
+            gap: 20px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(5px);
+        }
+        .visual-element {
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: bold;
+            color: white;
+            text-align: center;
+        }
+        .description {
+            flex-grow: 1;
+        }
+        .description h3 {
+            margin: 0 0 8px 0;
+            font-size: 1.1em;
+            color: #bdc3c7;
+        }
+        .description p {
+            margin: 0;
+            font-size: 0.9em;
+            color: #aab2bd;
+        }
+
+        /* Forme Nodi */
+        .node-module {
+            width: 140px;
+            height: 80px;
+            background-color: rgba(44, 62, 80, 0.3);
+            border: 2px dashed #7f8c8d;
+            color: #fff;
+            border-radius: 4px;
+            align-items: flex-start;
+            padding-top: 10px;
+        }
+        .node-struct {
+            width: 80px;
+            height: 40px;
+            background-color: #2980b9;
+            border-radius: 8px;
+        }
+        .node-trait {
+            width: 80px;
+            height: 40px;
+            background-color: #27ae60;
+            border: 2px solid #2ecc71;
+            border-radius: 8px;
+        }
+        .node-function {
+            width: 60px;
+            height: 60px;
+            background-color: #8e44ad;
+            border-radius: 50%;
+        }
+        .node-external {
+            width: 80px;
+            height: 40px;
+            background-color: #34495e;
+            opacity: 0.7;
+            border: 1px solid #95a5a6;
+            border-radius: 8px;
+        }
+
+        /* Frecce (Archi) */
+        .edge-container {
+            width: 100px;
+            height: 40px;
+            position: relative;
+        }
+        .edge-line {
+            position: absolute;
+            top: 50%;
+            left: 0;
+            width: 85%;
+            transform: translateY(-50%);
+        }
+        .edge-arrow {
+            position: absolute;
+            top: 50%;
+            right: 0;
+            transform: translateY(-50%);
+            border-top: 6px solid transparent;
+            border-bottom: 6px solid transparent;
+        }
+        
+        .edge-isa .edge-line { height: 3px; background-color: #e74c3c; }
+        .edge-isa .edge-arrow { border-left: 10px solid #e74c3c; }
+
+        .edge-calls .edge-line { height: 2px; background-color: #2ecc71; }
+        .edge-calls .edge-arrow { border-left: 8px solid #2ecc71; }
+
+        .edge-instantiates .edge-line { height: 2px; border-top: 2px dashed #3498db; background: transparent; }
+        .edge-instantiates .edge-arrow { border-left: 8px solid #3498db; }
+
+        .edge-uses .edge-line { height: 2px; border-top: 2px dotted #95a5a6; background: transparent; opacity: 0.7; }
+        .edge-uses .edge-arrow { border-left: 8px solid #95a5a6; opacity: 0.7; }
+        
+        .interaction-box {
+            background: rgba(30, 30, 30, 0.85);
+            border: 1px solid #444;
+            padding: 20px;
+            border-radius: 12px;
+            margin-top: 30px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+        }
+        .interaction-box h3 { color: #3498db; margin-top: 0; }
+    </style>
+</head>
+<body>
+
+    <h1>Legenda Architetturale</h1>
+    <p>Questa pagina descrive la semantica visiva utilizzata da Cytoscape per renderizzare il Dependency Graph prodotto dal <strong>Language Agnostic Analyzer</strong>.</p>
+
+    <h2>1. Componenti Software (Nodi)</h2>
+    <div class="legend-grid">
+        <div class="legend-card">
+            <div class="visual-element node-module">Module</div>
+            <div class="description">
+                <h3>Modulo / Namespace</h3>
+                <p>Un Nodo Composto (Bounding Box). I moduli agiscono come raccoglitori trasparenti (<em>scatole cinesi</em>). Qualsiasi classe o funzione dichiarata all'interno di un modulo verrà visualizzata fisicamente al suo interno.</p>
+            </div>
+        </div>
+        <div class="legend-card">
+            <div class="visual-element node-struct">Struct/Class</div>
+            <div class="description">
+                <h3>Tipo Strutturato (Classi, Struct)</h3>
+                <p>Rappresenta una struttura dati (es. <code>class</code> in Java/Python, <code>struct</code> in Rust/C). Sono i nodi blu dai bordi smussati.</p>
+            </div>
+        </div>
+        <div class="legend-card">
+            <div class="visual-element node-trait">Interface</div>
+            <div class="description">
+                <h3>Interfaccia / Trait</h3>
+                <p>Rappresenta un contratto comportamentale puro (es. <code>interface</code> in Java, <code>trait</code> in Rust). Il verde con bordo in risalto li distingue dalle implementazioni concrete.</p>
+            </div>
+        </div>
+        <div class="legend-card">
+            <div class="visual-element node-function">Function</div>
+            <div class="description">
+                <h3>Funzione / Metodo</h3>
+                <p>Nodi circolari viola. Rappresentano metodi appiattiti all'interno delle classi, o funzioni libere all'interno dei moduli.</p>
+            </div>
+        </div>
+        <div class="legend-card">
+            <div class="visual-element node-external">External</div>
+            <div class="description">
+                <h3>Dipendenza Esterna</h3>
+                <p>Grigi e semi-trasparenti. Rappresentano componenti che l'analizzatore ha rilevato tramite <code>import</code>, ma che non sono definiti all'interno dei file scansionati (es. classi della Standard Library o pacchetti esterni).</p>
+            </div>
+        </div>
+    </div>
+
+    <h2>2. Relazioni Architetturali (Archi)</h2>
+    <div class="legend-grid">
+        <div class="legend-card">
+            <div class="visual-element edge-container edge-isa">
+                <div class="edge-line"></div>
+                <div class="edge-arrow"></div>
+            </div>
+            <div class="description">
+                <h3>IsA (Ereditarietà)</h3>
+                <p>Una spessa linea rossa continua. Rappresenta la dipendenza più forte dell'OOP: ereditarietà di classi o implementazione rigorosa di un'interfaccia/trait.</p>
+            </div>
+        </div>
+        <div class="legend-card">
+            <div class="visual-element edge-container edge-calls">
+                <div class="edge-line"></div>
+                <div class="edge-arrow"></div>
+            </div>
+            <div class="description">
+                <h3>Calls (Invocazione)</h3>
+                <p>Linea verde continua. Tracciata quando il body di una funzione o metodo ne invoca esplicitamente un altro.</p>
+            </div>
+        </div>
+        <div class="legend-card">
+            <div class="visual-element edge-container edge-instantiates">
+                <div class="edge-line"></div>
+                <div class="edge-arrow"></div>
+            </div>
+            <div class="description">
+                <h3>Instantiates (Creazione)</h3>
+                <p>Linea blu tratteggiata. Segnala l'allocazione esplicita in memoria di una Classe o Struct (es. chiamata al costruttore <code>new</code>).</p>
+            </div>
+        </div>
+        <div class="legend-card">
+            <div class="visual-element edge-container edge-uses">
+                <div class="edge-line"></div>
+                <div class="edge-arrow"></div>
+            </div>
+            <div class="description">
+                <h3>Uses (Dipendenza Strutturale)</h3>
+                <p>Linea grigia sottile e puntinata. Si divide in <code>UsesFieldType</code>, <code>UsesParamType</code>, e <code>UsesReturnType</code>. Indica un accoppiamento leggero: la classe A possiede un parametro, un ritorno o un campo dati di tipo B.</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="interaction-box">
+        <h3>Visual Debugging Interattivo</h3>
+        <p>L'interfaccia di Cytoscape supporta il focus interattivo. <strong>Facendo Click o Tap su un qualsiasi nodo</strong>, tutto il resto del grafo diventerà semi-trasparente e passerà in secondo piano.</p>
+        <p>Rimarranno visibili solo:</p>
+        <ul>
+            <li>Il nodo cliccato.</li>
+            <li>Tutti i nodi che <strong>ricevono</strong> una dipendenza da lui (le sue dipendenze dirette).</li>
+            <li>Tutti i nodi che <strong>puntano</strong> a lui (i componenti che dipendono da lui).</li>
+            <li>Il Modulo contenitore (Bounding Box) per non perdere il contesto visivo.</li>
+        </ul>
+        <p><em>Per ripristinare il grafo completo, basta cliccare in uno spazio vuoto dello schermo (background).</em></p>
+    </div>
+
+</body>
+</html>

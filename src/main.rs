@@ -1,8 +1,11 @@
 use anyhow::Result;
 use clap::Parser;
 use language_agnostic_analyzer::{
-    analyzer::{self, full_analysis},
-    ir::AnalysisSummary,
+    analyzer::{parse_source, analyze_project},
+    model::AnalysisSummary,
+    debug::print_references,
+    language::SupportedLanguage,
+    resolver::primitives::PrimitiveRegistry,
 };
 use std::fs;
 use walkdir::WalkDir;
@@ -12,13 +15,20 @@ use cli::Cli;
 
 /// Entry point of the analyzer.
 /// Parses arguments and routes to either single file analysis or recursive directory analysis.
-fn main() -> Result<()> {
+fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
 
+    let config = if let Some(config_path) = cli.config {
+        let content = fs::read_to_string(&config_path)?;
+        serde_json::from_str(&content)?
+    } else {
+        language_agnostic_analyzer::config::AnalyzerConfig::default_strategies()
+    };
+
     if cli.path.is_file() {
-        analyze_single_file(&cli.path, cli.output.as_deref(), cli.csv.as_deref())?;
+        analyze_single_file(&cli.path, cli.output.as_deref(), cli.csv.as_deref(), cli.debug_refs, &config)?;
     } else if cli.path.is_dir() {
-        analyze_directory(&cli.path, cli.output.as_deref(), cli.csv.as_deref())?;
+        analyze_directory(&cli.path, cli.output.as_deref(), cli.csv.as_deref(), cli.debug_refs, &config)?;
     } else {
         println!("Percorso non valido!");
     }
@@ -31,13 +41,24 @@ fn analyze_single_file(
     path: &std::path::Path,
     json_out: Option<&std::path::Path>,
     csv_out: Option<&std::path::Path>,
-) -> Result<()> {
-    let lang = detect_language(path)?;
+    debug_refs: bool,
+    config: &language_agnostic_analyzer::config::AnalyzerConfig,
+) -> anyhow::Result<()> {
+    let lang = SupportedLanguage::from_path(path)
+        .ok_or_else(|| anyhow::anyhow!("Language not supported for file: {}", path.display()))?;
     let source = fs::read_to_string(path)?;
-    let (_modules, graph, summary) = full_analysis(lang, &source)?;
+    
+    // Phase 1: Parse
+    let (modules, primitives) = parse_source(lang, &source, path, config)?;
+    // Phase 2-4: Resolve and Graph
+    let (resolved_modules, graph, summary) = analyze_project(modules, primitives, config);
 
     println!("=== ANALISI {} ===", path.display());
     print_summary(&summary);
+
+    if debug_refs {
+        print_references(&resolved_modules);
+    }
 
     if let Some(out) = json_out {
         let json = serde_json::to_string_pretty(&graph)?;
@@ -65,36 +86,46 @@ fn analyze_single_file(
     Ok(())
 }
 
-/// Recursively processes all files in a directory.
-/// Combines the graphs from all recognized source files and aggregates their summaries.
+/// Recursively processes all files in a directory to build a unified workspace.
+/// Resolves cross-file references natively using the algebraic Query Engine.
 fn analyze_directory(
     dir: &std::path::Path,
     json_out: Option<&std::path::Path>,
     csv_out: Option<&std::path::Path>,
-) -> Result<()> {
-    let mut total_summary = AnalysisSummary::default();
-    let mut all_graphs = vec![];
+    debug_refs: bool,
+    config: &language_agnostic_analyzer::config::AnalyzerConfig,
+) -> anyhow::Result<()> {
+    let mut all_modules = vec![];
+    let mut combined_primitives = PrimitiveRegistry::empty();
 
+    // Phase 1: Unified Extraction
     for entry in WalkDir::new(dir).into_iter().filter_map(|e| e.ok()) {
         if entry.file_type().is_file()
-            && let Ok(lang) = detect_language(entry.path())
+            && let Some(lang) = SupportedLanguage::from_path(entry.path())
         {
-            let source = fs::read_to_string(entry.path())?;
-            let (_modules, graph, summary) = analyzer::full_analysis(lang, &source)?;
-            total_summary.total_modules += summary.total_modules;
-            total_summary.total_structured_types += summary.total_structured_types;
-            total_summary.total_free_functions += summary.total_free_functions;
-            all_graphs.push(graph);
+            if let Ok(source) = fs::read_to_string(entry.path()) {
+                if let Ok((mut file_modules, file_primitives)) = parse_source(lang, &source, entry.path(), config) {
+                    all_modules.append(&mut file_modules);
+                    combined_primitives.merge(file_primitives);
+                }
+            }
         }
     }
 
-    println!("=== ANALISI CARTELLA {} ===", dir.display());
-    print_summary(&total_summary);
+    // Phase 2-4: Unified Resolution and Graph Building
+    let (resolved_modules, graph, summary) = analyze_project(all_modules, combined_primitives, config);
 
-    // Salva tutto (opzionale)
+    println!("=== ANALISI CARTELLA {} ===", dir.display());
+    print_summary(&summary);
+    
+    if debug_refs {
+        print_references(&resolved_modules);
+    }
+
     if let Some(out) = json_out {
-        let json = serde_json::to_string_pretty(&all_graphs)?;
+        let json = serde_json::to_string_pretty(&graph)?;
         fs::write(out, json)?;
+        println!("Grafo dell'intero Workspace salvato in {}", out.display());
 
         // Esportazione automatica Cytoscape
         if let Some(parent) = out.parent() {
@@ -103,26 +134,14 @@ fn analyze_directory(
                 .and_then(|n| n.to_str())
                 .unwrap_or("graph.json");
             let cyto_path = parent.join(format!("cyto_{}", file_name));
-            language_agnostic_analyzer::export::cytoscape::export_graphs(&all_graphs, &cyto_path)?;
+            language_agnostic_analyzer::export::cytoscape::export_graphs(std::slice::from_ref(&graph), &cyto_path)?;
             println!("Grafo Cytoscape salvato in {}", cyto_path.display());
         }
     }
     if let Some(csv) = csv_out {
-        save_summary_csv(&total_summary, csv)?;
+        save_summary_csv(&summary, csv)?;
     }
     Ok(())
-}
-
-/// Helper function to match file extensions to tree-sitter language parsers.
-fn detect_language(path: &std::path::Path) -> Result<tree_sitter::Language> {
-    match path.extension().and_then(|s| s.to_str()) {
-        Some("rs") => Ok(analyzer::languages::rust()),
-        Some("java") => Ok(analyzer::languages::java()),
-        Some("py") => Ok(analyzer::languages::python()),
-        Some("c") | Some("h") => Ok(analyzer::languages::c()),
-        Some("cpp") | Some("cxx") | Some("cc") | Some("hxx") => Ok(analyzer::languages::cpp()),
-        _ => anyhow::bail!("Language not supported for file: {}", path.display()),
-    }
 }
 
 /// Prints a basic aggregation of the extracted components to standard output.
@@ -130,6 +149,8 @@ fn print_summary(s: &AnalysisSummary) {
     println!("Moduli: {}", s.total_modules);
     println!("Structured types: {}", s.total_structured_types);
     println!("Free functions: {}", s.total_free_functions);
+    println!("Riferimenti risolti: {}", s.resolved_refs);
+    println!("Riferimenti sconosciuti: {}", s.failed_refs);
 }
 
 /// Appends a CSV header and row detailing the total component counts.
@@ -141,3 +162,4 @@ fn save_summary_csv(s: &AnalysisSummary, path: &std::path::Path) -> Result<()> {
     fs::write(path, csv)?;
     Ok(())
 }
+

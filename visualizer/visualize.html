@@ -3,13 +3,55 @@
 <head>
     <title>Language Agnostic Analyzer - Dependency Graph</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.26.0/cytoscape.min.js"></script>
-        <link rel="stylesheet" href="style.css" type="text/css" /> 
+    <script src="https://unpkg.com/layout-base/layout-base.js"></script>
+    <script src="https://unpkg.com/cose-base/cose-base.js"></script>
+    <script src="https://unpkg.com/cytoscape-fcose/cytoscape-fcose.js"></script>
+    <link rel="stylesheet" href="style.css" type="text/css" /> 
 </head>
 <body>
     <div id="info">
+        <h3>Control Panel</h3>
         <div id="status">Loading...</div>
         <select id="graph-selector" style="display: none;"></select>
+        
+        <div class="toggles-container" style="display: none;" id="toggles-panel">
+            <label class="toggle-row">
+                <input type="checkbox" id="toggle-structural" checked>
+                <span>Struttura (IsA, Uses)</span>
+            </label>
+            <label class="toggle-row">
+                <input type="checkbox" id="toggle-behavioral" checked>
+                <span>Comportamento (Calls, Instantiates)</span>
+            </label>
+
+            <details class="advanced-filters">
+                <summary>Filtri Avanzati</summary>
+                <div class="filters-grid">
+                    <label class="toggle-row"><input type="checkbox" class="edge-filter struct-filter" value="IsA" checked> <span>IsA (Ereditarietà)</span></label>
+                    <label class="toggle-row"><input type="checkbox" class="edge-filter struct-filter" value="UsesFieldType" checked> <span>UsesFieldType</span></label>
+                    <label class="toggle-row"><input type="checkbox" class="edge-filter struct-filter" value="UsesParamType" checked> <span>UsesParamType</span></label>
+                    <label class="toggle-row"><input type="checkbox" class="edge-filter struct-filter" value="UsesReturnType" checked> <span>UsesReturnType</span></label>
+                    <label class="toggle-row"><input type="checkbox" class="edge-filter struct-filter" value="UsesLocalType" checked> <span>UsesLocalType</span></label>
+                    <label class="toggle-row"><input type="checkbox" class="edge-filter behav-filter" value="Calls" checked> <span>Calls</span></label>
+                    <label class="toggle-row"><input type="checkbox" class="edge-filter behav-filter" value="Instantiates" checked> <span>Instantiates</span></label>
+                </div>
+            </details>
+        </div>
     </div>
+
+    <div id="sidebar">
+        <h3 id="sb-type">Type</h3>
+        <h2 id="sb-name">Node Name</h2>
+        <div class="sidebar-stat" style="margin-top: 15px;"><span>In-Degree (Riceve da)</span><strong id="sb-indegree">0</strong></div>
+        <div class="sidebar-stat"><span>Out-Degree (Punta a)</span><strong id="sb-outdegree">0</strong></div>
+        <div id="sb-extra"></div>
+    </div>
+
+    <div id="search-container">
+        <input type="text" id="search-box" placeholder="Cerca un nodo per nome" style="display: none;" autocomplete="off" spellcheck="false" />
+    </div>
+
+    <a href="legend.html" target="_blank" class="legendBtn">?</a>
     <div id="cy"></div>
 
     <script type="module">
@@ -35,24 +77,120 @@
                         elements: elements,
                         style: style,
                         layout: {
-                            name: 'cose',
-                            idealEdgeLength: 100,
-                            nodeOverlap: 20,
-                            refresh: 20,
+                            name: 'fcose',
+                            quality: "proof",
+                            randomize: true,
+                            animate: true,
+                            animationDuration: 1000,
                             fit: true,
                             padding: 30,
-                            randomize: false,
-                            componentSpacing: 100,
-                            nodeRepulsion: 400000,
-                            edgeElasticity: 100,
-                            nestingFactor: 5,
-                            gravity: 80,
-                            numIter: 1000,
-                            initialTemp: 200,
-                            coolingFactor: 0.95,
-                            minTemp: 1.0
+                            nodeDimensionsIncludeLabels: true,
+                            uniformNodeDimensions: false,
+                            packComponents: true,
+                            step: "all",
+                            idealEdgeLength: edge => 50,
+                            edgeElasticity: edge => 0.45,
+                            nodeRepulsion: node => 4500,
+                            gravity: 0.25,
+                            gravityRange: 3.8,
+                            gravityCompound: 1.0,
+                            gravityRangeCompound: 1.5,
                         }
-                });
+                    });
+
+                    // Visual Debugging Interattivo & Sidebar
+                    cy.on('tap', 'node', function(e) {
+                        var node = e.target;
+                        var neighborhood = node.closedNeighborhood();
+                        var context = neighborhood.union(node.ancestors()).union(node.descendants());
+                        
+                        cy.elements().addClass('dimmed');
+                        context.removeClass('dimmed');
+
+                        // Sidebar
+                        document.getElementById('sb-name').innerText = node.data('label') || node.data('id').split('::').pop();
+                        document.getElementById('sb-type').innerText = node.data('type') || 'Module';
+                        document.getElementById('sb-indegree').innerText = node.indegree(false);
+                        document.getElementById('sb-outdegree').innerText = node.outdegree(false);
+                        
+                        let extra = "<strong>Percorso Assoluto:</strong><br/>" + node.data('id');
+                        if (node.data('parent')) {
+                            extra += "<br/><br/><strong>Modulo Padre:</strong><br/>" + node.data('parent');
+                        }
+                        document.getElementById('sb-extra').innerHTML = extra;
+                        document.getElementById('sidebar').classList.add('active');
+                    });
+
+                    cy.on('tap', function(e) {
+                        if (e.target === cy) {
+                            cy.elements().removeClass('dimmed');
+                            document.getElementById('sidebar').classList.remove('active');
+                        }
+                    });
+
+                    // Semantic Toggles Logic
+                    document.getElementById('toggles-panel').style.display = 'flex';
+                    
+                    const toggleEdges = () => {
+                        cy.edges().style('display', 'none'); // Reset
+                        
+                        const activeFilters = Array.from(document.querySelectorAll('.edge-filter:checked')).map(cb => cb.value);
+                        
+                        if (activeFilters.length > 0) {
+                            const selector = activeFilters.map(val => `[label = "${val}"]`).join(', ');
+                            // Some structural edges start with "Uses", so we handle exact match except for "Uses" which we don't have exactly, we have UsesFieldType etc.
+                            // The values of checkboxes are exact matches like "UsesFieldType", so `[label = "${val}"]` works perfectly!
+                            cy.edges(selector).style('display', 'element');
+                        }
+                    };
+
+                    document.getElementById('toggle-structural').addEventListener('change', function(e) {
+                        document.querySelectorAll('.struct-filter').forEach(cb => cb.checked = e.target.checked);
+                        toggleEdges();
+                    });
+
+                    document.getElementById('toggle-behavioral').addEventListener('change', function(e) {
+                        document.querySelectorAll('.behav-filter').forEach(cb => cb.checked = e.target.checked);
+                        toggleEdges();
+                    });
+
+                    document.querySelectorAll('.edge-filter').forEach(cb => {
+                        cb.addEventListener('change', () => {
+                            const allStruct = Array.from(document.querySelectorAll('.struct-filter'));
+                            document.getElementById('toggle-structural').checked = allStruct.some(c => c.checked);
+                            
+                            const allBehav = Array.from(document.querySelectorAll('.behav-filter'));
+                            document.getElementById('toggle-behavioral').checked = allBehav.some(c => c.checked);
+                            
+                            toggleEdges();
+                        });
+                    });
+
+                    toggleEdges();
+
+                    // Search Logic
+                    const searchBox = document.getElementById('search-box');
+                    searchBox.style.display = 'block';
+                    searchBox.addEventListener('input', function(e) {
+                        const query = e.target.value.toLowerCase().trim();
+                        if (query === "") {
+                            cy.elements().removeClass('dimmed');
+                            return;
+                        }
+
+                        // Trova i nodi che matchano
+                        const matched = cy.nodes().filter(function(ele) {
+                            return ele.data('label') && ele.data('label').toLowerCase().includes(query);
+                        });
+
+                        if (matched.length > 0) {
+                            const context = matched.union(matched.ancestors());
+                            cy.elements().addClass('dimmed');
+                            context.removeClass('dimmed');
+                        } else {
+                            cy.elements().addClass('dimmed');
+                        }
+                    });
             })
             .catch(err => {
                 document.getElementById('status').innerText = "Error: Load graph failed for " + jsonPath;

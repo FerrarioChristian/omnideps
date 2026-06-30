@@ -1,0 +1,404 @@
+{
+  "nodes": [
+    {
+      "Module": {
+        "name": [
+          "root"
+        ],
+        "imports": [
+          {
+            "path": [
+              "crate",
+              "User"
+            ],
+            "alias": null,
+            "is_wildcard": false
+          }
+        ],
+        "structured_types": [
+          {
+            "name": [
+              "root",
+              "Controller"
+            ],
+            "kind": "Struct",
+            "fields": [
+              {
+                "name": "user",
+                "ty": {
+                  "Resolved": [
+                    "root",
+                    "User"
+                  ]
+                }
+              }
+            ],
+            "methods": [
+              {
+                "name": [
+                  "root",
+                  "Controller",
+                  "do_something"
+                ],
+                "signature": {
+                  "parameters": [
+                    {
+                      "name": null,
+                      "ty": {
+                        "Failed": []
+                      },
+                      "is_variadic": false
+                    }
+                  ],
+                  "return_type": {
+                    "Failed": []
+                  }
+                },
+                "body": {
+                  "declarations": [
+                    {
+                      "name": "n",
+                      "ty": {
+                        "Failed": []
+                      }
+                    }
+                  ],
+                  "calls": [
+                    {
+                      "Resolved": [
+                        "root",
+                        "User",
+                        "get_name"
+                      ]
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "StructuredType": {
+        "name": [
+          "root",
+          "Controller"
+        ],
+        "kind": "Struct",
+        "fields": [
+          {
+            "name": "user",
+            "ty": {
+              "Resolved": [
+                "root",
+                "User"
+              ]
+            }
+          }
+        ],
+        "methods": [
+          {
+            "name": [
+              "root",
+              "Controller",
+              "do_something"
+            ],
+            "signature": {
+              "parameters": [
+                {
+                  "name": null,
+                  "ty": {
+                    "Failed": []
+                  },
+                  "is_variadic": false
+                }
+              ],
+              "return_type": {
+                "Failed": []
+              }
+            },
+            "body": {
+              "declarations": [
+                {
+                  "name": "n",
+                  "ty": {
+                    "Failed": []
+                  }
+                }
+              ],
+              "calls": [
+                {
+                  "Resolved": [
+                    "root",
+                    "User",
+                    "get_name"
+                  ]
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "Function": {
+        "name": [
+          "root",
+          "Controller",
+          "do_something"
+        ],
+        "signature": {
+          "parameters": [
+            {
+              "name": null,
+              "ty": {
+                "Failed": []
+              },
+              "is_variadic": false
+            }
+          ],
+          "return_type": {
+            "Failed": []
+          }
+        },
+        "body": {
+          "declarations": [
+            {
+              "name": "n",
+              "ty": {
+                "Failed": []
+              }
+            }
+          ],
+          "calls": [
+            {
+              "Resolved": [
+                "root",
+                "User",
+                "get_name"
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "Module": {
+        "name": [
+          "root"
+        ],
+        "structured_types": [
+          {
+            "name": [
+              "root",
+              "User"
+            ],
+            "kind": "Struct",
+            "fields": [
+              {
+                "name": "name",
+                "ty": {
+                  "Primitive": {
+                    "Other": "String"
+                  }
+                }
+              }
+            ],
+            "methods": [
+              {
+                "name": [
+                  "root",
+                  "User",
+                  "get_name"
+                ],
+                "signature": {
+                  "parameters": [
+                    {
+                      "name": null,
+                      "ty": {
+                        "Failed": []
+                      },
+                      "is_variadic": false
+                    }
+                  ],
+                  "return_type": {
+                    "Primitive": {
+                      "Other": "String"
+                    }
+                  }
+                },
+                "body": {
+                  "calls": [
+                    {
+                      "Failed": [
+                        "User"
+                      ]
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "StructuredType": {
+        "name": [
+          "root",
+          "User"
+        ],
+        "kind": "Struct",
+        "fields": [
+          {
+            "name": "name",
+            "ty": {
+              "Primitive": {
+                "Other": "String"
+              }
+            }
+          }
+        ],
+        "methods": [
+          {
+            "name": [
+              "root",
+              "User",
+              "get_name"
+            ],
+            "signature": {
+              "parameters": [
+                {
+                  "name": null,
+                  "ty": {
+                    "Failed": []
+                  },
+                  "is_variadic": false
+                }
+              ],
+              "return_type": {
+                "Primitive": {
+                  "Other": "String"
+                }
+              }
+            },
+            "body": {
+              "calls": [
+                {
+                  "Failed": [
+                    "User"
+                  ]
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "Function": {
+        "name": [
+          "root",
+          "User",
+          "get_name"
+        ],
+        "signature": {
+          "parameters": [
+            {
+              "name": null,
+              "ty": {
+                "Failed": []
+              },
+              "is_variadic": false
+            }
+          ],
+          "return_type": {
+            "Primitive": {
+              "Other": "String"
+            }
+          }
+        },
+        "body": {
+          "calls": [
+            {
+              "Failed": [
+                "User"
+              ]
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": [
+        "root"
+      ],
+      "to": [
+        "root",
+        "Controller"
+      ],
+      "kind": "ModuleContainment"
+    },
+    {
+      "from": [
+        "root"
+      ],
+      "to": [
+        "root",
+        "User"
+      ],
+      "kind": "ModuleContainment"
+    },
+    {
+      "from": [
+        "root",
+        "Controller"
+      ],
+      "to": [
+        "root",
+        "Controller",
+        "do_something"
+      ],
+      "kind": "NestedIn"
+    },
+    {
+      "from": [
+        "root",
+        "Controller"
+      ],
+      "to": [
+        "root",
+        "User"
+      ],
+      "kind": "UsesFieldType"
+    },
+    {
+      "from": [
+        "root",
+        "Controller",
+        "do_something"
+      ],
+      "to": [
+        "root",
+        "User",
+        "get_name"
+      ],
+      "kind": "Calls"
+    },
+    {
+      "from": [
+        "root",
+        "User"
+      ],
+      "to": [
+        "root",
+        "User",
+        "get_name"
+      ],
+      "kind": "NestedIn"
+    }
+  ]
+}

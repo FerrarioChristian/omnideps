@@ -44,7 +44,15 @@ pipeline di analisi.
     gerarchica di identificatori ($\langle i_1, \dots, i_n \rangle$)
     che rappresenta il percorso assoluto e univoco di un'entità (es.
     il namespace o il modulo).
-  \item $\tau$ (\textbf{Type Reference}): Un riferimento astratto a un tipo. Rappresentato da un tipo somma a cinque stati che ne modella il ciclo di vita durante l'analisi: \texttt{Prim} (primitivo di base), \texttt{Unresolved} (nome grezzo appena estratto), \texttt{Resolved} (percorso assoluto accertato nel codebase), \texttt{External} (percorso risolto tramite import ma non analizzato nel codebase), o \texttt{Failed} (tentativo di risoluzione non andato a buon fine).
+  \item $\tau$ (\textbf{Type Reference}): Un riferimento astratto a
+    un tipo. Rappresentato da un tipo somma a sei stati che ne
+    modella il ciclo di vita durante l'analisi: \texttt{Prim}
+    (primitivo di base), \texttt{Unresolved} (nome grezzo appena
+    estratto), \texttt{ResolutionQuery} (espressione algebrica di
+    intento), \texttt{Resolved} (percorso assoluto accertato nel
+    codebase), \texttt{External} (percorso risolto tramite import ma
+    non analizzato nel codebase), o \texttt{Failed} (tentativo di
+    risoluzione non andato a buon fine).
 \end{itemize}
 
 \subsection{Membri Strutturali e Firme}
@@ -58,8 +66,12 @@ pipeline di analisi.
     funzione, composta dalla tupla $\langle \vec{P}, \tau_{ret}
     \rangle$. Astrae i tipi di input e output isolandoli dal
     componente implementativo.
+  \item $\mathcal{B}$ (\textbf{Block}): Un blocco lessicale (es.
+    delimitato da \texttt{\{\}}) che modella uno scope interno.
+    Traccia le variabili locali dichiarate, le chiamate, le
+    istanziazioni e annida in modo ricorsivo eventuali sotto-blocchi.
   \item $\mathcal{F}$ (\textbf{Function}): Un componente funzionale
-    universale definito dalla coppia $\langle \mathcal{I}, \sigma
+    universale definito dalla tupla $\langle \mathcal{I}, \sigma, \mathcal{B}
     \rangle$. Il suo ruolo architetturale (metodo o funzione libera)
     è determinato unicamente dal costrutto in cui è annidato.
 \end{itemize}
@@ -85,12 +97,24 @@ pipeline di analisi.
 
 \subsection{Modello di Risoluzione e Grafo}
 \begin{itemize}
-  \item $\Sigma$ (\textbf{Symbol Table}): La funzione di mappa
-    globale che associa i nomi qualificati ($\mathcal{QN}$) alle
-    effettive istanze dei componenti ($\mathcal{C}$).
-  \item $\Gamma$ (\textbf{Resolution Context}): Il contesto locale
-    (comprendente scope attuale e importazioni) utilizzato per
-    risolvere riferimenti ambigui durante la fase di risoluzione.
+  \item $\mathcal{Q}$ (\textbf{Query Algebra}): L'insieme delle
+    espressioni algebriche costanti ($\text{Find}$, $\text{Extract}$,
+    $\text{Call}$)
+    che modellano l'intento logico di risoluzione di un tipo, rinviandone
+    l'esecuzione (valutazione lazy).
+  \item $\rho$ (\textbf{Symbol Stack / Environment}): L'ambiente
+    lessicale effimero modellato come pila di scope ($\langle
+    \Sigma_0, \dots, \Sigma_n \rangle$).
+    Utilizzato nella Fase 2a per proiettare variabili locali nelle
+    rispettive query $\mathcal{Q}$.
+  \item $\mathcal{GR}$ (\textbf{Global Registry}): L'indice piatto e
+    globale del progetto che mappa in tempo costante $\mathcal{O}(1)$
+    ogni $\mathcal{QN}$ ai metadati strutturali essenziali (es. tipo
+    di ritorno).
+  \item $\Gamma$ (\textbf{Execution Context}): Il contesto immutabile
+    composto dal prefisso corrente, dalla gerarchia degli import e
+    dal $\mathcal{GR}$,
+    utilizzato dal valutatore per risolvere le query $\mathcal{Q}$.
   \item $\mathcal{G}$ (\textbf{Dependency Graph}): Il grafo orientato
     finale $\langle V, E \rangle$. I vertici $V$ sono i componenti
     estratti dal codice e gli archi $E$ sono le relazioni semantiche
@@ -100,14 +124,20 @@ pipeline di analisi.
 \subsection{Fasi dell'Analisi}
 \begin{itemize}
   \item $\Phi$ (\textbf{Full Analysis}): La funzione matematica
-    complessiva che rappresenta l'intero programma, calcolata come la
-    composizione delle tre fasi sottostanti ($\Phi = G \circ R \circ E$).
-  \item $E$ (\textbf{Extraction}): La prima fase dipendente dal
-    linguaggio che trasforma i nodi dell'albero sintattico nel Modulo
-    Radice $\mathcal{M}$.
-  \item $R$ (\textbf{Resolution}): La fase agnostica che naviga la
-    gerarchia $\mathcal{M}$ risolvendo e validando tutti i
-    riferimenti $\tau$ grazie al contesto $\Gamma$.
+    complessiva che definisce la pipeline architetturale
+    ($\Phi = G \circ R_{exec} \circ R_{build} \circ \text{Agg} \circ E$).
+  \item $E$ (\textbf{Extraction}): Fase dipendente dal
+    linguaggio che traduce il CST del singolo file in moduli $\mathcal{M}$.
+  \item $\text{Agg}$ (\textbf{Workspace Aggregation}): Funzione che
+    fonde i moduli estratti dai singoli file in un unico ecosistema globale.
+  \item $R_{build}$ (\textbf{Query Building}): La Fase 2a (sostituzione), che
+    attraversa l'IR unificato sostituendo variabili locali tramite
+    l'environment $\rho$
+    per generare i riferimenti $\tau = \text{ResolutionQuery}(\mathcal{Q})$.
+  \item $R_{exec}$ (\textbf{Query Execution}): La Fase 2b (navigazione), che
+    popola il $\mathcal{GR}$ e valuta algebricamente ogni
+    $\mathcal{Q}$ per produrre
+    percorsi assoluti validati.
   \item $G$ (\textbf{Graphing}): L'ultima fase che converte il
     modello a oggetti risolto nel grafo delle dipendenze $\mathcal{G}$.
 \end{itemize}

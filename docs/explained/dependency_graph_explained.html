@@ -1,0 +1,990 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fase 3: Costruzione del Dependency Graph — Deep Dive Tecnico</title>
+    <style>
+        :root {
+            --bg: #fafbfc;
+            --card-bg: #ffffff;
+            --text: #24292f;
+            --text-secondary: #57606a;
+            --border: #d0d7de;
+            --accent: #0969da;
+            --accent-subtle: #ddf4ff;
+            --success: #1a7f37;
+            --success-subtle: #dafbe1;
+            --warning: #9a6700;
+            --warning-subtle: #fff8c5;
+            --danger: #cf222e;
+            --danger-subtle: #ffebe9;
+            --purple: #8250df;
+            --purple-subtle: #fbefff;
+            --code-bg: #f6f8fa;
+            --pre-bg: #1b1f23;
+            --pre-text: #e6edf3;
+            --nav-bg: #f6f8fa;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif;
+            line-height: 1.7;
+            max-width: 1060px;
+            margin: 0 auto;
+            padding: 2.5rem 2rem;
+            color: var(--text);
+            background: var(--bg);
+        }
+
+        /* ── Wiki Navigation ── */
+        .wiki-nav {
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+            padding: 0.7rem 1rem;
+            margin-bottom: 2rem;
+            background: var(--nav-bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-size: 0.88em;
+            flex-wrap: wrap;
+        }
+        .wiki-nav a {
+            color: var(--accent);
+            text-decoration: none;
+            padding: 0.25rem 0.6rem;
+            border-radius: 4px;
+            transition: background 0.15s;
+        }
+        .wiki-nav a:hover { background: var(--accent-subtle); }
+        .wiki-nav a.active {
+            background: var(--accent);
+            color: #fff;
+            font-weight: 600;
+        }
+        .wiki-nav .sep { color: var(--border); font-size: 1.1em; }
+        .wiki-nav .label { color: var(--text-secondary); font-weight: 600; margin-right: 0.2rem; }
+
+        h1 {
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+            color: var(--text);
+            letter-spacing: -0.02em;
+        }
+        h1 + p { color: var(--text-secondary); font-size: 1.1em; margin-bottom: 2rem; }
+
+        h2 {
+            font-size: 1.45rem;
+            font-weight: 600;
+            color: var(--text);
+            margin-top: 2.8rem;
+            margin-bottom: 1rem;
+            padding-bottom: 0.4rem;
+            border-bottom: 1px solid var(--border);
+        }
+        h3 {
+            font-size: 1.15rem;
+            font-weight: 600;
+            color: var(--accent);
+            margin-top: 1.6rem;
+            margin-bottom: 0.6rem;
+        }
+        h4 {
+            font-size: 1.05rem;
+            font-weight: 600;
+            color: var(--text);
+            margin-top: 1.2rem;
+            margin-bottom: 0.4rem;
+        }
+
+        p, li { font-size: 1rem; color: var(--text); }
+        p { margin-bottom: 0.8rem; }
+        li { margin-bottom: 0.3rem; }
+        ol, ul { padding-left: 1.5rem; margin-bottom: 1rem; }
+
+        code {
+            background: var(--code-bg);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+            font-size: 0.88em;
+            color: var(--text);
+            border: 1px solid var(--border);
+        }
+        pre {
+            background: var(--pre-bg);
+            color: var(--pre-text);
+            padding: 1.2rem 1.4rem;
+            border-radius: 8px;
+            overflow-x: auto;
+            font-size: 0.88em;
+            line-height: 1.55;
+            margin: 0.8rem 0 1.2rem 0;
+            border: 1px solid #30363d;
+        }
+        pre code { background: none; border: none; padding: 0; color: inherit; }
+
+        .step {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-left: 4px solid var(--accent);
+            padding: 1.2rem 1.4rem;
+            margin-bottom: 1.2rem;
+            border-radius: 0 8px 8px 0;
+        }
+        .step h3 { margin-top: 0; }
+        .step-success { border-left-color: var(--success); }
+        .step-success h3 { color: var(--success); }
+        .step-warning { border-left-color: var(--warning); }
+        .step-warning h3 { color: var(--warning); }
+        .step-danger { border-left-color: var(--danger); }
+        .step-danger h3 { color: var(--danger); }
+        .step-purple { border-left-color: var(--purple); }
+        .step-purple h3 { color: var(--purple); }
+
+        .info-box {
+            background: var(--accent-subtle);
+            border: 1px solid #84c5f5;
+            padding: 1rem 1.2rem;
+            border-radius: 8px;
+            margin: 1rem 0;
+        }
+        .info-box strong { color: var(--accent); }
+
+        .warn-box {
+            background: var(--warning-subtle);
+            border: 1px solid #d4a72c;
+            padding: 1rem 1.2rem;
+            border-radius: 8px;
+            margin: 1rem 0;
+        }
+        .warn-box strong { color: var(--warning); }
+
+        .tree-container {
+            background: #f0f3f6;
+            border: 1px solid var(--border);
+            padding: 1.4rem 1.6rem;
+            border-radius: 8px;
+            font-family: 'SFMono-Regular', Consolas, monospace;
+            font-size: 0.88em;
+            line-height: 1.65;
+            margin: 1rem 0;
+            white-space: pre;
+            overflow-x: auto;
+        }
+        .node { font-weight: 700; color: #cf222e; }
+        .symbol { color: var(--accent); font-weight: 600; }
+        .arrow { color: #8b949e; }
+        .dim { color: #8b949e; font-style: italic; }
+        .green { color: var(--success); font-weight: 600; }
+        .purple { color: var(--purple); font-weight: 600; }
+
+        .flowchart {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            align-items: center;
+            margin: 1rem 0;
+            font-family: 'SFMono-Regular', Consolas, monospace;
+            font-size: 0.88em;
+        }
+        .flowchart .box {
+            background: var(--accent-subtle);
+            border: 1px solid #84c5f5;
+            padding: 0.4rem 0.8rem;
+            border-radius: 6px;
+            font-weight: 600;
+            color: var(--accent);
+        }
+        .flowchart .box.active {
+            background: var(--success-subtle);
+            border-color: #4ac26b;
+            color: var(--success);
+        }
+        .flowchart .sep { color: #8b949e; font-size: 1.2em; }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1rem 0;
+            font-size: 0.95em;
+        }
+        th, td {
+            border: 1px solid var(--border);
+            padding: 0.6rem 0.8rem;
+            text-align: left;
+        }
+        th { background: var(--code-bg); font-weight: 600; }
+
+        .toc {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1.2rem 1.6rem;
+            margin: 1.5rem 0 2rem 0;
+        }
+        .toc h3 { margin-top: 0; color: var(--text); font-size: 1rem; }
+        .toc ol { margin-bottom: 0; }
+        .toc li { margin-bottom: 0.15rem; }
+        .toc a { color: var(--accent); text-decoration: none; }
+        .toc a:hover { text-decoration: underline; }
+
+        .ref { font-size: 0.85em; color: var(--text-secondary); font-style: italic; }
+
+        .edge-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.82em;
+            font-weight: 600;
+            font-family: 'SFMono-Regular', Consolas, monospace;
+        }
+        .edge-structural { background: var(--purple-subtle); color: var(--purple); border: 1px solid #c297ff; }
+        .edge-type { background: var(--accent-subtle); color: var(--accent); border: 1px solid #84c5f5; }
+        .edge-behavior { background: var(--success-subtle); color: var(--success); border: 1px solid #4ac26b; }
+        .edge-inherit { background: var(--warning-subtle); color: var(--warning); border: 1px solid #d4a72c; }
+    </style>
+</head>
+<body>
+
+    <nav class="wiki-nav">
+        <span class="label">📖 Wiki:</span>
+        <a href="extraction_explained.html">Fase 1 — Estrazione</a>
+        <span class="sep">·</span>
+        <a href="name_resolution_explained.html">Fase 2 — Name Resolution</a>
+        <span class="sep">·</span>
+        <a href="dependency_graph_explained.html" class="active">Fase 3 — Dependency Graph</a>
+        <span class="sep">·</span>
+        <a href="features_roadmap.html">Features &amp; Roadmap</a>
+    </nav>
+
+    <h1>Deep Dive: Fase 3 — Costruzione del Dependency Graph</h1>
+    <p>Documentazione tecnica esaustiva della trasformazione dell'IR risolta in un grafo di dipendenze architetturali, con spiegazione passo-passo della generazione di nodi, archi, e dell'esportazione in formato Cytoscape.</p>
+
+    <div class="toc">
+        <h3>Indice</h3>
+        <ol>
+            <li><a href="#overview">Panoramica e Posizione nella Pipeline</a></li>
+            <li><a href="#data-structures">Strutture Dati del Grafo</a></li>
+            <li><a href="#build-entry">Entry Point: <code>build_dependency_graph</code></a></li>
+            <li><a href="#flatten">Fase A — Flattening dei Nodi (<code>flatten_modules</code>)</a></li>
+            <li><a href="#edges">Fase B — Generazione degli Archi</a></li>
+            <li><a href="#edge-types">Catalogo Completo dei Tipi di Arco</a></li>
+            <li><a href="#edge-functions">Le Funzioni di Generazione Archi in Dettaglio</a></li>
+            <li><a href="#cytoscape">Esportazione Cytoscape</a></li>
+            <li><a href="#summary">Generazione del Summary</a></li>
+            <li><a href="#full-example">Esempio Completo End-to-End</a></li>
+        </ol>
+    </div>
+
+    <!-- ============================================================ -->
+    <h2 id="overview">1. Panoramica e Posizione nella Pipeline</h2>
+
+    <p>La <strong>Fase 3 (Costruzione del Dependency Graph)</strong> è il terzo stadio della pipeline. Riceve in input i moduli dell'IR con tutti i <code>TypeRef</code> già risolti dalla Fase 2 e produce in output un <code>DependencyGraph</code> — una struttura composta da <strong>nodi</strong> (i componenti del codice) e <strong>archi</strong> (le relazioni tra essi).</p>
+
+    <div class="flowchart">
+        <span class="box">1. Estrazione CST→IR</span>
+        <span class="sep">→</span>
+        <span class="box">2. Name Resolution</span>
+        <span class="sep">→</span>
+        <span class="box active">3. Dependency Graph</span>
+        <span class="sep">→</span>
+        <span class="box">4. Summary</span>
+    </div>
+    <p class="ref">Riferimento: <code>analyzer.rs:104</code> — <code>let graph = crate::export::graph::build_dependency_graph(&amp;resolved);</code></p>
+
+    <p>Il grafo è la rappresentazione finale dell'architettura del codice. Può essere:</p>
+    <ul>
+        <li><strong>Serializzato in JSON</strong> per analisi programmatica</li>
+        <li><strong>Esportato in formato Cytoscape</strong> per visualizzazione interattiva</li>
+        <li><strong>Analizzato per metriche</strong> (accoppiamento, coesione, componenti connesse, ecc.)</li>
+    </ul>
+
+    <p>Il processo si divide in due fasi logiche eseguite in sequenza:</p>
+    <div class="flowchart">
+        <span class="box" style="background: var(--purple-subtle); border-color: #c297ff; color: var(--purple);">A. Flatten Nodi</span>
+        <span class="sep">→</span>
+        <span class="box active">B. Genera Archi</span>
+        <span class="sep">→</span>
+        <span class="box">DependencyGraph { nodes, edges }</span>
+    </div>
+
+    <!-- ============================================================ -->
+    <h2 id="data-structures">2. Strutture Dati del Grafo</h2>
+    <p class="ref">Riferimento: <code>ir.rs:110-141</code></p>
+
+    <h3>2.1 <code>DependencyGraph</code></h3>
+    <pre><code>pub struct DependencyGraph {
+    pub nodes: Vec&lt;Component&gt;,   // Tutti i componenti appiattiti
+    pub edges: Vec&lt;Dependency&gt;,  // Tutte le relazioni tra componenti
+}</code></pre>
+
+    <h3>2.2 <code>Component</code> — I nodi del grafo</h3>
+    <pre><code>pub enum Component {
+    Module(Module),
+    StructuredType(StructuredType),
+    Function(Function),
+}</code></pre>
+    <p>Ogni componente del codice (modulo, tipo strutturato, funzione) diventa un <strong>nodo</strong> nel grafo. I nodi sono identificati dal loro <code>QualifiedName</code> (nome assoluto calcolato dalla Fase 2).</p>
+
+    <h3>2.3 <code>Dependency</code> — Gli archi del grafo</h3>
+    <pre><code>pub struct Dependency {
+    pub from: QualifiedName,       // Nodo sorgente (chi dipende)
+    pub to: QualifiedName,         // Nodo target (da chi dipende)
+    pub kind: DependencyEdgeKind,  // Tipo di relazione
+}</code></pre>
+
+    <h3>2.4 <code>DependencyEdgeKind</code> — Tipologie di relazione</h3>
+    <pre><code>pub enum DependencyEdgeKind {
+    Inherits,            // Ereditarietà (extends, super_types)
+    Implements,          // Implementazione (impl for, implements)
+    UsesFieldType,       // Tipo di un campo
+    UsesParamType,       // Tipo di un parametro
+    UsesReturnType,      // Tipo di ritorno
+    NestedIn,            // Contenimento (metodo in struct, nested type)
+    ModuleContainment,   // Contenimento (componente in modulo)
+    Calls,               // Chiamata a funzione
+    Instantiates,        // Istanziazione (new, struct expression)
+}</code></pre>
+
+    <p>I 9 tipi di arco si dividono in quattro categorie logiche:</p>
+    <table>
+        <thead><tr><th>Categoria</th><th>Archi</th><th>Significato</th></tr></thead>
+        <tbody>
+            <tr>
+                <td><span class="edge-badge edge-structural">Strutturale</span></td>
+                <td><code>ModuleContainment</code>, <code>NestedIn</code></td>
+                <td>Relazione gerarchica "chi contiene chi"</td>
+            </tr>
+            <tr>
+                <td><span class="edge-badge edge-inherit">Ereditarietà</span></td>
+                <td><code>Inherits</code>, <code>Implements</code></td>
+                <td>Relazione di sotto-tipizzazione</td>
+            </tr>
+            <tr>
+                <td><span class="edge-badge edge-type">Type-Level</span></td>
+                <td><code>UsesFieldType</code>, <code>UsesParamType</code>, <code>UsesReturnType</code></td>
+                <td>Dipendenza tramite riferimento a un tipo</td>
+            </tr>
+            <tr>
+                <td><span class="edge-badge edge-behavior">Comportamentale</span></td>
+                <td><code>Calls</code>, <code>Instantiates</code></td>
+                <td>Dipendenza tramite invocazione o costruzione</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <!-- ============================================================ -->
+    <h2 id="build-entry">3. Entry Point: <code>build_dependency_graph</code></h2>
+    <p class="ref">Riferimento: <code>export/graph.rs:4-13</code></p>
+
+    <pre><code>pub fn build_dependency_graph(modules: &amp;[Module]) -&gt; DependencyGraph {
+    // Fase A: Appiattisci tutti i componenti in un vettore di nodi
+    let nodes = flatten_modules(modules);
+
+    // Fase B: Genera tutti gli archi attraversando i moduli
+    let mut edges = vec![];
+    for m in modules {
+        traverse_module_for_edges(m, None, &amp;mut edges);
+    }
+
+    DependencyGraph { nodes, edges }
+}</code></pre>
+
+    <p>La funzione è breve ma nasconde due processi complessi:</p>
+    <ul>
+        <li><strong>Fase A</strong> (<code>flatten_modules</code>) — Raccoglie tutti i componenti (moduli, tipi, funzioni) dalla struttura gerarchica dell'IR e li appiattisce in un vettore lineare.</li>
+        <li><strong>Fase B</strong> (<code>traverse_module_for_edges</code>) — Attraversa ricorsivamente la gerarchia dell'IR generando gli archi di dipendenza per ogni relazione trovata.</li>
+    </ul>
+
+    <!-- ============================================================ -->
+    <h2 id="flatten">4. Fase A — Flattening dei Nodi (<code>flatten_modules</code>)</h2>
+    <p class="ref">Riferimento: <code>export/graph.rs:201-221</code></p>
+
+    <p>L'IR è una struttura gerarchica ad albero (moduli contengono struct, struct contengono metodi, ecc.). Il grafo delle dipendenze necessita invece di un elenco <strong>piatto</strong> di nodi. La funzione <code>flatten_modules</code> appiattisce ricorsivamente la gerarchia.</p>
+
+    <pre><code>fn flatten_modules(modules: &amp;[Module]) -&gt; Vec&lt;Component&gt; {
+    let mut flat = vec![];
+    for m in modules {
+        // 1. Il modulo stesso diventa un nodo
+        flat.push(Component::Module(m.clone()));
+
+        // 2. Ogni tipo strutturato (e i suoi annidamenti) diventa nodo
+        for st in &amp;m.structured_types {
+            flat.extend(flatten_structured_type(st));
+        }
+
+        // 3. Ogni funzione libera diventa un nodo
+        flat.extend(m.free_functions.iter().cloned().map(Component::Function));
+
+        // 4. Ricorsione nei sotto-moduli
+        flat.extend(flatten_modules(&amp;m.sub_modules));
+    }
+    flat
+}
+
+fn flatten_structured_type(st: &amp;StructuredType) -&gt; Vec&lt;Component&gt; {
+    let mut flat = vec![Component::StructuredType(st.clone())];
+
+    // I metodi della struct diventano nodi Function
+    flat.extend(st.methods.iter().cloned().map(Component::Function));
+
+    // Ricorsione nei tipi annidati
+    for nested in &amp;st.nested_types {
+        flat.extend(flatten_structured_type(nested));
+    }
+    flat
+}</code></pre>
+
+    <div class="info-box">
+        <strong>Cosa viene appiattito:</strong> Il flattening produce nodi per: ogni modulo, ogni tipo strutturato (inclusi i nested), ogni metodo, e ogni funzione libera. Ciò che <strong>non</strong> diventa nodo: i campi (<code>Field</code>), i parametri (<code>Parameter</code>), gli import, e gli impl blocks (che sono già stati fusi nella Fase 2).
+    </div>
+
+    <h3>4.1 Esempio di Flattening</h3>
+    <p>Data la seguente struttura IR:</p>
+    <div class="tree-container">
+<span class="node">Module "root"</span>
+ <span class="arrow">├──</span> Module "core"
+ <span class="arrow">│</span>    <span class="arrow">├──</span> StructuredType "Veicolo"
+ <span class="arrow">│</span>    <span class="arrow">│</span>    <span class="arrow">└──</span> method "accelera()"
+ <span class="arrow">│</span>    <span class="arrow">└──</span> StructuredType "Auto"
+ <span class="arrow">│</span>         <span class="arrow">├──</span> method "avvia()"
+ <span class="arrow">│</span>         <span class="arrow">└──</span> nested StructuredType "Motore"
+ <span class="arrow">└──</span> Function "main()"</div>
+
+    <p>Il flattening produce il seguente vettore piatto di nodi:</p>
+    <div class="tree-container">
+<span class="symbol">nodes</span> = [
+  <span class="node">Module("root")</span>,
+  <span class="node">Module("core")</span>,
+  <span class="green">StructuredType("Veicolo")</span>,
+  <span class="purple">Function("accelera()")</span>,
+  <span class="green">StructuredType("Auto")</span>,
+  <span class="purple">Function("avvia()")</span>,
+  <span class="green">StructuredType("Motore")</span>,      <span class="dim">← nested type appiattito</span>
+  <span class="purple">Function("main()")</span>,
+]</div>
+
+    <!-- ============================================================ -->
+    <h2 id="edges">5. Fase B — Generazione degli Archi</h2>
+    <p class="ref">Riferimento: <code>export/graph.rs:15-58</code></p>
+
+    <p>La seconda fase attraversa ricorsivamente l'IR generando un arco <code>Dependency</code> per ogni relazione tra componenti. La funzione principale è <code>traverse_module_for_edges</code>.</p>
+
+    <pre><code>fn traverse_module_for_edges(
+    m: &amp;Module,
+    parent_id: Option&lt;&amp;QualifiedName&gt;,
+    edges: &amp;mut Vec&lt;Dependency&gt;,
+) {
+    // 1. Arco di contenimento modulo→modulo (se ha un genitore)
+    if let Some(parent) = parent_id {
+        edges.push(Dependency {
+            from: parent.clone(),
+            to: m.name.clone(),
+            kind: DependencyEdgeKind::ModuleContainment,
+        });
+    }
+
+    // 2. Per ogni tipo strutturato: arco contenimento + archi interni
+    for st in &amp;m.structured_types {
+        edges.push(Dependency {
+            from: m.name.clone(), to: st.name.clone(),
+            kind: DependencyEdgeKind::ModuleContainment,
+        });
+        traverse_structured_type_edges(st, edges);
+    }
+
+    // 3. Per ogni funzione libera: arco contenimento + archi interni
+    for ff in &amp;m.free_functions {
+        edges.push(Dependency {
+            from: m.name.clone(), to: ff.name.clone(),
+            kind: DependencyEdgeKind::ModuleContainment,
+        });
+        add_function_edges(ff, edges);
+    }
+
+    // 4. Per ogni impl block residuo: arco contenimento + archi interni
+    for ib in &amp;m.impl_blocks {
+        edges.push(Dependency {
+            from: m.name.clone(), to: ib.name.clone(),
+            kind: DependencyEdgeKind::ModuleContainment,
+        });
+        add_impl_edges(ib, edges);
+    }
+
+    // 5. Ricorsione nei sotto-moduli
+    for sub in &amp;m.sub_modules {
+        traverse_module_for_edges(sub, Some(&amp;m.name), edges);
+    }
+}</code></pre>
+
+    <p>Per ogni modulo, vengono generati:</p>
+    <ol>
+        <li>Un arco <code>ModuleContainment</code> <em>dal genitore al modulo corrente</em> (se esiste un genitore).</li>
+        <li>Un arco <code>ModuleContainment</code> <em>dal modulo a ciascun componente diretto</em> (struct, funzioni, impl blocks).</li>
+        <li>Gli archi interni di ciascun componente (delegati a funzioni specifiche).</li>
+        <li>La ricorsione nei sotto-moduli, passando il nome del modulo corrente come <code>parent_id</code>.</li>
+    </ol>
+
+    <!-- ============================================================ -->
+    <h2 id="edge-types">6. Catalogo Completo dei Tipi di Arco</h2>
+
+    <table>
+        <thead><tr><th>Tipo Arco</th><th>Da (from)</th><th>A (to)</th><th>Generato da</th><th>Quando</th></tr></thead>
+        <tbody>
+            <tr>
+                <td><span class="edge-badge edge-structural">ModuleContainment</span></td>
+                <td>Modulo genitore</td>
+                <td>Modulo, Struct, Funzione, Impl</td>
+                <td><code>traverse_module_for_edges</code></td>
+                <td>Sempre, per ogni componente diretto del modulo</td>
+            </tr>
+            <tr>
+                <td><span class="edge-badge edge-structural">NestedIn</span></td>
+                <td>StructuredType o ImplBlock</td>
+                <td>Metodo o Nested Type</td>
+                <td><code>traverse_structured_type_edges</code>, <code>add_impl_edges</code></td>
+                <td>Per ogni metodo e tipo annidato in un tipo strutturato</td>
+            </tr>
+            <tr>
+                <td><span class="edge-badge edge-inherit">Inherits</span></td>
+                <td>StructuredType</td>
+                <td>Super type</td>
+                <td><code>add_super_edges</code></td>
+                <td>Per ogni <code>TypeRef::Resolved</code> o <code>External</code> in <code>super_types</code></td>
+            </tr>
+            <tr>
+                <td><span class="edge-badge edge-inherit">Implements</span></td>
+                <td>ImplBlock</td>
+                <td>Tipo target o Trait</td>
+                <td><code>add_impl_edges</code></td>
+                <td>Per <code>impl_for</code> e <code>implements_trait</code> se risolti</td>
+            </tr>
+            <tr>
+                <td><span class="edge-badge edge-type">UsesFieldType</span></td>
+                <td>StructuredType o Function</td>
+                <td>Tipo del campo o variabile locale</td>
+                <td><code>add_field_edges</code>, <code>add_block_edges</code></td>
+                <td>Per ogni campo di un tipo strutturato, oppure per ogni dichiarazione di variabile locale nel body di una funzione (inclusi blocchi annidati), con <code>TypeRef::Resolved</code> o <code>External</code></td>
+            </tr>
+            <tr>
+                <td><span class="edge-badge edge-type">UsesParamType</span></td>
+                <td>Function</td>
+                <td>Tipo del parametro</td>
+                <td><code>add_function_edges</code></td>
+                <td>Per ogni parametro con tipo risolto</td>
+            </tr>
+            <tr>
+                <td><span class="edge-badge edge-type">UsesReturnType</span></td>
+                <td>Function</td>
+                <td>Tipo di ritorno</td>
+                <td><code>add_function_edges</code></td>
+                <td>Se il tipo di ritorno è risolto</td>
+            </tr>
+            <tr>
+                <td><span class="edge-badge edge-behavior">Calls</span></td>
+                <td>Function</td>
+                <td>Funzione/tipo chiamato</td>
+                <td><code>add_block_edges</code></td>
+                <td>Per ogni <code>calls</code> entry nel body della funzione (ricorsivamente nei sotto-blocchi) con tipo risolto</td>
+            </tr>
+            <tr>
+                <td><span class="edge-badge edge-behavior">Instantiates</span></td>
+                <td>Function</td>
+                <td>Tipo istanziato</td>
+                <td><code>add_block_edges</code></td>
+                <td>Per ogni <code>instantiates</code> entry nel body della funzione (ricorsivamente nei sotto-blocchi) con tipo risolto</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <div class="warn-box">
+        <strong>Regola fondamentale:</strong> Gli archi vengono generati <strong>solo</strong> per <code>TypeRef::Resolved</code> e <code>TypeRef::External</code>. I riferimenti <code>Primitive</code>, <code>Unresolved</code> e <code>Failed</code> vengono completamente ignorati — non generano archi. Questo significa che i tipi non risolti non producono dipendenze false nel grafo.
+    </div>
+
+    <!-- ============================================================ -->
+    <h2 id="edge-functions">7. Le Funzioni di Generazione Archi in Dettaglio</h2>
+
+    <h3>7.1 <code>traverse_structured_type_edges</code></h3>
+    <p class="ref">Riferimento: <code>graph.rs:60-81</code></p>
+    <pre><code>fn traverse_structured_type_edges(st: &amp;StructuredType, edges: &amp;mut Vec&lt;Dependency&gt;) {
+    // Archi Inherits per super_types
+    add_super_edges(st, edges);
+
+    // Archi UsesFieldType per i campi
+    add_field_edges(st, edges);
+
+    // Per ogni metodo: arco NestedIn + archi della funzione
+    for m in &amp;st.methods {
+        edges.push(Dependency {
+            from: st.name.clone(), to: m.name.clone(),
+            kind: DependencyEdgeKind::NestedIn,
+        });
+        add_function_edges(m, edges);
+    }
+
+    // Per ogni tipo annidato: arco NestedIn + ricorsione
+    for nested in &amp;st.nested_types {
+        edges.push(Dependency {
+            from: st.name.clone(), to: nested.name.clone(),
+            kind: DependencyEdgeKind::NestedIn,
+        });
+        traverse_structured_type_edges(nested, edges);  // Ricorsione
+    }
+}</code></pre>
+    <p>Questa funzione è il punto di raccolta per tutte le dipendenze di un tipo strutturato. Genera archi per ereditarietà, campi, metodi e tipi annidati. Per i metodi e i nested types, genera prima un arco <code>NestedIn</code> (relazione strutturale), poi delega la generazione degli archi interni.</p>
+
+    <h3>7.2 <code>add_super_edges</code> — Archi di ereditarietà</h3>
+    <p class="ref">Riferimento: <code>graph.rs:83-96</code></p>
+    <pre><code>fn add_super_edges(st: &amp;StructuredType, edges: &amp;mut Vec&lt;Dependency&gt;) {
+    for sup in &amp;st.super_types {
+        match sup {
+            TypeRef::Resolved(to) | TypeRef::External(to) =&gt; {
+                edges.push(Dependency {
+                    from: st.name.clone(),
+                    to: to.clone(),
+                    kind: DependencyEdgeKind::Inherits,
+                });
+            }
+            _ =&gt; {}  // Primitive, Unresolved, Failed → ignorati
+        }
+    }
+}</code></pre>
+    <p>Per ogni super-tipo (classe base, interfaccia implementata, trait), se il <code>TypeRef</code> è stato risolto, genera un arco <code>Inherits</code>. Notare che sia <code>Resolved</code> che <code>External</code> vengono processati — una classe può ereditare da un tipo esterno (es. una classe di una libreria).</p>
+
+    <h3>7.3 <code>add_field_edges</code> — Archi dei campi</h3>
+    <p class="ref">Riferimento: <code>graph.rs:98-111</code></p>
+    <pre><code>fn add_field_edges(st: &amp;StructuredType, edges: &amp;mut Vec&lt;Dependency&gt;) {
+    for f in &amp;st.fields {
+        match &amp;f.ty {
+            TypeRef::Resolved(to) | TypeRef::External(to) =&gt; {
+                edges.push(Dependency {
+                    from: st.name.clone(),
+                    to: to.clone(),
+                    kind: DependencyEdgeKind::UsesFieldType,
+                });
+            }
+            _ =&gt; {}
+        }
+    }
+}</code></pre>
+    <p>Per ogni campo del tipo strutturato, se il tipo del campo è risolto, genera un arco <code>UsesFieldType</code>. I campi con tipi primitivi (<code>String</code>, <code>int</code>, ecc.) o non risolti non generano archi.</p>
+
+    <h3>7.4 <code>add_function_edges</code> — Archi dalla firma di una funzione</h3>
+    <p class="ref">Riferimento: <code>graph.rs:113-135</code></p>
+    <p>La funzione <code>add_function_edges</code> gestisce gli archi derivanti dalla <strong>firma</strong> della funzione (parametri e tipo di ritorno) e poi <strong>delega</strong> l'analisi del corpo a <code>add_block_edges</code>:</p>
+    <pre><code>fn add_function_edges(ff: &amp;Function, edges: &amp;mut Vec&lt;Dependency&gt;) {
+    // 1. Parametri → UsesParamType
+    for p in &amp;ff.signature.parameters {
+        match &amp;p.ty {
+            TypeRef::Resolved(to) | TypeRef::External(to) =&gt; {
+                edges.push(Dependency { from: ff.name.clone(), to: to.clone(),
+                    kind: DependencyEdgeKind::UsesParamType });
+            }
+            _ =&gt; {}
+        }
+    }
+
+    // 2. Tipo di ritorno → UsesReturnType
+    match &amp;ff.signature.return_type {
+        TypeRef::Resolved(to) | TypeRef::External(to) =&gt; {
+            edges.push(Dependency { from: ff.name.clone(), to: to.clone(),
+                kind: DependencyEdgeKind::UsesReturnType });
+        }
+        _ =&gt; {}
+    }
+
+    // 3. Corpo → delega a add_block_edges
+    if let Some(body) = &amp;ff.body {
+        add_block_edges(ff, body, edges);
+    }
+}</code></pre>
+
+    <div class="info-box">
+        <strong>Cambio architetturale:</strong> In precedenza, <code>add_function_edges</code> accedeva direttamente ai campi <code>ff.calls</code> e <code>ff.instantiates</code> della <code>Function</code>. Ora la struttura <code>Function</code> contiene un campo <code>body: Option&lt;Block&gt;</code>, e le chiamate, le istanziazioni e le dichiarazioni locali risiedono nei <code>Block</code> annidati. Questo riflette più fedelmente la struttura reale del codice (blocchi <code>if</code>, <code>while</code>, ecc.).
+    </div>
+
+    <h3>7.5 <code>add_block_edges</code> — Attraversamento ricorsivo dei blocchi</h3>
+    <p class="ref">Riferimento: <code>graph.rs:137-165</code></p>
+    <p>Questa nuova funzione attraversa ricorsivamente la struttura a blocchi del corpo di una funzione, generando archi per dichiarazioni locali, chiamate e istanziazioni a qualsiasi livello di annidamento:</p>
+    <pre><code>fn add_block_edges(ff: &amp;Function, block: &amp;Block, edges: &amp;mut Vec&lt;Dependency&gt;) {
+    // 1. Dichiarazioni (variabili locali) → UsesFieldType
+    for decl in &amp;block.declarations {
+        if let Some(to) = type_ref_target(&amp;decl.ty) {
+            edges.push(Dependency {
+                from: ff.name.clone(),
+                to: to.clone(),
+                kind: DependencyEdgeKind::UsesFieldType,
+            });
+        }
+    }
+
+    // 2. Chiamate → Calls
+    for call in &amp;block.calls {
+        match call {
+            TypeRef::Resolved(to) | TypeRef::External(to) =&gt; {
+                edges.push(Dependency { from: ff.name.clone(), to: to.clone(),
+                    kind: DependencyEdgeKind::Calls });
+            }
+            _ =&gt; {}
+        }
+    }
+
+    // 3. Istanziazioni → Instantiates
+    for inst in &amp;block.instantiates {
+        match inst {
+            TypeRef::Resolved(to) | TypeRef::External(to) =&gt; {
+                edges.push(Dependency { from: ff.name.clone(), to: to.clone(),
+                    kind: DependencyEdgeKind::Instantiates });
+            }
+            _ =&gt; {}
+        }
+    }
+
+    // 4. Ricorsione nei sotto-blocchi (if, while, for, ecc.)
+    for sub in &amp;block.sub_blocks {
+        add_block_edges(ff, sub, edges);
+    }
+}</code></pre>
+
+    <p>La struttura <code>Block</code> rappresenta un blocco di codice e contiene:</p>
+    <ul>
+        <li><code>declarations</code> — variabili locali dichiarate nel blocco</li>
+        <li><code>calls</code> — chiamate a funzione effettuate nel blocco</li>
+        <li><code>instantiates</code> — istanziazioni di tipi nel blocco</li>
+        <li><code>sub_blocks</code> — blocchi annidati (corpi di <code>if</code>, <code>while</code>, <code>for</code>, ecc.)</li>
+    </ul>
+
+    <div class="warn-box">
+        <strong>Attribuzione al livello funzione:</strong> Tutti gli archi generati da <code>add_block_edges</code>, a qualsiasi livello di annidamento, sono sempre attribuiti alla <strong>funzione contenitrice</strong> (<code>from: ff.name</code>). Questo è intenzionale: nel grafo delle dipendenze architetturali, il livello di dettaglio minimo è la funzione, non il singolo blocco. Se una variabile viene dichiarata dentro un <code>if</code>, l'arco avrà come sorgente la funzione che contiene quell'<code>if</code>.
+    </div>
+
+    <h4>Diagramma: struttura IR di una Function con Block</h4>
+    <div class="tree-container">
+<span class="node">Function "calcola"</span>
+ <span class="arrow">├──</span> signature
+ <span class="arrow">│</span>    <span class="arrow">├──</span> parameters: [p: <span class="green">Resolved(Veicolo)</span>]
+ <span class="arrow">│</span>    <span class="arrow">└──</span> return_type: <span class="green">Resolved(Auto)</span>
+ <span class="arrow">└──</span> <span class="symbol">body: Block</span>
+      <span class="arrow">├──</span> declarations: [tmp: <span class="green">Resolved(Motore)</span>]
+      <span class="arrow">├──</span> calls: [<span class="green">Resolved(Veicolo::accelera)</span>]
+      <span class="arrow">├──</span> instantiates: [<span class="green">Resolved(Auto)</span>]
+      <span class="arrow">└──</span> <span class="symbol">sub_blocks:</span>
+           <span class="arrow">└──</span> <span class="symbol">Block</span> <span class="dim">(if branch)</span>
+                <span class="arrow">├──</span> declarations: []
+                <span class="arrow">├──</span> calls: [<span class="green">Resolved(log)</span>]
+                <span class="arrow">├──</span> instantiates: []
+                <span class="arrow">└──</span> sub_blocks: []</div>
+    <p>In questo esempio, <code>add_block_edges</code> visita il blocco principale e il sotto-blocco del ramo <code>if</code>, generando archi per <em>tutte</em> le dipendenze, attribuiti sempre a <code>"calcola"</code>.</p>
+
+    <h3>7.6 <code>add_impl_edges</code> — Archi degli impl blocks</h3>
+    <p class="ref">Riferimento: <code>graph.rs:162-199</code></p>
+    <pre><code>fn add_impl_edges(ib: &amp;ImplBlock, edges: &amp;mut Vec&lt;Dependency&gt;) {
+    // 1. impl_for → Implements
+    match &amp;ib.impl_for {
+        TypeRef::Resolved(to) | TypeRef::External(to) =&gt; {
+            edges.push(Dependency { from: ib.name.clone(), to: to.clone(),
+                kind: DependencyEdgeKind::Implements });
+        }
+        _ =&gt; {}
+    }
+
+    // 2. implements_trait → Implements
+    match &amp;ib.implements_trait {
+        Some(TypeRef::Resolved(to)) | Some(TypeRef::External(to)) =&gt; {
+            edges.push(Dependency { from: ib.name.clone(), to: to.clone(),
+                kind: DependencyEdgeKind::Implements });
+        }
+        _ =&gt; {}
+    }
+
+    // 3. Metodi → NestedIn + archi funzione
+    for m in &amp;ib.methods { ... }
+
+    // 4. Tipi annidati → NestedIn + ricorsione
+    for nested in &amp;ib.nested_types { ... }
+}</code></pre>
+    <p>Genera archi <code>Implements</code> sia per il tipo target (<code>impl_for</code>) che per l'eventuale trait (<code>implements_trait</code>). Poi processa metodi e tipi annidati come in <code>traverse_structured_type_edges</code>.</p>
+
+    <div class="info-box">
+        <strong>Nota:</strong> Nella pratica corrente, dopo la Fase 2 il campo <code>module.impl_blocks</code> è sempre vuoto (gli impl blocks vengono fusi nei tipi target). Tuttavia, <code>add_impl_edges</code> viene comunque chiamata preventivamente — se in futuro il flattening venisse modificato, gli archi sarebbero generati correttamente.
+    </div>
+
+    <!-- ============================================================ -->
+    <h2 id="cytoscape">8. Esportazione Cytoscape e Nodi Composti (Compound Nodes)</h2>
+    <p class="ref">Riferimento: <code>export/cytoscape.rs</code></p>
+
+    <p>Il formato <strong>Cytoscape</strong> è uno standard per la visualizzazione interattiva di grafi. L'esportazione trasforma il <code>DependencyGraph</code> in un array JSON di elementi Cytoscape, sfruttando la funzionalità dei <strong>Compound Nodes</strong> (nodi che contengono altri nodi) per rappresentare la gerarchia.</p>
+
+    <h3>8.1 Formato di output</h3>
+    <p>Ogni elemento è un nodo o un arco. I nodi possono avere una proprietà <code>parent</code>:</p>
+    <pre><code>// Nodo Modulo (Padre)
+{ "data": { "id": "src::core", "label": "core", "type": "Module" } }
+
+// Nodo Struct (Figlio)
+{ "data": { "id": "src::core::Veicolo", "label": "Veicolo", "type": "Struct", "parent": "src::core" } }
+
+// Arco (Dipendenza architetturale)
+{ "data": { "id": "e0", "source": "src::core::Auto", "target": "src::core::Veicolo",
+            "label": "UsesFieldType" } }</code></pre>
+
+    <h3>8.2 Processo di esportazione</h3>
+    <ol>
+        <li><strong>Analisi degli archi strutturali:</strong> Prima di esportare, il sistema analizza tutti gli archi di tipo <code>ModuleContainment</code> e <code>NestedIn</code> per mappare le relazioni genitore-figlio.
+            <ul>
+                <li>Se il nodo padre è <code>"root"</code>, la parentela viene <strong>ignorata</strong>. Questo evita che l'intero grafo venga racchiuso in una scatola gigante e inutile, migliorando il layout.</li>
+            </ul>
+        </li>
+        <li><strong>Nodi:</strong> Per ogni <code>Component</code> nel grafo, crea un nodo Cytoscape con:
+            <ul>
+                <li><code>id</code> — Il <code>QualifiedName</code> unito con <code>::</code> (es. <code>"src::core::Veicolo"</code>)</li>
+                <li><code>label</code> — L'ultimo segmento del nome (es. <code>"Veicolo"</code>)</li>
+                <li><code>type</code> — Il tipo di componente (<code>"Module"</code>, <code>"Struct"</code>, <code>"Class"</code>, <code>"Function"</code>)</li>
+                <li><code>parent</code> — L'ID del nodo genitore (se presente e non root)</li>
+            </ul>
+        </li>
+        <li><strong>Archi:</strong> Per ogni <code>Dependency</code>, crea un arco con source e target.
+            <ul>
+                <li>Gli archi <code>ModuleContainment</code> e <code>NestedIn</code> vengono <strong>scartati</strong>, poiché la loro informazione è già stata convertita nella gerarchia <code>parent</code> dei nodi.</li>
+                <li>Se il source o target non esiste come nodo (es. dipendenze esterne), viene creato automaticamente come nodo di tipo <code>"External"</code>.</li>
+                <li>Archi duplicati (stessa sorgente, stesso target, stesso tipo) vengono <strong>deduplicati</strong>.</li>
+            </ul>
+        </li>
+    </ol>
+
+    <div class="info-box">
+        <strong>Vantaggio dei Compound Nodes:</strong> Trasformare le dipendenze gerarchiche in proprietà <code>parent</code> (invece di usare frecce tradizionali) permette agli algoritmi fisici come <code>fcose</code> di disegnare scatole (bounding boxes) per i moduli e le classi. Gli archi visibili rimangono solo quelli puramente architetturali (dipendenze di tipo e di comportamento), riducendo drasticamente il disordine visivo.
+    </div>
+
+    <!-- ============================================================ -->
+    <h2 id="summary">9. Generazione del Summary</h2>
+    <p class="ref">Riferimento: <code>export/summary.rs</code></p>
+
+    <p>Il quarto ed ultimo step della pipeline produce un <code>AnalysisSummary</code> con statistiche aggregate:</p>
+    <pre><code>pub struct AnalysisSummary {
+    pub total_modules: usize,
+    pub total_structured_types: usize,
+    pub total_free_functions: usize,
+    pub resolved_refs: usize,
+    pub unknown_refs: usize,
+}</code></pre>
+
+    <p>La funzione <code>build_analysis_summary</code> attraversa ricorsivamente tutti i moduli contando:</p>
+    <ul>
+        <li><strong>Moduli:</strong> Numero totale (inclusi sotto-moduli)</li>
+        <li><strong>Tipi strutturati:</strong> Numero totale (inclusi nested types, contati ricorsivamente)</li>
+        <li><strong>Funzioni libere:</strong> Numero totale (i metodi non vengono contati qui)</li>
+    </ul>
+
+    <h3>9.1 Conteggio ricorsivo dei riferimenti nelle funzioni</h3>
+    <p>Il conteggio dei riferimenti risolti e non risolti (<code>resolved_refs</code> / <code>unknown_refs</code>) segue la stessa struttura ricorsiva a blocchi utilizzata nella generazione degli archi:</p>
+    <pre><code>fn count_refs_in_func(f: &amp;Function, resolved: &amp;mut usize, failed: &amp;mut usize) {
+    // Parametri e tipo di ritorno...
+    for p in &amp;f.signature.parameters { tally_ref(&amp;p.ty, resolved, failed); }
+    tally_ref(&amp;f.signature.return_type, resolved, failed);
+
+    // Corpo: delega a count_refs_in_block
+    if let Some(body) = &amp;f.body {
+        count_refs_in_block(body, resolved, failed);
+    }
+}
+
+fn count_refs_in_block(block: &amp;Block, resolved: &amp;mut usize, failed: &amp;mut usize) {
+    for decl in &amp;block.declarations { tally_ref(&amp;decl.ty, resolved, failed); }
+    for call in &amp;block.calls         { tally_ref(call, resolved, failed); }
+    for inst in &amp;block.instantiates   { tally_ref(inst, resolved, failed); }
+    // Ricorsione nei sotto-blocchi
+    for sub in &amp;block.sub_blocks {
+        count_refs_in_block(sub, resolved, failed);
+    }
+}</code></pre>
+    <div class="info-box">
+        <strong>Coerenza con il grafo:</strong> Il conteggio del summary e la generazione degli archi attraversano la stessa struttura a blocchi con la stessa logica ricorsiva. Questo garantisce che le statistiche del summary siano sempre coerenti con il numero di archi effettivamente generati nel grafo.
+    </div>
+
+    <!-- ============================================================ -->
+    <h2 id="full-example">10. Esempio Completo End-to-End</h2>
+
+    <p>Riprendiamo il solito codice di esempio dopo la Fase 2 (Name Resolution). I nomi sono ora assoluti e i tipi risolti:</p>
+
+    <pre><code>Module "root"
+ ├── imports: [ external::db::Database as Db ]
+ ├── structured_types:
+ │    └── User { name: Primitive(String) }
+ └── sub_modules:
+      └── Module "core"
+           ├── structured_types:
+           │    ├── Veicolo { id: Primitive(String) }
+           │    └── Auto { base: Resolved(["root","core","Veicolo"]),
+           │               storage: External(["external","db","Database"]) }
+           └── free_functions:
+                └── calcola() → Resolved(["root","core","Auto"])
+                     body: Block {
+                       declarations: []
+                       calls: [Resolved(["root","core","Veicolo"])]
+                       instantiates: [Resolved(["root","core","Auto"])]
+                       sub_blocks: []
+                     }</code></pre>
+
+    <div class="step step-purple">
+        <h3>Fase A — Flattening</h3>
+        <div class="tree-container">
+<span class="symbol">nodes</span> = [
+  <span class="node">Module(["root"])</span>,
+  <span class="green">StructuredType(["root","User"])</span>,
+  <span class="node">Module(["root","core"])</span>,
+  <span class="green">StructuredType(["root","core","Veicolo"])</span>,
+  <span class="green">StructuredType(["root","core","Auto"])</span>,
+  <span class="purple">Function(["root","core","calcola"])</span>,
+]</div>
+    </div>
+
+    <div class="step step-success">
+        <h3>Fase B — Generazione Archi</h3>
+        <p>L'attraversamento produce i seguenti archi:</p>
+
+        <table>
+            <thead><tr><th>#</th><th>From</th><th>To</th><th>Kind</th><th>Generato da</th></tr></thead>
+            <tbody>
+                <tr><td>1</td><td><code>root</code></td><td><code>root::User</code></td><td><span class="edge-badge edge-structural">ModuleContainment</span></td><td>struct nel modulo root</td></tr>
+                <tr><td>2</td><td><code>root</code></td><td><code>root::core</code></td><td><span class="edge-badge edge-structural">ModuleContainment</span></td><td>sotto-modulo "core"</td></tr>
+                <tr><td>3</td><td><code>root::core</code></td><td><code>root::core::Veicolo</code></td><td><span class="edge-badge edge-structural">ModuleContainment</span></td><td>struct in "core"</td></tr>
+                <tr><td>4</td><td><code>root::core</code></td><td><code>root::core::Auto</code></td><td><span class="edge-badge edge-structural">ModuleContainment</span></td><td>struct in "core"</td></tr>
+                <tr><td>5</td><td><code>root::core</code></td><td><code>root::core::calcola</code></td><td><span class="edge-badge edge-structural">ModuleContainment</span></td><td>funzione in "core"</td></tr>
+                <tr><td>6</td><td><code>root::core::Auto</code></td><td><code>root::core::Veicolo</code></td><td><span class="edge-badge edge-type">UsesFieldType</span></td><td>campo <code>base: Veicolo</code></td></tr>
+                <tr><td>7</td><td><code>root::core::Auto</code></td><td><code>external::db::Database</code></td><td><span class="edge-badge edge-type">UsesFieldType</span></td><td>campo <code>storage: Db</code></td></tr>
+                <tr><td>8</td><td><code>root::core::calcola</code></td><td><code>root::core::Auto</code></td><td><span class="edge-badge edge-type">UsesReturnType</span></td><td>return type → Auto</td></tr>
+                <tr><td>9</td><td><code>root::core::calcola</code></td><td><code>root::core::Veicolo</code></td><td><span class="edge-badge edge-behavior">Calls</span></td><td>chiamata nel body (via <code>add_block_edges</code>)</td></tr>
+                <tr><td>10</td><td><code>root::core::calcola</code></td><td><code>root::core::Auto</code></td><td><span class="edge-badge edge-behavior">Instantiates</span></td><td>istanziazione nel body (via <code>add_block_edges</code>)</td></tr>
+            </tbody>
+        </table>
+
+        <p>Nota come i campi con tipo <code>Primitive(String)</code> (es. <code>User.name</code>, <code>Veicolo.id</code>) <strong>non generano archi</strong> — i tipi primitivi non sono componenti del grafo.</p>
+    </div>
+
+    <div class="step">
+        <h3>Risultato: Grafo Visivo con Nodi Composti</h3>
+        <div class="tree-container">
+<span class="node">[src::core]</span> <span class="dim">(Compound Node)</span>
+  <span class="arrow">│</span>
+  <span class="arrow">├──</span> <span class="green">[Veicolo]</span> <span class="dim">← parent: "src::core"</span>
+  <span class="arrow">│</span>      <span class="arrow">↑</span>
+  <span class="arrow">├──</span> <span class="green">[Auto]</span> ── <span class="edge-badge edge-type">UsesFieldType</span> ──┘
+  <span class="arrow">│</span>      <span class="arrow">│</span>
+  <span class="arrow">│</span>      <span class="arrow">└──</span> <span class="edge-badge edge-type">UsesFieldType</span> ──→ <span class="dim">[external::db::Database]</span>
+  <span class="arrow">│</span>
+  <span class="arrow">└──</span> <span class="purple">[calcola()]</span>
+         <span class="edge-badge edge-type">UsesReturnType</span> ──→ Auto
+         <span class="edge-badge edge-behavior">Calls</span> ───────────→ Veicolo
+         <span class="edge-badge edge-behavior">Instantiates</span> ────→ Auto
+
+<span class="green">[User]</span> <span class="dim">(Nodo Top-Level, parent="root" ignorato)</span></div>
+        <p>Nota come le relazioni strutturali (<code>ModuleContainment</code>, <code>NestedIn</code>) non appaiono più come frecce orizzontali, ma come relazioni di annidamento visivo spaziale, ripulendo l'architettura per concentrarsi solo sugli accoppiamenti di tipo e di comportamento.</p>
+    </div>
+
+</body>
+</html>
