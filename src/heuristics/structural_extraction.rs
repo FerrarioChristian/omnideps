@@ -1,7 +1,7 @@
 //! Handles the extraction of macro-level architectural structures from the AST.
 //!
-//! This module focuses on extracting signatures and boundaries of complex entities 
-//! like fields, methods, parameters, and super-types. It heavily utilizes 
+//! This module focuses on extracting signatures and boundaries of complex entities
+//! like fields, methods, parameters, and super-types. It heavily utilizes
 //! recursive traversal patterns to abstract away language-specific syntax trees.
 
 use crate::model::{Field, Function, Parameter, StructuredType, TypeRef};
@@ -12,7 +12,7 @@ use super::type_extraction::extract_type_ref;
 
 /// Recursively abstracts the extraction of a list of items of a generic type `T`.
 ///
-/// It scans the children of the provided node. If a child matches the given parsing 
+/// It scans the children of the provided node. If a child matches the given parsing
 /// logic (`parser`), the item is collected. If it encounters a container node (like `body` or `block`),
 /// it descends into it recursively.
 ///
@@ -29,12 +29,12 @@ where
     for child in node.children(&mut cursor) {
         if let Some(item) = parser(child, source) {
             items.push(item);
-        } else if !crate::heuristics::classifiers::is_function(child) && (
-            child.kind().contains("body")
-            || child.kind().contains("list")
-            || child.kind().contains("block")
-            || child.kind().contains("declaration")
-        ) {
+        } else if !crate::heuristics::classifiers::is_function(child)
+            && (child.kind().contains("body")
+                || child.kind().contains("list")
+                || child.kind().contains("block")
+                || child.kind().contains("declaration"))
+        {
             items.extend(extract_list_of(child, source, parser));
         }
     }
@@ -46,7 +46,12 @@ pub fn extract_fields(node: Node, source: &str) -> Vec<Field> {
     extract_list_of(node, source, |child, src| {
         if matches!(
             child.kind(),
-            "field_declaration" | "property_declaration" | "field" | "member_declaration" | "variable_declarator" | "attribute"
+            "field_declaration"
+                | "property_declaration"
+                | "field"
+                | "member_declaration"
+                | "variable_declarator"
+                | "attribute"
         ) {
             if let Some(name) = extract_identifier(child, src) {
                 let ty = extract_type_ref(child, src);
@@ -64,7 +69,11 @@ pub fn extract_methods(node: Node, source: &str) -> Vec<Function> {
 
 /// Extracts all nested structured types (classes, structs) declared within a given node.
 pub fn extract_nested_types(node: Node, source: &str) -> Vec<StructuredType> {
-    extract_list_of(node, source, crate::heuristics::parsers::try_parse_structured_type)
+    extract_list_of(
+        node,
+        source,
+        crate::heuristics::parsers::try_parse_structured_type,
+    )
 }
 
 /// Extracts formal parameters from a function or method signature.
@@ -101,9 +110,12 @@ pub fn extract_return_type(node: Node, source: &str) -> TypeRef {
     let text = node_text(node, source);
     if let Some(arrow_pos) = text.find("->") {
         let after = text[arrow_pos + 2..].trim();
-        let ret_type: String = after.chars().take_while(|c| c.is_alphanumeric() || *c == '_' || *c == ':').collect();
+        let ret_type: String = after
+            .chars()
+            .take_while(|c| c.is_alphanumeric() || *c == '_' || *c == ':')
+            .collect();
         if !ret_type.is_empty() {
-             return TypeRef::Unresolved(split_qualified_name(&ret_type));
+            return TypeRef::Unresolved(split_qualified_name(&ret_type));
         }
     }
 
@@ -115,12 +127,27 @@ pub fn extract_super_types(node: Node, source: &str) -> Vec<TypeRef> {
     let mut supers = vec![];
     let mut super_nodes = vec![];
 
-    if let Some(n) = node.child_by_field_name("super_type") { super_nodes.push(n); }
-    if let Some(n) = node.child_by_field_name("extends") { super_nodes.push(n); }
-    if let Some(n) = node.child_by_field_name("implements") { super_nodes.push(n); }
-    if let Some(n) = node.child_by_field_name("superclass") { super_nodes.push(n); }
-    if let Some(n) = node.child_by_field_name("interfaces") { super_nodes.push(n); }
-    if let Some(n) = node.child_by_field_name("superclasses") { super_nodes.push(n); }
+    if let Some(n) = node.child_by_field_name("super_type") {
+        super_nodes.push(n);
+    }
+    if let Some(n) = node.child_by_field_name("extends") {
+        super_nodes.push(n);
+    }
+    if let Some(n) = node.child_by_field_name("implements") {
+        super_nodes.push(n);
+    }
+    if let Some(n) = node.child_by_field_name("superclass") {
+        super_nodes.push(n);
+    }
+    if let Some(n) = node.child_by_field_name("interfaces") {
+        super_nodes.push(n);
+    }
+    if let Some(n) = node.child_by_field_name("superclasses") {
+        super_nodes.push(n);
+    }
+    if let Some(n) = node.child_by_field_name("bounds") {
+        super_nodes.push(n);
+    } // trait bounds
 
     let mut cursor = node.walk();
     for child in node.children(&mut cursor) {
@@ -133,12 +160,18 @@ pub fn extract_super_types(node: Node, source: &str) -> Vec<TypeRef> {
         let mut cursor = n.walk();
         for child in n.children(&mut cursor) {
             let kind = child.kind();
-            if matches!(kind, "type_identifier" | "identifier" | "scoped_type_identifier") {
+            if matches!(
+                kind,
+                "type_identifier" | "identifier" | "scoped_type_identifier"
+            ) {
                 supers.push(extract_type_ref(child, source));
             } else if kind == "type_list" {
                 let mut c2 = child.walk();
                 for c3 in child.children(&mut c2) {
-                    if matches!(c3.kind(), "type_identifier" | "identifier" | "scoped_type_identifier") {
+                    if matches!(
+                        c3.kind(),
+                        "type_identifier" | "identifier" | "scoped_type_identifier"
+                    ) {
                         supers.push(extract_type_ref(c3, source));
                     }
                 }
@@ -154,7 +187,7 @@ pub fn extract_impl_for(node: Node, source: &str) -> TypeRef {
     if let Some(type_node) = node.child_by_field_name("type") {
         return extract_type_ref(type_node, source);
     }
-    
+
     // Fallback: If there's no trait, the first type is the target (impl Target).
     // If there is a trait (impl Trait for Target), the second type is the target.
     if let Some(trait_node) = node.child_by_field_name("trait") {
@@ -164,16 +197,21 @@ pub fn extract_impl_for(node: Node, source: &str) -> TypeRef {
         for child in node.children(&mut cursor) {
             if child.id() == trait_node.id() {
                 found_trait = true;
-            } else if found_trait && matches!(child.kind(), "type_identifier" | "scoped_type_identifier" | "identifier") {
+            } else if found_trait
+                && matches!(
+                    child.kind(),
+                    "type_identifier" | "scoped_type_identifier" | "identifier"
+                )
+            {
                 return extract_type_ref(child, source);
             }
         }
     }
-    
+
     extract_type_ref(node, source)
 }
 
-/// Extracts the specific trait or interface being implemented by an implementation block 
+/// Extracts the specific trait or interface being implemented by an implementation block
 /// (e.g. `Trait` in `impl Trait for Target`).
 pub fn extract_implements_trait(node: Node, source: &str) -> Option<TypeRef> {
     if let Some(trait_node) = node.child_by_field_name("trait") {
@@ -192,3 +230,4 @@ pub fn extract_implements_trait(node: Node, source: &str) -> Option<TypeRef> {
     }
     None
 }
+

@@ -5,7 +5,7 @@ use language_agnostic_analyzer::{
     config::AnalyzerConfig,
     language::SupportedLanguage,
     model::{
-        Component, DependencyEdgeKind, DependencyGraph, TestManifest, TestReport, TestReportEdge,
+        Component, DependencyGraph, TestManifest, TestReport, TestReportEdge,
         TestReportNode,
     },
     resolver::primitives::PrimitiveRegistry,
@@ -40,8 +40,9 @@ fn analyze_directory(dir: &std::path::Path, config: &AnalyzerConfig) -> Result<D
         if entry.file_type().is_file() {
             if let Some(lang) = SupportedLanguage::from_path(entry.path()) {
                 if let Ok(source) = fs::read_to_string(entry.path()) {
+                    let rel_path = entry.path().strip_prefix(&src_dir).unwrap_or(entry.path());
                     if let Ok((mut file_modules, file_primitives)) =
-                        parse_source(lang, &source, entry.path(), config)
+                        parse_source(lang, &source, rel_path, config)
                     {
                         all_modules.append(&mut file_modules);
                         combined_primitives.merge(file_primitives);
