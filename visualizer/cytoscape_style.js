@@ -152,6 +152,15 @@ const style = [
 		}
 	},
 	{
+		selector: 'edge[label = "AccessesField"]',
+		style: {
+			'line-color': '#e67e22',
+			'target-arrow-color': '#e67e22',
+			'line-style': 'dashed',
+			'width': 2
+		}
+	},
+	{
 		selector: '.dimmed',
 		style: {
 			'opacity': 0.15

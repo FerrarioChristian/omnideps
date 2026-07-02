@@ -139,6 +139,9 @@
 
         .edge-uses .edge-line { height: 2px; border-top: 2px dotted #95a5a6; background: transparent; opacity: 0.7; }
         .edge-uses .edge-arrow { border-left: 8px solid #95a5a6; opacity: 0.7; }
+
+        .edge-accesses .edge-line { height: 2px; border-top: 2px dashed #e67e22; background: transparent; }
+        .edge-accesses .edge-arrow { border-left: 8px solid #e67e22; }
         
         .interaction-box {
             background: rgba(30, 30, 30, 0.85);
@@ -225,6 +228,16 @@
             <div class="description">
                 <h3>Instantiates (Creazione)</h3>
                 <p>Linea blu tratteggiata. Segnala l'allocazione esplicita in memoria di una Classe o Struct (es. chiamata al costruttore <code>new</code>).</p>
+            </div>
+        </div>
+        <div class="legend-card">
+            <div class="visual-element edge-container edge-accesses">
+                <div class="edge-line"></div>
+                <div class="edge-arrow"></div>
+            </div>
+            <div class="description">
+                <h3>AccessesField (Accesso a Campo)</h3>
+                <p>Linea arancione tratteggiata. Tracciata quando una funzione o metodo tenta di leggere o scrivere un campo dato (es. <code>oggetto.campo</code>).</p>
             </div>
         </div>
         <div class="legend-card">
