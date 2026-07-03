@@ -29,6 +29,14 @@ fn traverse_module_for_edges(
         });
     }
 
+    for import in &m.imports {
+        edges.push(Dependency {
+            from: m.name.clone(),
+            to: import.path.clone(),
+            kind: DependencyEdgeKind::Imports,
+        });
+    }
+
     for st in &m.structured_types {
         edges.push(Dependency {
             from: m.name.clone(),

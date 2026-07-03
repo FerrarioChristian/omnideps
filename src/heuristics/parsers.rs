@@ -136,7 +136,11 @@ pub fn try_parse_import(node: Node, source: &str) -> Option<Import> {
         .or_else(|| node.child_by_field_name("path")) 
         .or_else(|| node.child_by_field_name("module_name"))
     {
-        split_qualified_name(&node_text(p_node, source))
+        let mut p_text = node_text(p_node, source);
+        if p_text.starts_with("crate::") {
+            p_text = p_text.replace("crate::", "");
+        }
+        split_qualified_name(&p_text)
     } else {
         // Fallback for preproc_include or generic imports
         let mut p = vec![];
