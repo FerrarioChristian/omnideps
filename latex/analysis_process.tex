@@ -107,6 +107,20 @@ unificata di tutti i moduli $\vec{\mathcal{M}}$ estratti nel
 Workspace permette all'Indice Globale di tracciare dipendenze
 *cross-file* senza latenza computazionale.
 
+\subsection{Configurazione e Politiche di Risoluzione}
+A causa delle differenze semantiche tra i vari linguaggi supportati, la fase di 
+risoluzione è parametrizzata rispetto a una \textbf{Configurazione} ($\mathcal{K}_{cfg}$). 
+Tale configurazione permette di attivare o disattivare euristiche specifiche per
+emulare le convenzioni di namespace del linguaggio analizzato, senza alterare 
+la logica core dell'esecutore algebrico. La configurazione si articola su tre assi:
+\begin{itemize}
+  \item \textbf{Global Scope Fallback}: Determina se un tipo non trovato nel namespace corrente debba essere cercato nel namespace globale (es. \texttt{root} in Java) o se debba essere considerato non risolto. È cruciale per linguaggi come Java e C++, che ammettono l'uso implicito di entità globali.
+  \item \textbf{Transitive Imports}: Selettore booleano che modella la transitività dei moduli. In linguaggi come C e C++, l'inclusione di un file propaga al modulo corrente anche tutto ciò che tale file ha importato a sua volta (\textit{header propagation}). Se attivato, l'algoritmo di risoluzione naviga ricorsivamente l'albero degli import.
+  \item \textbf{Cyclic MRO Check (Method Resolution Order)}: Modella la tolleranza al ciclo nell'ereditarietà. Linguaggi come C++ permettono gerarchie complesse di ereditarietà multipla, mentre Java la restringe alle sole interfacce. L'esecutore mantiene traccia dei percorsi visitati durante la ricerca di un membro (\textit{find-going-down}) e risolve la MRO effettuando una scansione \textit{Depth-First, Left-to-Right} che, se \texttt{cyclic\_mro\_check} è attivo, previene deadlock computazionali causati da eventuali dipendenze circolari (valide o malformate) tra tipi.
+\end{itemize}
+Attraverso questa mappa di proprietà $\mathcal{K}_{cfg}: \mathcal{L} \to \{0,1\}^3$, 
+il motore di risoluzione $\mathcal{R}$ si specializza mantenendo un design strettamente language-agnostic.
+
 \subsection{Appiattimento (Flattening) dei Blocchi di Implementazione}
 Durante la fase di risoluzione, il sistema applica una trasformazione
 strutturale ai blocchi di implementazione ($\mathcal{B}_{lk}$).
