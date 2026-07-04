@@ -142,6 +142,9 @@
 
         .edge-accesses .edge-line { height: 2px; border-top: 2px dashed #e67e22; background: transparent; }
         .edge-accesses .edge-arrow { border-left: 8px solid #e67e22; }
+
+        .edge-imports .edge-line { height: 2px; background-color: #8e44ad; }
+        .edge-imports .edge-arrow { border-left: 8px solid #8e44ad; }
         
         .interaction-box {
             background: rgba(30, 30, 30, 0.85);
@@ -248,6 +251,16 @@
             <div class="description">
                 <h3>Uses (Dipendenza Strutturale)</h3>
                 <p>Linea grigia sottile e puntinata. Si divide in <code>UsesFieldType</code>, <code>UsesParamType</code>, e <code>UsesReturnType</code>. Indica un accoppiamento leggero: la classe A possiede un parametro, un ritorno o un campo dati di tipo B.</p>
+            </div>
+        </div>
+        <div class="legend-card">
+            <div class="visual-element edge-container edge-imports">
+                <div class="edge-line"></div>
+                <div class="edge-arrow"></div>
+            </div>
+            <div class="description">
+                <h3>Imports (Inclusione)</h3>
+                <p>Linea viola solida. Generata dalle dichiarazioni di importazione/use esplicite a livello di modulo.</p>
             </div>
         </div>
     </div>

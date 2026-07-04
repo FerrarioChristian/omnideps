@@ -161,6 +161,16 @@ const style = [
 		}
 	},
 	{
+		selector: 'edge[label = "Imports"]',
+		style: {
+			'line-color': '#8e44ad',
+			'target-arrow-color': '#8e44ad',
+			'line-style': 'solid',
+			'width': 2,
+			'opacity': 0.8
+		}
+	},
+	{
 		selector: '.dimmed',
 		style: {
 			'opacity': 0.15
