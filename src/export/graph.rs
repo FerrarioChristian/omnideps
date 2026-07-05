@@ -64,6 +64,16 @@ fn traverse_structured_type_edges(st: &StructuredType, edges: &mut Vec<Dependenc
     add_super_edges(st, edges);
     add_field_edges(st, edges);
 
+    for f in &st.fields {
+        let mut f_name = st.name.clone();
+        f_name.push(f.name.clone());
+        edges.push(Dependency {
+            from: st.name.clone(),
+            to: f_name,
+            kind: DependencyEdgeKind::NestedIn,
+        });
+    }
+
     for m in &st.methods {
         edges.push(Dependency {
             from: st.name.clone(),
@@ -199,6 +209,11 @@ fn flatten_modules(modules: &[Module]) -> Vec<Component> {
 
 fn flatten_structured_type(st: &StructuredType) -> Vec<Component> {
     let mut flat = vec![Component::StructuredType(st.clone())];
+    for f in &st.fields {
+        let mut f_name = st.name.clone();
+        f_name.push(f.name.clone());
+        flat.push(Component::Field(f_name, f.ty.clone()));
+    }
     flat.extend(st.methods.iter().cloned().map(Component::Function));
     for nested in &st.nested_types {
         flat.extend(flatten_structured_type(nested));

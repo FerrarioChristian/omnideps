@@ -116,4 +116,5 @@ pub enum Component {
     Module(Module),
     StructuredType(StructuredType),
     Function(Function),
+    Field(QualifiedName, TypeRef),
 }

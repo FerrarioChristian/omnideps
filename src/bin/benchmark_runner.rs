@@ -72,6 +72,7 @@ fn verify_graph_adherence(graph: &DependencyGraph, manifest: &TestManifest) -> T
             Component::Module(m) => flatten_name(&m.name),
             Component::StructuredType(s) => flatten_name(&s.name),
             Component::Function(f) => flatten_name(&f.name),
+            Component::Field(name, _) => flatten_name(name),
         };
         // Some nodes like roots might be prefixed or not depending on config, but let's try direct matches
         nodes_map.insert(name, node);
@@ -97,8 +98,9 @@ fn verify_graph_adherence(graph: &DependencyGraph, manifest: &TestManifest) -> T
         let actual_kind = if exists {
             match nodes_map.get(&node.name).unwrap() {
                 Component::Module(_) => "Module".to_string(),
-                Component::StructuredType(_) => "StructuredType".to_string(),
+                Component::StructuredType(st) => format!("{:?}", st.kind),
                 Component::Function(_) => "Function".to_string(),
+                Component::Field(_, _) => "Field".to_string(),
             }
         } else {
             "-".to_string()

@@ -92,6 +92,12 @@ pub fn export_graphs(graphs: &[DependencyGraph], out_path: &Path) -> anyhow::Res
                     let parent = get_parent_id(&f.name);
                     add_node(&mut elements, &mut added_nodes, id, label, "Function".to_string(), parent);
                 }
+                Component::Field(name, _ty) => {
+                    let id = qn_to_id(name);
+                    let label = name.last().cloned().unwrap_or_else(|| "".to_string());
+                    let parent = get_parent_id(name);
+                    add_node(&mut elements, &mut added_nodes, id, label, "Field".to_string(), parent);
+                }
             }
         }
 
