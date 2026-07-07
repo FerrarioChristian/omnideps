@@ -40,7 +40,6 @@ pub fn is_structured_type(node: Node) -> bool {
         && !kind.contains("reference")
         && !kind.contains("body")
         && !kind.contains("mod")
-        && !kind.contains("variant")
         && !kind.contains("super")
         && !kind.contains("base")
         && !kind.contains("constructor")

@@ -19,6 +19,8 @@ pub enum StructuredTypeKind {
     Struct,
     Interface,
     Trait,
+    Enum,
+    EnumVariant,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize)]

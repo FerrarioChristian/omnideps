@@ -198,17 +198,28 @@ eventuale alias, e un flag per indicare l'inclusione \textit{wildcard}.
 Ogni elemento del software è quindi un nodo in un albero di
 componenti $T \in \mathcal{D}_{IR}$.
 
-\section{Grafo delle Dipendenze $\mathcal{G}$}
-Il risultato finale dell'analisi è un grafo orientato $\mathcal{G} = (V, E)$.
-L'insieme dei vertici $V$ è l'insieme di tutti i componenti
-identificati nel sistema:
-$$V = \{ c \mid c \in \mathcal{C} \}$$
-L'insieme degli archi $E$ rappresenta le relazioni semantiche e
-strutturali tra i componenti stessi. Formalmente, un arco è una
-tripla definita sul prodotto cartesiano dei vertici:
-$$E \subseteq \mathcal{C} \times \mathcal{C} \times \text{Kind}$$
-dove $\text{Kind}$ definisce la semantica della dipendenza
-(ereditarietà, uso di tipo nei campi, parametri di metodi,
-implementazione di trait, ecc.).
+\section{Configurazione dell'Analizzatore ($\mathcal{K}_{cfg}$)}
+Per garantire flessibilità nell'adattamento ai diversi ecosistemi linguistici e alle diverse precisioni richieste, l'analizzatore supporta un modello di configurazione parametrico:
+$$\mathcal{K}_{cfg} = \langle \text{ResolutionStrategy}, \text{IncludeOrphans} \rangle$$
+dove:
+\begin{itemize}
+    \item \textbf{ResolutionStrategy} definisce la strategia di risoluzione dei nomi adottata dall'Executor (es. ricerca puramente lessicale nello scope corrente, ricerca nel namespace globale, o euristiche parziali basate su suffissi).
+    \item \textbf{IncludeOrphans} definisce le regole per il filtraggio e l'inclusione nel grafo finale per i nodi privi di dipendenze entranti o uscenti, permettendo di limitare il rumore visivo.
+\end{itemize}
+
+\section{Costruzione del Grafo e Trait Bounds}
+Il processo finale di costruzione del grafo delle dipendenze $\mathcal{G} = (V, E)$ avviene tramite un'operazione di \textit{flattening} dell'albero gerarchico dei moduli $T$.
+
+\subsection{Flattening e Nodi}
+L'albero dei moduli $\mathcal{M}$ viene ispezionato ricorsivamente. Ogni tipo strutturato $\mathcal{S}$ e funzione $\mathcal{F}$ estratta viene promossa a vertice in $V$. I tipi strutturati annidati $\vec{\mathcal{S}}_{nest}$ (inclusi i campi interni di enumeratori, ovvero \textit{enum varianti}) vengono appiattiti in vertici indipendenti ed equipaggiati del proprio namespace qualificato ereditato dal padre.
+
+\subsection{Archi e Trait Bounds}
+Gli archi orientati $E \subseteq V \times V \times \text{Kind}$ vengono estratti mappando le relazioni $\tau$ risolte ai rispettivi componenti target:
+\begin{itemize}
+    \item \textbf{ModuleContainment e NestedIn}: Derivano strutturalmente dalla posizione gerarchica e legano i figli ai rispettivi contenitori o tipi padre.
+    \item \textbf{Trait Bounds e Implementazioni}: I costrutti \textit{Trait} e i \textit{Trait Bounds} sui parametri generici vengono convertiti in dipendenze strutturali. I blocchi di implementazione temporanei $\mathcal{B}_{lk}$ generano archi di tipo \textit{Implements} dal tipo \textit{target} $\tau$ verso le interfacce o trait implementati, per poi collassare e trasferire le proprie funzioni come metodi del \textit{target}.
+    \item \textbf{Imports}: Esplicitano le dichiarazioni dirette di utilizzo di altri componenti o moduli esterni.
+    \item \textbf{Relazioni Comportamentali}: Generati dai blocchi interni $\mathcal{B}$, includono \textit{AccessesField}, \textit{Instantiates}, e \textit{Calls}, modellando accuratamente i flussi di invocazione, la creazione di istanze e l'accesso in memoria.
+\end{itemize}
 
 \includegraphics[width=\textwidth]{images/mermaid-diagram-guest-low.pnga

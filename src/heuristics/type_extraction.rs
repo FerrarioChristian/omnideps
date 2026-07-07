@@ -22,6 +22,10 @@ pub fn determine_structured_kind(kind: &str, text: &str) -> StructuredTypeKind {
         StructuredTypeKind::Trait
     } else if kind.contains("struct") || text.contains("struct") {
         StructuredTypeKind::Struct
+    } else if kind.contains("enum_variant") {
+        StructuredTypeKind::EnumVariant
+    } else if kind.contains("enum") || text.contains("enum") {
+        StructuredTypeKind::Enum
     } else {
         StructuredTypeKind::Class
     }

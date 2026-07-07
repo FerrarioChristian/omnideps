@@ -16,7 +16,6 @@ pub fn generic_extract(lang: Language, source: &str, lang_name: &str, file_path:
     let mut cursor = root.walk();
     for child in root.children(&mut cursor) {
         if let Some(pkg) = crate::heuristics::parsers::try_parse_package_declaration(child, source) {
-            println!("Found package: {:?}", pkg);
             package_path = Some(pkg);
             break;
         }
