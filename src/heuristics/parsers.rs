@@ -73,7 +73,11 @@ pub fn try_parse_function(node: Node, source: &str) -> Option<Function> {
         return None;
     }
 
-    let name = extract_identifier(node, source).unwrap_or_else(|| "unnamed_function".to_string());
+    let mut name =
+        extract_identifier(node, source).unwrap_or_else(|| "unnamed_function".to_string());
+    if node.kind().contains("constructor") {
+        name = "<constructor>".to_string();
+    }
     let parameters = extract_parameters(node, source);
     let return_type = extract_return_type(node, source);
 
