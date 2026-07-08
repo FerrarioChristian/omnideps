@@ -3,7 +3,7 @@ use tree_sitter::Language;
 
 /// Extracts the basic Intermediate Representation (IR) modules from a source file given its Tree-sitter Language.
 /// It parses the source code into an AST and delegates node matching to the heuristics dispatcher.
-pub fn generic_extract(lang: Language, source: &str, lang_name: &str, file_path: Option<String>) -> anyhow::Result<(Vec<Module>, Option<Vec<String>>)> {
+pub fn generic_extract(lang: Language, source: &str, lang_name: &str, file_path: Option<String>, config: &crate::config::AnalyzerConfig) -> anyhow::Result<(Vec<Module>, Option<Vec<String>>)> {
     let mut parser = tree_sitter::Parser::new();
     parser.set_language(&lang).unwrap();
 
@@ -22,15 +22,15 @@ pub fn generic_extract(lang: Language, source: &str, lang_name: &str, file_path:
     }
 
     let mut modules = vec![];
-    walk_cst(root, source, &mut modules, lang_name, file_path);
+    walk_cst(root, source, &mut modules, lang_name, file_path, config);
     Ok((modules, package_path))
 }
 
 /// Recursively traverses the Concrete Syntax Tree (CST).
 /// When a recognized component is found, it's added to the IR and the recursion stops for that branch
 /// to prevent duplicating internal methods/functions as top-level components.
-fn walk_cst(node: tree_sitter::Node, source: &str, modules: &mut Vec<Module>, lang_name: &str, file_path: Option<String>) {
-    if let Some(comp) = crate::heuristics::dispatch_node(node, source) {
+fn walk_cst(node: tree_sitter::Node, source: &str, modules: &mut Vec<Module>, lang_name: &str, file_path: Option<String>, config: &crate::config::AnalyzerConfig) {
+    if let Some(comp) = crate::heuristics::dispatch_node(node, source, lang_name, config) {
         if modules.is_empty() {
             modules.push(Module {
                 name: vec!["root".to_string()],
@@ -50,7 +50,7 @@ fn walk_cst(node: tree_sitter::Node, source: &str, modules: &mut Vec<Module>, la
                 let mut cursor = node.walk();
                 let mut new_modules = vec![m];
                 for child in node.children(&mut cursor) {
-                    walk_cst(child, source, &mut new_modules, lang_name, file_path.clone());
+                    walk_cst(child, source, &mut new_modules, lang_name, file_path.clone(), config);
                 }
                 // The new module is now populated (it is located at new_modules[0])
                 modules[0].sub_modules.push(new_modules.remove(0));
@@ -61,7 +61,7 @@ fn walk_cst(node: tree_sitter::Node, source: &str, modules: &mut Vec<Module>, la
                 let mut cursor = node.walk();
                 for child in node.children(&mut cursor) {
                     if child.kind().contains("body") || child.kind().contains("block") {
-                        walk_cst(child, source, modules, lang_name, file_path.clone());
+                        walk_cst(child, source, modules, lang_name, file_path.clone(), config);
                     }
                 }
             }
@@ -76,7 +76,7 @@ fn walk_cst(node: tree_sitter::Node, source: &str, modules: &mut Vec<Module>, la
 
     let mut cursor = node.walk();
     for child in node.children(&mut cursor) {
-        walk_cst(child, source, modules, lang_name, file_path.clone());
+        walk_cst(child, source, modules, lang_name, file_path.clone(), config);
     }
 }
 
@@ -91,7 +91,7 @@ pub fn parse_source(
     config: &crate::config::AnalyzerConfig,
 ) -> anyhow::Result<(Vec<Module>, PrimitiveRegistry)> {
     let file_path_str = path.to_string_lossy().to_string();
-    let (mut modules, package_path) = generic_extract(lang.to_tree_sitter_lang(), source, lang.name(), Some(file_path_str.clone()))?;
+    let (mut modules, package_path) = generic_extract(lang.to_tree_sitter_lang(), source, lang.name(), Some(file_path_str.clone()), config)?;
     
     let lang_config = config.get_for(lang.name());
     

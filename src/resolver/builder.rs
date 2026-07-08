@@ -5,10 +5,11 @@ use super::stack::SymbolStack;
 /// Context for the Query Building phase (Lexical Substitution).
 pub struct BuilderContext<'a> {
     pub stack: &'a RefCell<SymbolStack>,
+    pub config: &'a crate::config::AnalyzerConfig,
 }
 
 /// Transforms Unresolved references into mathematical Queries using Lexical Substitution.
-pub fn build_queries(modules: Vec<Module>) -> Vec<Module> {
+pub fn build_queries(modules: Vec<Module>, config: &crate::config::AnalyzerConfig) -> Vec<Module> {
     let stack = RefCell::new(SymbolStack::new());
     
     // We push the GLOBAL ROOT frame
@@ -16,18 +17,22 @@ pub fn build_queries(modules: Vec<Module>) -> Vec<Module> {
 
     let ctx = BuilderContext {
         stack: &stack,
+        config,
     };
 
     let processed_modules = modules
         .into_iter()
-        .map(|m| build_module_queries(&ctx, m))
+        .map(|m| {
+            let lang = m.language.clone();
+            build_module_queries(&ctx, lang, m)
+        })
         .collect();
 
     stack.borrow_mut().pop_scope();
     processed_modules
 }
 
-fn build_module_queries(ctx: &BuilderContext, mut module: Module) -> Module {
+fn build_module_queries(ctx: &BuilderContext, current_lang: Option<String>, mut module: Module) -> Module {
     ctx.stack.borrow_mut().push_scope();
 
     // 1. Hoist imports as substitutions?
@@ -36,22 +41,25 @@ fn build_module_queries(ctx: &BuilderContext, mut module: Module) -> Module {
     // But local variables MUST be registered.
     // What about `self` and `this`? They are just local symbols pointing to the current class.
     
-    module.structured_types = module.structured_types.into_iter().map(|st| build_structured_type_queries(ctx, st)).collect();
+    module.structured_types = module.structured_types.into_iter().map(|st| build_structured_type_queries(ctx, current_lang.clone(), st)).collect();
     module.free_functions = module.free_functions.into_iter().map(|ff| build_function_queries(ctx, ff)).collect();
-    module.impl_blocks = module.impl_blocks.into_iter().map(|ib| build_impl_block_queries(ctx, ib)).collect();
-    module.sub_modules = module.sub_modules.into_iter().map(|sub| build_module_queries(ctx, sub)).collect();
+    module.impl_blocks = module.impl_blocks.into_iter().map(|ib| build_impl_block_queries(ctx, current_lang.clone(), ib)).collect();
+    module.sub_modules = module.sub_modules.into_iter().map(|sub| {
+        let lang = sub.language.clone().or(current_lang.clone());
+        build_module_queries(ctx, lang, sub)
+    }).collect();
 
     ctx.stack.borrow_mut().pop_scope();
     module
 }
 
-fn build_structured_type_queries(ctx: &BuilderContext, mut st: StructuredType) -> StructuredType {
+fn build_structured_type_queries(ctx: &BuilderContext, current_lang: Option<String>, mut st: StructuredType) -> StructuredType {
     ctx.stack.borrow_mut().push_scope();
     
-    // Inject self and this
+    // Inject self keyword according to language configuration
     let self_query = Query::Find(st.name.last().unwrap_or(&"".to_string()).clone());
-    ctx.stack.borrow_mut().define_symbol("self".to_string(), self_query.clone());
-    ctx.stack.borrow_mut().define_symbol("this".to_string(), self_query);
+    let lang_config = ctx.config.get_for(current_lang.as_deref().unwrap_or(""));
+    ctx.stack.borrow_mut().define_symbol(lang_config.self_keyword.clone(), self_query);
 
     st.super_types = st.super_types.into_iter().map(|t| substitute_type(ctx, t, false)).collect();
     st.fields = st.fields.into_iter().map(|mut f| {
@@ -59,7 +67,7 @@ fn build_structured_type_queries(ctx: &BuilderContext, mut st: StructuredType) -
         f
     }).collect();
     st.methods = st.methods.into_iter().map(|m| build_function_queries(ctx, m)).collect();
-    st.nested_types = st.nested_types.into_iter().map(|n| build_structured_type_queries(ctx, n)).collect();
+    st.nested_types = st.nested_types.into_iter().map(|n| build_structured_type_queries(ctx, current_lang.clone(), n)).collect();
 
     ctx.stack.borrow_mut().pop_scope();
     st
@@ -107,17 +115,17 @@ fn build_block_queries(ctx: &BuilderContext, mut block: Block) -> Block {
     block
 }
 
-fn build_impl_block_queries(ctx: &BuilderContext, mut ib: ImplBlock) -> ImplBlock {
+fn build_impl_block_queries(ctx: &BuilderContext, current_lang: Option<String>, mut ib: ImplBlock) -> ImplBlock {
     ctx.stack.borrow_mut().push_scope();
 
     ib.impl_for = substitute_type(ctx, ib.impl_for, false);
     if let TypeRef::ResolutionQuery(ref q) = ib.impl_for {
-        ctx.stack.borrow_mut().define_symbol("self".to_string(), q.clone());
-        ctx.stack.borrow_mut().define_symbol("this".to_string(), q.clone());
+        let lang_config = ctx.config.get_for(current_lang.as_deref().unwrap_or(""));
+        ctx.stack.borrow_mut().define_symbol(lang_config.self_keyword.clone(), q.clone());
     }
     ib.implements_trait = ib.implements_trait.map(|t| substitute_type(ctx, t, false));
     ib.methods = ib.methods.into_iter().map(|m| build_function_queries(ctx, m)).collect();
-    ib.nested_types = ib.nested_types.into_iter().map(|n| build_structured_type_queries(ctx, n)).collect();
+    ib.nested_types = ib.nested_types.into_iter().map(|n| build_structured_type_queries(ctx, current_lang.clone(), n)).collect();
 
     ctx.stack.borrow_mut().pop_scope();
     ib
