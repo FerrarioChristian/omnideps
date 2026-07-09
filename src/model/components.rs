@@ -62,6 +62,7 @@ pub struct Function {
     pub name: QualifiedName,
     pub signature: Signature,
     pub body: Option<Block>,
+    pub is_constructor: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
