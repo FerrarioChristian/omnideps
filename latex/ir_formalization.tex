@@ -203,7 +203,7 @@ Per garantire flessibilità nell'adattamento ai diversi ecosistemi
 linguistici e alle diverse precisioni richieste, l'analizzatore
 supporta un modello di configurazione parametrico:
 $$\mathcal{K}_{cfg} = \langle \text{ModuleStrategy},
-\text{TransitiveImports}, \text{CyclicMROCheck},
+\text{TransitiveImports},
 \text{SupportImplBlocks}, \text{SelfKeyword} \rangle$$
 dove:
 \begin{itemize}
@@ -212,8 +212,7 @@ dove:
     statement di package).
   \item \textbf{TransitiveImports} indica se le importazioni
     esportano transitivamente i propri membri (es. Python).
-  \item \textbf{CyclicMROCheck} abilita o disabilita il controllo dei
-    cicli nella Method Resolution Order.
+
   \item \textbf{SupportImplBlocks} determina se il linguaggio
     supporta l'estrazione di blocchi di implementazione scorporati
     dalla dichiarazione del tipo strutturato.
@@ -227,19 +226,19 @@ configurazione per i principali linguaggi supportati:
 
 \begin{table}[h]
   \centering
-  \begin{tabular}{|l|c|c|c|c|c|}
+  \begin{tabular}{|l|c|c|c|c|}
     \hline
     \textbf{Linguaggio} & \textbf{ModuleStrategy} &
-    \textbf{TransitiveImports} & \textbf{CyclicMRO} &
+    \textbf{TransitiveImports} &
     \textbf{ImplBlocks} & \textbf{SelfKeyword} \\ \hline
-    \textbf{Java} & PackageBased & False & True & False &
+    \textbf{Java} & PackageBased & False & False &
     \texttt{this} \\ \hline
-    \textbf{Rust} & DirectoryBased & False & True & True &
+    \textbf{Rust} & DirectoryBased & False & True &
     \texttt{self} \\ \hline
-    \textbf{Python} & DirectoryBased & True & True & False &
+    \textbf{Python} & DirectoryBased & True & False &
     \texttt{self} \\ \hline
-    \textbf{C++} & PackageBased & False & True & True & \texttt{this} \\ \hline
-    \textbf{C} & PackageBased & False & True & False & \texttt{this} \\ \hline
+    \textbf{C++} & PackageBased & False & True & \texttt{this} \\ \hline
+    \textbf{C} & PackageBased & False & False & \texttt{this} \\ \hline
   \end{tabular}
   \caption{Profili di configurazione dei linguaggi implementati}
 \end{table}
