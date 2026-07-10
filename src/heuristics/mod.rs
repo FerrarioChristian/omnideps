@@ -19,8 +19,10 @@ pub fn dispatch_node(node: Node, source: &str, lang_name: &str, config: &crate::
     if let Some(import) = parsers::try_parse_import(node, source) {
         return Some(ParsedItem::Import(import));
     }
-    if let Some(m) = parsers::try_parse_module_node(node, source) {
-        return Some(ParsedItem::Component(Component::Module(m)));
+    if config.get_for(lang_name).modules.inline_module_blocks {
+        if let Some(m) = parsers::try_parse_module_node(node, source) {
+            return Some(ParsedItem::Component(Component::Module(m)));
+        }
     }
     if let Some(st) = parsers::try_parse_structured_type(node, source) {
         return Some(ParsedItem::Component(Component::StructuredType(st)));

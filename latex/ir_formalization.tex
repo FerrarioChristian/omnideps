@@ -202,14 +202,14 @@ componenti $T \in \mathcal{D}_{IR}$.
 Per garantire flessibilità nell'adattamento ai diversi ecosistemi
 linguistici e alle diverse precisioni richieste, l'analizzatore
 supporta un modello di configurazione parametrico:
-$$\mathcal{K}_{cfg} = \langle \text{ModuleStrategy},
+$$\mathcal{K}_{cfg} = \langle \text{ModuleConfig},
 \text{TransitiveImports},
 \text{SupportImplBlocks}, \text{SelfKeyword} \rangle$$
 dove:
 \begin{itemize}
-  \item \textbf{ModuleStrategy} definisce la convenzione di
-    risoluzione dei moduli (es. bastato su directory, o basato su
-    statement di package).
+  \item \textbf{ModuleConfig} modella le regole di raggruppamento
+    logico ed è composto da tre dimensioni ortogonali:
+    $\langle \text{ImplicitFile}, \text{FileDecl}, \text{InlineBlocks} \rangle$.
   \item \textbf{TransitiveImports} indica se le importazioni
     esportano transitivamente i propri membri (es. Python).
 
@@ -228,19 +228,32 @@ configurazione per i principali linguaggi supportati:
   \centering
   \begin{tabular}{|l|c|c|c|c|}
     \hline
-    \textbf{Linguaggio} & \textbf{ModuleStrategy} &
-    \textbf{TransitiveImports} &
+    \textbf{Linguaggio} & \textbf{TransitiveImports} &
     \textbf{ImplBlocks} & \textbf{SelfKeyword} \\ \hline
-    \textbf{Java} & PackageBased & False & False &
+    \textbf{Java} & False & False &
     \texttt{this} \\ \hline
-    \textbf{Rust} & DirectoryBased & False & True &
+    \textbf{Rust} & False & True &
     \texttt{self} \\ \hline
-    \textbf{Python} & DirectoryBased & True & False &
+    \textbf{Python} & True & False &
     \texttt{self} \\ \hline
-    \textbf{C++} & PackageBased & False & True & \texttt{this} \\ \hline
-    \textbf{C} & PackageBased & False & False & \texttt{this} \\ \hline
+    \textbf{C++} & False & True & \texttt{this} \\ \hline
+    \textbf{C} & False & False & \texttt{this} \\ \hline
   \end{tabular}
   \caption{Profili di configurazione dei linguaggi implementati}
+\end{table}
+
+\begin{table}[h]
+  \centering
+  \begin{tabular}{|l|c|c|c|}
+    \hline
+    \textbf{Linguaggio} & \textbf{ImplicitFile} & \textbf{FileDecl} & \textbf{InlineBlocks} \\ \hline
+    \textbf{Java} & False & True & False \\ \hline
+    \textbf{Rust} & True & False & True \\ \hline
+    \textbf{Python} & True & False & False \\ \hline
+    \textbf{C++} & False & False & True \\ \hline
+    \textbf{C} & False & False & False \\ \hline
+  \end{tabular}
+  \caption{Dettaglio di ModuleConfig per i linguaggi supportati}
 \end{table}
 
 \section{Costruzione del Grafo e Trait Bounds}

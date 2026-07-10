@@ -13,11 +13,13 @@ pub fn generic_extract(lang: Language, source: &str, lang_name: &str, file_path:
     let root = tree.root_node();
 
     let mut package_path = None;
-    let mut cursor = root.walk();
-    for child in root.children(&mut cursor) {
-        if let Some(pkg) = crate::heuristics::parsers::try_parse_package_declaration(child, source) {
-            package_path = Some(pkg);
-            break;
+    if config.get_for(lang_name).modules.file_level_declarations {
+        let mut cursor = root.walk();
+        for child in root.children(&mut cursor) {
+            if let Some(pkg) = crate::heuristics::parsers::try_parse_package_declaration(child, source) {
+                package_path = Some(pkg);
+                break;
+            }
         }
     }
 
@@ -95,17 +97,11 @@ pub fn parse_source(
     
     let lang_config = config.get_for(lang.name());
     
-    match lang_config.module_strategy {
-        crate::config::ModuleStrategy::DirectoryBased => {
-            apply_directory_strategy(&mut modules, path, &file_path_str, lang.name());
-        },
-        crate::config::ModuleStrategy::PackageBased => {
-            if let Some(pkg_path) = package_path {
-                apply_package_strategy(&mut modules, pkg_path, &file_path_str, lang.name());
-            }
-        },
-        crate::config::ModuleStrategy::SingleRoot => {
-            // Keep as is, everything stays in root
+    if lang_config.modules.implicit_file_modules {
+        apply_directory_strategy(&mut modules, path, &file_path_str, lang.name());
+    } else if lang_config.modules.file_level_declarations {
+        if let Some(pkg_path) = package_path {
+            apply_package_strategy(&mut modules, pkg_path, &file_path_str, lang.name());
         }
     }
 
