@@ -52,6 +52,11 @@ impl GlobalRegistry {
             ff_prefix.extend(ff.name.clone());
             self.paths.insert(ff_prefix, RegistryEntry::Function { return_type: ff.signature.return_type.clone(), is_constructor: ff.is_constructor });
         }
+        for fv in &m.free_variables {
+            let mut fv_prefix = prefix.clone();
+            fv_prefix.push(fv.name.clone());
+            self.paths.insert(fv_prefix, RegistryEntry::Field { field_type: fv.ty.clone() });
+        }
         for ib in &m.impl_blocks {
             // Register ImplBlock methods and nested types
             let target_name = match &ib.impl_for {

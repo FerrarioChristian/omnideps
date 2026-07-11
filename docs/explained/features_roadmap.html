@@ -273,16 +273,16 @@ User() // Python</pre>
             <td>-</td>
         </tr>
         <tr>
-            <td>Accesso Statico</td>
-            <td><span class="status-partial">Parz</span></td>
+            <td>Accesso Statico / Variabili Globali</td>
+            <td><span class="status-yes">Sì</span></td>
             <td>
                 <pre>Math.PI;
-System.out;</pre>
+static STATIC_SA: StructA;</pre>
             </td>
             <td>
-                <div class="implementation-idea"><strong>Idea di implementazione:</strong> Estendere <code>find_behavioral_deps</code> per catturare i nodi di tipo <code>member_access</code> o <code>scoped_identifier</code> *anche* fuori dalle espressioni di chiamata. Il prefisso (es. `Math`) andrebbe salvato in un nuovo array <code>accesses</code> in <code>Block</code>, e risolto dal builder in un arco <code>AccessesStatic</code>.</div>
+                Estrazione come <span class="ir-node">Field</span> associato al modulo padre. Nel momento dell'uso, il risolutore le intercetta nell'Indice Globale e le collega. I token_tree macro (come <code>println!</code> in Rust) sono correttamente decostruiti.
             </td>
-            <td>-</td>
+            <td><span class="function-ref">extract_free_variables</span>, <span class="function-ref">find_behavioral_deps</span></td>
         </tr>
         <tr>
             <td>Enum Usage</td>

@@ -43,6 +43,7 @@ fn walk_cst(node: tree_sitter::Node, source: &str, modules: &mut Vec<Module>, la
                 structured_types: vec![],
                 free_functions: vec![],
                 impl_blocks: vec![],
+                free_variables: vec![],
             });
         }
         
@@ -67,8 +68,10 @@ fn walk_cst(node: tree_sitter::Node, source: &str, modules: &mut Vec<Module>, la
                     }
                 }
             }
-            crate::heuristics::ParsedItem::Component(crate::model::Component::Field(_, _)) => {
-                // Fields are already extracted as part of StructuredType, skip them here
+            crate::heuristics::ParsedItem::Component(crate::model::Component::Field(name, ty)) => {
+                if let Some(n) = name.last() {
+                    modules[0].free_variables.push(crate::model::Field { name: n.clone(), ty });
+                }
             }
             crate::heuristics::ParsedItem::ImplBlock(ib) => modules[0].impl_blocks.push(ib),
             crate::heuristics::ParsedItem::Import(i) => modules[0].imports.push(i),
@@ -142,6 +145,7 @@ fn apply_directory_strategy(modules: &mut Vec<Module>, path: &std::path::Path, f
                 structured_types: vec![],
                 free_functions: vec![],
                 impl_blocks: vec![],
+                free_variables: vec![],
             };
             current = outer;
         }
@@ -155,6 +159,7 @@ fn apply_directory_strategy(modules: &mut Vec<Module>, path: &std::path::Path, f
             structured_types: vec![],
             free_functions: vec![],
             impl_blocks: vec![],
+            free_variables: vec![],
         };
         modules.push(global_root);
     }
@@ -178,6 +183,7 @@ fn apply_package_strategy(modules: &mut Vec<Module>, package_path: Vec<String>, 
         structured_types: content_module.structured_types,
         free_functions: content_module.free_functions,
         impl_blocks: content_module.impl_blocks,
+        free_variables: content_module.free_variables,
     };
 
     // Wrap in outer packages
@@ -191,6 +197,7 @@ fn apply_package_strategy(modules: &mut Vec<Module>, package_path: Vec<String>, 
             structured_types: vec![],
             free_functions: vec![],
             impl_blocks: vec![],
+            free_variables: vec![],
         };
         current = outer;
     }
@@ -205,6 +212,7 @@ fn apply_package_strategy(modules: &mut Vec<Module>, package_path: Vec<String>, 
         structured_types: vec![],
         free_functions: vec![],
         impl_blocks: vec![],
+        free_variables: vec![],
     };
     modules.push(global_root);
 }

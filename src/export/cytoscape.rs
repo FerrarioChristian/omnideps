@@ -67,6 +67,16 @@ pub fn export_graphs(graphs: &[DependencyGraph], out_path: &Path) -> anyhow::Res
     };
 
     for graph in graphs {
+        // Build a map of node types to determine parent types
+        let mut parent_types = std::collections::HashMap::new();
+        for node in &graph.nodes {
+            match node {
+                Component::Module(m) => { parent_types.insert(qn_to_id(&m.name), "Module"); }
+                Component::StructuredType(st) => { parent_types.insert(qn_to_id(&st.name), "Struct"); }
+                _ => {}
+            }
+        }
+
         // 1. Export nodes
         for node in &graph.nodes {
             match node {
@@ -97,7 +107,14 @@ pub fn export_graphs(graphs: &[DependencyGraph], out_path: &Path) -> anyhow::Res
                     let id = qn_to_id(name);
                     let label = name.last().cloned().unwrap_or_else(|| "".to_string());
                     let parent = get_parent_id(name);
-                    add_node(&mut elements, &mut added_nodes, id, label, "Field".to_string(), parent);
+                    let parent_type = parent.as_ref().and_then(|p| parent_types.get(p)).copied().unwrap_or("Unknown");
+                    
+                    let ty_str = if parent_type == "Module" {
+                        "StaticVariable".to_string()
+                    } else {
+                        "StructField".to_string()
+                    };
+                    add_node(&mut elements, &mut added_nodes, id, label, ty_str, parent);
                 }
             }
         }

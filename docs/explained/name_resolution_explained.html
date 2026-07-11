@@ -619,9 +619,10 @@ block.instantiates = block.instantiates.into_iter().map(|i| substitute_type(ctx,
     <h3>6.2 Perché <code>HashMap&lt;QN, RegistryEntry&gt;</code> e Non <code>HashSet&lt;QN&gt;</code></h3>
     <p>La v2 usava un <code>HashSet&lt;QualifiedName&gt;</code> — solo esistenza, nessuna informazione sul tipo. Questo era sufficiente per la risoluzione base ma impediva l'inferenza di tipo per le catene di chiamate.</p>
     <pre><code>pub enum RegistryEntry {
-    Module,
-    StructuredType,
-    Function { return_type: TypeRef },  // ← Questo abilita Call(Q) + resolve_call_return
+    Module { imports: Vec&lt;Import&gt; },
+    StructuredType { super_types: Vec&lt;TypeRef&gt; },
+    Function { return_type: TypeRef, is_constructor: bool },
+    Field { field_type: TypeRef },
 }</code></pre>
     <p><strong>Perché salvare il <code>return_type</code>?</strong> Quando l'Executor incontra <code>Call(Extract(Find("Auto"), "calcola"))</code> con <code>resolve_call_return = true</code>, deve sapere cosa restituisce <code>calcola()</code>. Chiama <code>registry.get(["root","core","calcola"])</code> e legge <code>RegistryEntry::Function { return_type: ResolutionQuery(Find("Auto")) }</code>. Poi valuta ricorsivamente <code>Find("Auto")</code> per ottenere il tipo di ritorno assoluto.</p>
 

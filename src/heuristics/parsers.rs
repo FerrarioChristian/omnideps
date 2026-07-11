@@ -22,6 +22,7 @@ pub fn try_parse_module_node(node: Node, source: &str) -> Option<Module> {
         structured_types: vec![],
         free_functions: vec![],
         impl_blocks: vec![],
+        free_variables: vec![],
     })
 }
 
@@ -197,6 +198,19 @@ pub fn try_parse_import(node: Node, source: &str) -> Option<Import> {
         alias,
         is_wildcard,
     })
+}
+
+pub fn try_parse_free_variable(node: Node, source: &str) -> Option<crate::model::Field> {
+    if !is_free_variable(node) {
+        return None;
+    }
+
+    if let Some(name) = extract_identifier(node, source) {
+        let ty = extract_type_ref(node, source);
+        return Some(crate::model::Field { name, ty });
+    }
+
+    None
 }
 
 #[cfg(test)]

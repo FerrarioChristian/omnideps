@@ -182,7 +182,7 @@ disgiunta (sum type) dei costrutti strutturali definitivi del
 sistema. Ogni componente rappresenta l'unità logica che può comparire
 come vertice nel grafo delle dipendenze:
 $$\mathcal{C} ::= \text{Mod}(\mathcal{M}) \mid
-\text{StructuredType}(\mathcal{S}) \mid \text{Function}(\mathcal{F})$$
+\text{StructuredType}(\mathcal{S}) \mid \text{Function}(\mathcal{F}) \mid \text{Field}(F)$$
 
 \subsection{Modulo ($\mathcal{M}$)}
 L'intera struttura del programma è catturata dal tipo \textbf{Modulo}
@@ -190,7 +190,7 @@ L'intera struttura del programma è catturata dal tipo \textbf{Modulo}
 del file system o dei namespace:
 $$\mathcal{M} = \langle \mathcal{QN}, \mathcal{I}_{imports},
 \vec{\mathcal{M}_{nest}},
-\vec{\mathcal{S}}, \vec{\mathcal{F}}, \vec{\mathcal{B}}_{lk} \rangle$$
+\vec{\mathcal{S}}, \vec{\mathcal{F}}, \vec{F}_{free}, \vec{\mathcal{B}}_{lk} \rangle$$
 dove $\mathcal{I}_{imports}$ è l'insieme delle dipendenze esplicite
 (import/use/include) definite nel modulo. Ogni elemento in
 $\mathcal{I}_{imports}$ contiene il percorso qualificato, un
