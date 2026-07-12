@@ -33,7 +33,8 @@ where
             && (child.kind().contains("body")
                 || child.kind().contains("list")
                 || child.kind().contains("block")
-                || child.kind().contains("declaration"))
+                || child.kind().contains("declaration")
+                || child.kind().contains("variant"))
         {
             items.extend(extract_list_of(child, source, parser));
         }
@@ -68,7 +69,12 @@ pub fn extract_fields(node: Node, source: &str) -> Vec<Field> {
             let mut c = n.walk();
             for child in n.children(&mut c) {
                 let kind = child.kind();
-                if kind == "visibility_modifier" || kind == "," || kind == "(" || kind == ")" || kind.contains("attribute") {
+                if kind == "visibility_modifier"
+                    || kind == ","
+                    || kind == "("
+                    || kind == ")"
+                    || kind.contains("attribute")
+                {
                     continue;
                 }
                 fds.push(Field {
@@ -259,4 +265,3 @@ pub fn extract_implements_trait(node: Node, source: &str) -> Option<TypeRef> {
     }
     None
 }
-
