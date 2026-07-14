@@ -172,6 +172,17 @@
         }
     }
 
+    function exportJson() {
+        if (!elements || elements.length === 0) return;
+        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(elements, null, 2));
+        const downloadAnchorNode = document.createElement('a');
+        downloadAnchorNode.setAttribute("href", dataStr);
+        downloadAnchorNode.setAttribute("download", "graph_export.json");
+        document.body.appendChild(downloadAnchorNode);
+        downloadAnchorNode.click();
+        downloadAnchorNode.remove();
+    }
+
     onDestroy(() => {
         if (cy) {
             cy.destroy();
@@ -257,6 +268,10 @@
     {/if}
 
     {#if elements && elements.length > 0}
+        <button onclick={exportJson} style="width: 100%; padding: 10px; margin-bottom: 15px; background: #27ae60; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; transition: opacity 0.2s;">
+            ⬇️ Export Graph to JSON
+        </button>
+
         <div class="toggles-container" id="toggles-panel">
             <label class="toggle-row">
                 <input type="checkbox" bind:checked={structChecked} onchange={toggleStructural}>
