@@ -5,7 +5,7 @@
     import style from '$lib/cytoscape_style.js';
     import LegendModal from '$lib/LegendModal.svelte';
 
-    let { elements = [], statusMessage = '', controls } = $props();
+    let { elements = [], rawOutput = null, statusMessage = '', controls } = $props();
 
     let cy = null;
     let cyContainer = null;
@@ -177,7 +177,18 @@
         const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(elements, null, 2));
         const downloadAnchorNode = document.createElement('a');
         downloadAnchorNode.setAttribute("href", dataStr);
-        downloadAnchorNode.setAttribute("download", "graph_export.json");
+        downloadAnchorNode.setAttribute("download", "cytoscape_graph.json");
+        document.body.appendChild(downloadAnchorNode);
+        downloadAnchorNode.click();
+        downloadAnchorNode.remove();
+    }
+
+    function exportRawJson() {
+        if (!rawOutput) return;
+        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(rawOutput, null, 2));
+        const downloadAnchorNode = document.createElement('a');
+        downloadAnchorNode.setAttribute("href", dataStr);
+        downloadAnchorNode.setAttribute("download", "analyzer_raw_output.json");
         document.body.appendChild(downloadAnchorNode);
         downloadAnchorNode.click();
         downloadAnchorNode.remove();
@@ -221,15 +232,15 @@
         top: 20px;
         left: 20px;
         background: rgba(30, 30, 30, 0.85);
-        color: #ecf0f1;
-        padding: 10px 15px;
-        border-radius: 8px;
+        color: #bdc3c7;
+        padding: 6px 12px;
+        border-radius: 6px;
         border: 1px solid #444;
         z-index: 10;
         box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
         backdrop-filter: blur(5px);
         font-weight: bold;
-        font-size: 14px;
+        font-size: 12px;
         cursor: pointer;
         transition: all 0.2s;
         display: flex;
@@ -237,7 +248,23 @@
         gap: 8px;
     }
     .open-btn:hover {
-        background: #0969da;
+        color: #fff;
+        border-color: #0969da;
+    }
+    .export-btn {
+        flex: 1;
+        padding: 6px 12px;
+        background: rgba(30, 30, 30, 0.85);
+        color: #bdc3c7;
+        border: 1px solid #444;
+        border-radius: 6px;
+        cursor: pointer;
+        font-weight: bold;
+        transition: all 0.2s;
+        font-size: 12px;
+    }
+    .export-btn:hover {
+        color: #fff;
         border-color: #0969da;
     }
 </style>
@@ -268,9 +295,16 @@
     {/if}
 
     {#if elements && elements.length > 0}
-        <button onclick={exportJson} style="width: 100%; padding: 10px; margin-bottom: 15px; background: #27ae60; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; transition: opacity 0.2s;">
-            ⬇️ Export Graph to JSON
-        </button>
+        <div style="display: flex; gap: 10px; margin-bottom: 15px; margin-top: 10px;">
+            <button class="export-btn" onclick={exportJson}>
+                Export Cytoscape
+            </button>
+            {#if rawOutput}
+                <button class="export-btn" onclick={exportRawJson}>
+                    Export Raw JSON
+                </button>
+            {/if}
+        </div>
 
         <div class="toggles-container" id="toggles-panel">
             <label class="toggle-row">

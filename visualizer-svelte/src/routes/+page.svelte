@@ -6,6 +6,7 @@
     let selectedFile = $state('');
     let searchQuery = $state('');
     let elements = $state([]);
+    let rawOutput = $state(null);
     let statusMessage = $state('Loading benchmarks...');
     let isAnalyzing = $state(false);
     
@@ -65,6 +66,7 @@
             
             const data = await res.json();
             elements = data.elements;
+            rawOutput = data.rawOutput || null;
             statusMessage = path;
         } catch (err) {
             statusMessage = "Error analyzing: " + err.message;
@@ -150,18 +152,20 @@
     
     .open-modal-btn {
         width: 100%;
-        padding: 10px;
-        background: #0969da;
-        color: white;
-        border: none;
+        padding: 6px 12px;
+        background: rgba(30, 30, 30, 0.85);
+        color: #bdc3c7;
+        border: 1px solid #444;
         border-radius: 6px;
         cursor: pointer;
         font-weight: bold;
-        transition: opacity 0.2s;
-        margin-bottom: 5px;
+        font-size: 12px;
+        transition: all 0.2s;
+        margin-bottom: 10px;
     }
     .open-modal-btn:hover {
-        opacity: 0.9;
+        color: #fff;
+        border-color: #0969da;
     }
 </style>
 
@@ -171,7 +175,7 @@
     </button>
 {/snippet}
 
-<GraphViewer {elements} {statusMessage} {controls} />
+<GraphViewer {elements} {rawOutput} {statusMessage} {controls} />
 
 {#if isModalOpen}
     <div class="modal-backdrop" onclick={() => isModalOpen = false} role="button" tabindex="0" onkeydown={(e) => e.key === 'Enter' && (isModalOpen = false)}>

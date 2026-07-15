@@ -10,6 +10,7 @@
     let selectedJsonFile = $state(null);
 
     let elements = $state([]);
+    let rawOutput = $state(null);
     let statusMessage = $state('Provide a path or raw code to analyze.');
     let isAnalyzing = $state(false);
 
@@ -22,6 +23,7 @@
             try {
                 const text = await selectedJsonFile.text();
                 elements = JSON.parse(text);
+                rawOutput = null; // No raw output when importing cytoscape json directly
                 statusMessage = "Loaded " + selectedJsonFile.name + " successfully";
             } catch (err) {
                 statusMessage = "Error parsing JSON: " + err.message;
@@ -32,6 +34,7 @@
         isAnalyzing = true;
         statusMessage = "Analyzing...";
         elements = []; // Clear current graph
+        rawOutput = null;
 
         let payload = {};
         if (mode === 'path') {
@@ -69,6 +72,7 @@
             
             const data = await res.json();
             elements = data.elements;
+            rawOutput = data.rawOutput || null;
             statusMessage = mode === 'path' ? customPath : "Raw Code Analyzed Successfully";
         } catch (err) {
             statusMessage = "Error analyzing: " + err.message;
@@ -112,6 +116,26 @@
         display: flex;
         align-items: center;
         gap: 5px;
+    }
+    .analyze-btn {
+        padding: 6px 12px;
+        background: rgba(30, 30, 30, 0.85);
+        color: #bdc3c7;
+        border: 1px solid #444;
+        border-radius: 6px;
+        cursor: pointer;
+        font-weight: bold;
+        font-size: 12px;
+        width: 100%;
+        transition: all 0.2s;
+    }
+    .analyze-btn:hover:not(:disabled) {
+        color: #fff;
+        border-color: #0969da;
+    }
+    .analyze-btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
     }
 </style>
 
@@ -167,10 +191,10 @@
     <button 
         onclick={analyzeCode} 
         disabled={isAnalyzing}
-        style="padding: 10px 15px; background: #0969da; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; width: 100%; transition: background 0.2s;"
+        class="analyze-btn"
     >
         {isAnalyzing ? 'Analyzing...' : 'Analyze'}
     </button>
 {/snippet}
 
-<GraphViewer {elements} {statusMessage} {controls} />
+<GraphViewer {elements} {rawOutput} {statusMessage} {controls} />

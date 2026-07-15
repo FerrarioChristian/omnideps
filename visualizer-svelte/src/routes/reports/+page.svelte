@@ -108,14 +108,14 @@
     }
 
     .run-btn {
-        padding: 6px 16px;
-        background: #0969da;
-        color: white;
-        border: none;
+        padding: 6px 12px;
+        background: rgba(30, 30, 30, 0.85);
+        color: #bdc3c7;
+        border: 1px solid #444;
         border-radius: 6px;
         cursor: pointer;
         font-weight: bold;
-        font-size: 13px;
+        font-size: 12px;
         transition: all 0.2s;
         min-width: 120px;
         display: flex;
@@ -125,8 +125,8 @@
     }
 
     .run-btn:hover:not(:disabled) {
-        opacity: 0.9;
-        box-shadow: 0 4px 15px rgba(9, 105, 218, 0.4);
+        color: #fff;
+        border-color: #0969da;
     }
 
     .run-btn:disabled {
