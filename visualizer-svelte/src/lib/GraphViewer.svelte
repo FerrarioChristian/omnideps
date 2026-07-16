@@ -22,11 +22,14 @@
     
     let structFilters = $state({
         'IsA': true,
+        'Implements': true,
         'Imports': true,
         'UsesFieldType': true,
         'UsesParamType': true,
         'UsesReturnType': true,
-        'UsesLocalType': true
+        'UsesLocalType': true,
+        'NestedIn': true,
+        'ModuleContainment': true
     });
     
     let behavFilters = $state({
@@ -58,27 +61,8 @@
         cy = cytoscape({
             container: cyContainer,
             elements: elements,
-            style: style,
-            layout: {
-                name: 'fcose',
-                quality: "proof",
-                randomize: true,
-                animate: true,
-                animationDuration: 1000,
-                fit: true,
-                padding: 30,
-                nodeDimensionsIncludeLabels: true,
-                uniformNodeDimensions: false,
-                packComponents: true,
-                step: "all",
-                idealEdgeLength: () => 50,
-                edgeElasticity: () => 0.45,
-                nodeRepulsion: () => 4500,
-                gravity: 0.25,
-                gravityRange: 3.8,
-                gravityCompound: 1.0,
-                gravityRangeCompound: 1.5,
-            }
+            style: style
+            // layout will be run after filters
         });
 
         cy.on('tap', 'node', function(e) {
@@ -109,25 +93,48 @@
         });
 
         applyFilters();
+
+        cy.layout({
+            name: 'fcose',
+            quality: "proof",
+            randomize: true,
+            animate: true,
+            animationDuration: 1000,
+            fit: true,
+            padding: 30,
+            nodeDimensionsIncludeLabels: true,
+            uniformNodeDimensions: false,
+            packComponents: true,
+            step: "all",
+            idealEdgeLength: () => 50,
+            edgeElasticity: () => 0.45,
+            nodeRepulsion: () => 4500,
+            gravity: 0.25,
+            gravityRange: 3.8,
+            gravityCompound: 1.0,
+            gravityRangeCompound: 1.5,
+        }).run();
     }
 
     function applyFilters() {
         if (!cy) return;
         
-        cy.edges().style('display', 'none'); // Reset
-        
-        let activeFilters = [];
-        for (const [key, val] of Object.entries(structFilters)) {
-            if (val) activeFilters.push(key);
-        }
-        for (const [key, val] of Object.entries(behavFilters)) {
-            if (val) activeFilters.push(key);
-        }
-        
-        if (activeFilters.length > 0) {
-            const selector = activeFilters.map(val => `[label = "${val}"]`).join(', ');
-            cy.edges(selector).style('display', 'element');
-        }
+        cy.batch(() => {
+            cy.edges().addClass('filtered-out');
+            
+            let activeFilters = [];
+            for (const [key, val] of Object.entries(structFilters)) {
+                if (val) activeFilters.push(key);
+            }
+            for (const [key, val] of Object.entries(behavFilters)) {
+                if (val) activeFilters.push(key);
+            }
+            
+            if (activeFilters.length > 0) {
+                const selector = activeFilters.map(val => `[label = "${val}"]`).join(', ');
+                cy.edges(selector).removeClass('filtered-out');
+            }
+        });
     }
 
     function toggleStructural() {
