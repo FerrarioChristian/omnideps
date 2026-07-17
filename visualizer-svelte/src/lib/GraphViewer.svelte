@@ -38,6 +38,23 @@
         'AccessesField': true
     });
 
+    let allNodesChecked = $state(true);
+    let nodeFilters = $state({
+        'Module': true,
+        'Class': true,
+        'Struct': true,
+        'Interface': true,
+        'Trait': true,
+        'Enum': true,
+        'EnumVariant': true,
+        'Function': true,
+        'StaticVariable': true,
+        'StructField': true,
+        'ClassField': true,
+        'Field': true,
+        'External': true
+    });
+
     let searchQuery = $state('');
 
     onMount(() => {
@@ -121,18 +138,28 @@
         
         cy.batch(() => {
             cy.edges().addClass('filtered-out');
+            cy.nodes().addClass('filtered-out');
             
-            let activeFilters = [];
+            let activeEdgeFilters = [];
             for (const [key, val] of Object.entries(structFilters)) {
-                if (val) activeFilters.push(key);
+                if (val) activeEdgeFilters.push(key);
             }
             for (const [key, val] of Object.entries(behavFilters)) {
-                if (val) activeFilters.push(key);
+                if (val) activeEdgeFilters.push(key);
             }
             
-            if (activeFilters.length > 0) {
-                const selector = activeFilters.map(val => `[label = "${val}"]`).join(', ');
-                cy.edges(selector).removeClass('filtered-out');
+            if (activeEdgeFilters.length > 0) {
+                const edgeSelector = activeEdgeFilters.map(val => `[label = "${val}"]`).join(', ');
+                cy.edges(edgeSelector).removeClass('filtered-out');
+            }
+
+            let activeNodeFilters = [];
+            for (const [key, val] of Object.entries(nodeFilters)) {
+                if (val) activeNodeFilters.push(key);
+            }
+            if (activeNodeFilters.length > 0) {
+                const nodeSelector = activeNodeFilters.map(val => `[type = "${val}"]`).join(', ');
+                cy.nodes(nodeSelector).removeClass('filtered-out');
             }
         });
     }
@@ -151,9 +178,17 @@
         applyFilters();
     }
 
+    function toggleAllNodes() {
+        for (let k in nodeFilters) {
+            nodeFilters[k] = allNodesChecked;
+        }
+        applyFilters();
+    }
+
     function onFilterChange() {
         structChecked = Object.values(structFilters).some(v => v);
         behavChecked = Object.values(behavFilters).some(v => v);
+        allNodesChecked = Object.values(nodeFilters).some(v => v);
         applyFilters();
     }
 
@@ -274,6 +309,27 @@
         color: #fff;
         border-color: #0969da;
     }
+    
+    .filter-section {
+        margin-bottom: 10px;
+        background: rgba(40, 40, 40, 0.5);
+        border: 1px solid #444;
+        border-radius: 6px;
+        overflow: hidden;
+    }
+    .filter-section summary {
+        padding: 10px;
+        cursor: pointer;
+        font-weight: bold;
+        background: rgba(50, 50, 50, 0.5);
+        user-select: none;
+    }
+    .filter-section summary:hover {
+        background: rgba(60, 60, 60, 0.8);
+    }
+    .filter-section .filter-content {
+        padding: 10px;
+    }
 </style>
 
 <!-- Content -->
@@ -314,30 +370,57 @@
         </div>
 
         <div class="toggles-container" id="toggles-panel">
-            <label class="toggle-row">
-                <input type="checkbox" bind:checked={structChecked} onchange={toggleStructural}>
-                <span>Struttura (IsA, Uses)</span>
-            </label>
-            <label class="toggle-row">
-                <input type="checkbox" bind:checked={behavChecked} onchange={toggleBehavioral}>
-                <span>Comportamento (Calls, Instantiates)</span>
-            </label>
+            <details class="filter-section">
+                <summary>Filtri Archi (Relazioni)</summary>
+                <div class="filter-content">
+                    <label class="toggle-row" style="font-weight:bold; border-bottom: 1px solid #555; padding-bottom: 5px; margin-bottom: 5px;">
+                        <input type="checkbox" bind:checked={structChecked} onchange={toggleStructural}>
+                        <span>Strutturali (IsA, Uses, Imports...)</span>
+                    </label>
+                    <div class="filters-grid" style="margin-bottom: 15px;">
+                        {#each Object.keys(structFilters) as key}
+                            <label class="toggle-row">
+                                <input type="checkbox" bind:checked={structFilters[key]} onchange={onFilterChange}> 
+                                <span>{key}</span>
+                            </label>
+                        {/each}
+                    </div>
 
-            <details class="advanced-filters">
-                <summary>Filtri Avanzati</summary>
-                <div class="filters-grid">
-                    {#each Object.keys(structFilters) as key}
-                        <label class="toggle-row">
-                            <input type="checkbox" bind:checked={structFilters[key]} onchange={onFilterChange}> 
-                            <span>{key}</span>
-                        </label>
-                    {/each}
-                    {#each Object.keys(behavFilters) as key}
-                        <label class="toggle-row">
-                            <input type="checkbox" bind:checked={behavFilters[key]} onchange={onFilterChange}> 
-                            <span>{key}</span>
-                        </label>
-                    {/each}
+                    <label class="toggle-row" style="font-weight:bold; border-bottom: 1px solid #555; padding-bottom: 5px; margin-bottom: 5px;">
+                        <input type="checkbox" bind:checked={behavChecked} onchange={toggleBehavioral}>
+                        <span>Comportamentali (Calls, Instantiates...)</span>
+                    </label>
+                    <div class="filters-grid">
+                        {#each Object.keys(behavFilters) as key}
+                            <label class="toggle-row">
+                                <input type="checkbox" bind:checked={behavFilters[key]} onchange={onFilterChange}> 
+                                <span>{key}</span>
+                            </label>
+                        {/each}
+                    </div>
+                </div>
+            </details>
+
+            <details class="filter-section">
+                <summary>Filtri Nodi (Entità)</summary>
+                <div class="filter-content">
+                    <label class="toggle-row" style="font-weight:bold; border-bottom: 1px solid #555; padding-bottom: 5px; margin-bottom: 5px;">
+                        <input type="checkbox" bind:checked={allNodesChecked} onchange={toggleAllNodes}>
+                        <span>Tutti i Nodi</span>
+                    </label>
+                    <div class="filters-grid">
+                        {#each Object.keys(nodeFilters) as key}
+                            <label class="toggle-row">
+                                <input type="checkbox" bind:checked={nodeFilters[key]} onchange={onFilterChange}> 
+                                <span title={key === 'Module' || key === 'Enum' ? 'Nascondendo questo nodo si nasconderà anche il suo contenuto' : ''}>
+                                    {key} {key === 'Module' || key === 'Enum' ? ' ⚠️' : ''}
+                                </span>
+                            </label>
+                        {/each}
+                    </div>
+                    <div style="font-size: 0.8em; color: #aaa; margin-top: 10px; line-height: 1.3;">
+                        ⚠️ Nascondere un nodo "contenitore" (es. Module, Enum) nasconderà automaticamente anche tutti i nodi contenuti al suo interno.
+                    </div>
                 </div>
             </details>
         </div>

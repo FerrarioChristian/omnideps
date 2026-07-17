@@ -116,6 +116,7 @@
         display: flex;
         align-items: center;
         gap: 5px;
+        font-size: 14px;
     }
     .analyze-btn {
         padding: 6px 12px;
@@ -151,7 +152,7 @@
         </label>
         <label>
             <input type="radio" bind:group={mode} value="json">
-            Raw JSON
+            Import JSON
         </label>
     </div>
 

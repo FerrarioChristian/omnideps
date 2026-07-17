@@ -126,21 +126,22 @@
     .node-struct {
         width: 80px;
         height: 40px;
-        background-color: #2980b9;
+        background-color: rgba(41, 128, 185, 0.15);
+        border: 2px solid #2980b9;
         border-radius: 8px;
     }
     .node-enum {
         width: 80px;
         height: 40px;
-        background-color: transparent;
-        border: 2px dashed #e84393;
+        background-color: rgba(232, 67, 147, 0.15); /* #e84393 with 15% opacity to match container logic if needed, but the user didn't explicitly ask for background change, I'll keep it transparent or just match the 15% like others */
+        border: 2px solid #e84393;
         border-radius: 8px;
     }
     .node-trait {
         width: 80px;
         height: 40px;
-        background-color: #27ae60;
-        border: 2px solid #2ecc71;
+        background-color: rgba(39, 174, 96, 0.15);
+        border: 2px solid #27ae60;
         border-radius: 8px;
     }
     .node-function {

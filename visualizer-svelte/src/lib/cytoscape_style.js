@@ -54,7 +54,7 @@ const style = [
 		style: {
 			'background-color': '#e84393',
 			'border-color': '#e84393',
-            'border-style': 'dashed'
+            'border-style': 'solid'
 		}
 	},
 	{
@@ -82,7 +82,7 @@ const style = [
 		selector: 'node[type = "Enum"]',
 		style: {
 			'background-color': '#e84393',
-            'border-style': 'dashed',
+            'border-style': 'solid',
             'border-width': 2,
             'border-color': '#e84393'
 		}
