@@ -99,6 +99,7 @@ fn build_block_queries(ctx: &BuilderContext, mut block: Block) -> Block {
 
     block.calls = block.calls.into_iter().map(|c| substitute_type(ctx, c, true)).collect();
     block.instantiates = block.instantiates.into_iter().map(|i| substitute_type(ctx, i, false)).collect();
+    block.accesses = block.accesses.into_iter().map(|a| substitute_type(ctx, a, false)).collect();
     
     block.sub_blocks = block.sub_blocks.into_iter().map(|b| build_block_queries(ctx, b)).collect();
 

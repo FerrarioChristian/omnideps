@@ -349,9 +349,10 @@
     ModuleContainment,   // Contenimento (componente in modulo)
     Calls,               // Chiamata a funzione
     Instantiates,        // Istanziazione (new, struct expression)
+    AccessesField,       // Accesso a stato (lettura/scrittura di campi)
 }</code></pre>
 
-    <p>I 9 tipi di arco si dividono in quattro categorie logiche:</p>
+    <p>I 10 tipi di arco si dividono in quattro categorie logiche:</p>
     <table>
         <thead><tr><th>Categoria</th><th>Archi</th><th>Significato</th></tr></thead>
         <tbody>
@@ -372,8 +373,8 @@
             </tr>
             <tr>
                 <td><span class="edge-badge edge-behavior">Comportamentale</span></td>
-                <td><code>Calls</code>, <code>Instantiates</code></td>
-                <td>Dipendenza tramite invocazione o costruzione</td>
+                <td><code>Calls</code>, <code>Instantiates</code>, <code>AccessesField</code></td>
+                <td>Dipendenza tramite invocazione, costruzione o accesso a stato (lettura/scrittura)</td>
             </tr>
         </tbody>
     </table>
@@ -599,6 +600,13 @@ fn flatten_structured_type(st: &amp;StructuredType) -&gt; Vec&lt;Component&gt; {
                 <td><code>add_block_edges</code></td>
                 <td>Per ogni <code>instantiates</code> entry nel body della funzione (ricorsivamente nei sotto-blocchi) con tipo risolto</td>
             </tr>
+            <tr>
+                <td><span class="edge-badge edge-behavior">AccessesField</span></td>
+                <td>Function</td>
+                <td>Tipo/Campo acceduto</td>
+                <td><code>add_block_edges</code></td>
+                <td>Per ogni <code>accesses</code> entry nel body della funzione (ricorsivamente nei sotto-blocchi) con tipo risolto</td>
+            </tr>
         </tbody>
     </table>
 
@@ -745,7 +753,18 @@ fn flatten_structured_type(st: &amp;StructuredType) -&gt; Vec&lt;Component&gt; {
         }
     }
 
-    // 4. Ricorsione nei sotto-blocchi (if, while, for, ecc.)
+    // 4. Accessi a campi → AccessesField
+    for acc in &amp;block.accesses {
+        match acc {
+            TypeRef::Resolved(to) | TypeRef::External(to) =&gt; {
+                edges.push(Dependency { from: ff.name.clone(), to: to.clone(),
+                    kind: DependencyEdgeKind::AccessesField });
+            }
+            _ =&gt; {}
+        }
+    }
+
+    // 5. Ricorsione nei sotto-blocchi (if, while, for, ecc.)
     for sub in &amp;block.sub_blocks {
         add_block_edges(ff, sub, edges);
     }
@@ -756,6 +775,7 @@ fn flatten_structured_type(st: &amp;StructuredType) -&gt; Vec&lt;Component&gt; {
         <li><code>declarations</code> — variabili locali dichiarate nel blocco</li>
         <li><code>calls</code> — chiamate a funzione effettuate nel blocco</li>
         <li><code>instantiates</code> — istanziazioni di tipi nel blocco</li>
+        <li><code>accesses</code> — accessi diretti (lettura/scrittura) allo stato (campi)</li>
         <li><code>sub_blocks</code> — blocchi annidati (corpi di <code>if</code>, <code>while</code>, <code>for</code>, ecc.)</li>
     </ul>
 
@@ -773,11 +793,13 @@ fn flatten_structured_type(st: &amp;StructuredType) -&gt; Vec&lt;Component&gt; {
       <span class="arrow">├──</span> declarations: [tmp: <span class="green">Resolved(Motore)</span>]
       <span class="arrow">├──</span> calls: [<span class="green">Resolved(Veicolo::accelera)</span>]
       <span class="arrow">├──</span> instantiates: [<span class="green">Resolved(Auto)</span>]
+      <span class="arrow">├──</span> accesses: [<span class="green">Resolved(Veicolo::stato)</span>]
       <span class="arrow">└──</span> <span class="symbol">sub_blocks:</span>
            <span class="arrow">└──</span> <span class="symbol">Block</span> <span class="dim">(if branch)</span>
                 <span class="arrow">├──</span> declarations: []
                 <span class="arrow">├──</span> calls: [<span class="green">Resolved(log)</span>]
                 <span class="arrow">├──</span> instantiates: []
+                <span class="arrow">├──</span> accesses: []
                 <span class="arrow">└──</span> sub_blocks: []</div>
     <p>In questo esempio, <code>add_block_edges</code> visita il blocco principale e il sotto-blocco del ramo <code>if</code>, generando archi per <em>tutte</em> le dipendenze, attribuiti sempre a <code>"calcola"</code>.</p>
 

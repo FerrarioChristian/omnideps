@@ -50,6 +50,8 @@ pub struct Block {
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub instantiates: Vec<TypeRef>,
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub accesses: Vec<TypeRef>,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub sub_blocks: Vec<Block>,
 }
 
@@ -114,4 +116,5 @@ pub enum Component {
     Module(Module),
     StructuredType(StructuredType),
     Function(Function),
+    Field(QualifiedName, TypeRef),
 }

@@ -29,6 +29,14 @@ fn traverse_module_for_edges(
         });
     }
 
+    for import in &m.imports {
+        edges.push(Dependency {
+            from: m.name.clone(),
+            to: import.path.clone(),
+            kind: DependencyEdgeKind::Imports,
+        });
+    }
+
     for st in &m.structured_types {
         edges.push(Dependency {
             from: m.name.clone(),
@@ -55,6 +63,16 @@ fn traverse_module_for_edges(
 fn traverse_structured_type_edges(st: &StructuredType, edges: &mut Vec<Dependency>) {
     add_super_edges(st, edges);
     add_field_edges(st, edges);
+
+    for f in &st.fields {
+        let mut f_name = st.name.clone();
+        f_name.push(f.name.clone());
+        edges.push(Dependency {
+            from: st.name.clone(),
+            to: f_name,
+            kind: DependencyEdgeKind::NestedIn,
+        });
+    }
 
     for m in &st.methods {
         edges.push(Dependency {
@@ -160,6 +178,15 @@ fn add_block_edges(ff: &Function, block: &Block, edges: &mut Vec<Dependency>) {
             });
         }
     }
+    for acc in &block.accesses {
+        if let Some(to) = type_ref_target(acc) {
+            edges.push(Dependency {
+                from: ff.name.clone(),
+                to: to.clone(),
+                kind: DependencyEdgeKind::AccessesField,
+            });
+        }
+    }
 
     // 3. Recurse into sub-blocks
     for sub in &block.sub_blocks {
@@ -182,6 +209,11 @@ fn flatten_modules(modules: &[Module]) -> Vec<Component> {
 
 fn flatten_structured_type(st: &StructuredType) -> Vec<Component> {
     let mut flat = vec![Component::StructuredType(st.clone())];
+    for f in &st.fields {
+        let mut f_name = st.name.clone();
+        f_name.push(f.name.clone());
+        flat.push(Component::Field(f_name, f.ty.clone()));
+    }
     flat.extend(st.methods.iter().cloned().map(Component::Function));
     for nested in &st.nested_types {
         flat.extend(flatten_structured_type(nested));

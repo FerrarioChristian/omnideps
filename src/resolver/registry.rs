@@ -34,7 +34,15 @@ impl GlobalRegistry {
     /// Recursively registers a Module, its functions, structured types, and Impl blocks.
     fn register_module(&mut self, m: &Module, mut prefix: QualifiedName) {
         prefix.extend(m.name.clone());
-        self.paths.insert(prefix.clone(), RegistryEntry::Module { imports: m.imports.clone() });
+        
+        let entry = self.paths.entry(prefix.clone()).or_insert_with(|| RegistryEntry::Module { imports: vec![] });
+        if let RegistryEntry::Module { imports: existing_imports } = entry {
+            for imp in &m.imports {
+                if !existing_imports.contains(imp) {
+                    existing_imports.push(imp.clone());
+                }
+            }
+        }
 
         for st in &m.structured_types {
             self.register_structured_type(st, prefix.clone());

@@ -38,9 +38,10 @@ fn test_benchmarks_analysis() {
             };
 
             let source = fs::read_to_string(path).expect("Impossibile leggere il file");
+            let config = language_agnostic_analyzer::config::AnalyzerConfig::default();
 
             // Verifica che l'analisi non vada in panico
-            let parse_result = parse_source(lang, &source);
+            let parse_result = parse_source(lang, &source, path, &config);
             assert!(
                 parse_result.is_ok(),
                 "Il parsing ha fallito per il file {:?}",
@@ -48,7 +49,7 @@ fn test_benchmarks_analysis() {
             );
 
             let (modules, primitives) = parse_result.unwrap();
-            let (_resolved_modules, graph, summary) = analyze_project(modules, primitives);
+            let (_resolved_modules, graph, summary) = analyze_project(modules, primitives, &config);
 
             // Assicuriamoci che il grafo contenga almeno dei nodi di base se il file non è vuoto
             if source.len() > 10 {

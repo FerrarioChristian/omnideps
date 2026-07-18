@@ -1,4 +1,6 @@
-use language_agnostic_analyzer::analyzer::{self, full_analysis};
+use language_agnostic_analyzer::analyzer::{parse_source, analyze_project};
+use language_agnostic_analyzer::language::SupportedLanguage;
+use language_agnostic_analyzer::config::AnalyzerConfig;
 use std::fs;
 use std::path::Path;
 use walkdir::WalkDir;
@@ -14,6 +16,7 @@ fn test_self_analysis() {
     }
 
     let mut all_graphs = vec![];
+    let config = AnalyzerConfig::default();
 
     for entry in WalkDir::new(src_dir).into_iter().filter_map(|e| e.ok()) {
         let path = entry.path();
@@ -23,13 +26,14 @@ fn test_self_analysis() {
 
             // Analyze only Rust files in the src directory
             if ext == "rs" {
-                let lang = analyzer::languages::rust();
+                let lang = SupportedLanguage::Rust;
                 let source = fs::read_to_string(path).expect("Unable to read source file for testing");
 
-                let result = full_analysis(lang, &source);
-                assert!(result.is_ok(), "Self-analysis failed for file {:?}", path);
+                let parse_result = parse_source(lang, &source, path, &config);
+                assert!(parse_result.is_ok(), "Self-analysis failed for file {:?}", path);
 
-                let (_modules, graph, _summary) = result.unwrap();
+                let (modules, primitives) = parse_result.unwrap();
+                let (_resolved_modules, graph, _summary) = analyze_project(modules, primitives, &config);
                 all_graphs.push(graph);
             }
         }

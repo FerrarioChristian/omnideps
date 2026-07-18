@@ -87,7 +87,7 @@ costruzione dei componenti dell'IR:
   \item $\text{extract\_super\_types} : \mathcal{N} \times
     \mathcal{S}_{code} \to \vec{\tau}$ \\
     Estrae i riferimenti alle gerarchie di ereditarietà o
-    implementazione di trait.
+    implementazione di trait (gestendo anche sintassi specifiche come i Trait Bounds in Rust).
 \end{itemize}
 
 \section{Fase 2: Risoluzione dei Nomi e Motore a Query ($R$)}
@@ -106,6 +106,20 @@ modo esaustivo nel Capitolo \ref{ch:name_resolution}. La fusione
 unificata di tutti i moduli $\vec{\mathcal{M}}$ estratti nel
 Workspace permette all'Indice Globale di tracciare dipendenze
 *cross-file* senza latenza computazionale.
+
+\subsection{Configurazione e Politiche di Risoluzione}
+A causa delle differenze semantiche tra i vari linguaggi supportati, la fase di 
+risoluzione è parametrizzata rispetto a una \textbf{Configurazione} ($\mathcal{K}_{cfg}$). 
+Tale configurazione permette di attivare o disattivare euristiche specifiche per
+emulare le convenzioni di namespace del linguaggio analizzato, senza alterare 
+la logica core dell'esecutore algebrico. La configurazione si articola su tre assi:
+\begin{itemize}
+  \item \textbf{Global Scope Fallback}: Determina se un tipo non trovato nel namespace corrente debba essere cercato nel namespace globale (es. \texttt{root} in Java) o se debba essere considerato non risolto. È cruciale per linguaggi come Java e C++, che ammettono l'uso implicito di entità globali.
+  \item \textbf{Transitive Imports}: Selettore booleano che modella la transitività dei moduli. In linguaggi come C e C++, l'inclusione di un file propaga al modulo corrente anche tutto ciò che tale file ha importato a sua volta (\textit{header propagation}). Se attivato, l'algoritmo di risoluzione naviga ricorsivamente l'albero degli import.
+  \item \textbf{Cyclic MRO Check (Method Resolution Order)}: Modella la tolleranza al ciclo nell'ereditarietà. Linguaggi come C++ permettono gerarchie complesse di ereditarietà multipla, mentre Java la restringe alle sole interfacce. L'esecutore mantiene traccia dei percorsi visitati durante la ricerca di un membro (\textit{find-going-down}) e risolve la MRO effettuando una scansione \textit{Depth-First, Left-to-Right} che, se \texttt{cyclic\_mro\_check} è attivo, previene deadlock computazionali causati da eventuali dipendenze circolari (valide o malformate) tra tipi.
+\end{itemize}
+Attraverso questa mappa di proprietà $\mathcal{K}_{cfg}: \mathcal{L} \to \{0,1\}^3$, 
+il motore di risoluzione $\mathcal{R}$ si specializza mantenendo un design strettamente language-agnostic.
 
 \subsection{Appiattimento (Flattening) dei Blocchi di Implementazione}
 Durante la fase di risoluzione, il sistema applica una trasformazione
@@ -154,6 +168,9 @@ risolti all'interno di ogni componente:
     blocchi di implementazione sono stati appiattiti, questa
     relazione unifica in modo agnostico sia l'ereditarietà di classe
     che l'implementazione di trait/interfacce ($k = \text{IsA}$).
+  \item \textbf{Importazioni}: Generata dalle dipendenze esplicite
+    registrate nella lista $\mathcal{I}_{imports}$ di ogni Modulo,
+    collegando un modulo ai tipi o sottomoduli importati ($k = \text{Imports}$).
   \item \textbf{Composizione/Uso}: Generata dal tipo di ogni campo
     $F$ ($k = \text{UsesFieldType}$).
   \item \textbf{Interazione Architetturale}: Generata dai tipi
@@ -166,11 +183,12 @@ risolti all'interno di ogni componente:
     di ogni funzione, includendo le dichiarazioni di variabili locali
     ($k = \text{UsesLocalType}$),
     le chiamate a funzioni o metodi
-    ($\vec{\tau}_{calls}$, $k = \text{Calls}$) e l'istanziazione
-    esplicita di tipi
-    strutturati ($\vec{\tau}_{inst}$, $k = \text{Instantiates}$).
+    ($\vec{\tau}_{calls}$, $k = \text{Calls}$), l'istanziazione
+    esplicita di tipi strutturati ($\vec{\tau}_{inst}$, $k = \text{Instantiates}$),
+    e gli accessi espliciti in lettura/scrittura allo stato di un
+    componente ($\vec{\tau}_{accesses}$, $k = \text{AccessesField}$).
   \item \textbf{Contenimento}: Generata dalla gerarchia dei moduli e
-    dei tipi annidati ($k = \text{NestedIn}, \text{Contains}$).
+    dei tipi annidati ($k = \text{NestedIn}, \text{ModuleContainment}$).
 \end{itemize}
 Il grafo così costruito fornisce una visione unificata e agnostica
 delle dipendenze, permettendo analisi metriche e strutturali cross-linguaggio.

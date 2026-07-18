@@ -118,6 +118,7 @@ fn execute_block(ctx: &ExecutorContext, mut b: Block) -> Block {
     b.declarations = b.declarations.into_iter().map(|mut d| { d.ty = evaluate_typeref(ctx, d.ty); d }).collect();
     b.calls = b.calls.into_iter().map(|c| evaluate_typeref(ctx, c)).collect();
     b.instantiates = b.instantiates.into_iter().map(|i| evaluate_typeref(ctx, i)).collect();
+    b.accesses = b.accesses.into_iter().map(|a| evaluate_typeref(ctx, a)).collect();
     b.sub_blocks = b.sub_blocks.into_iter().map(|sub| execute_block(ctx, sub)).collect();
     b
 }
@@ -191,11 +192,177 @@ pub fn extract_base_name(query: &Query) -> String {
 }
 
 /// Evaluates a query algebraically against the global registry and current context.
+fn get_module_imports(registry: &crate::resolver::registry::GlobalRegistry, mut path: crate::model::components::QualifiedName) -> Vec<crate::model::components::Import> {
+    while !path.is_empty() {
+        if let Some(crate::resolver::registry::RegistryEntry::Module { imports }) = registry.get(&path) {
+            return imports.clone();
+        }
+        path.pop();
+    }
+    vec![]
+}
+
+fn get_all_module_imports(registry: &crate::resolver::registry::GlobalRegistry, mut path: crate::model::components::QualifiedName) -> Vec<Vec<crate::model::components::Import>> {
+    let mut stack = vec![];
+    while !path.is_empty() {
+        if let Some(crate::resolver::registry::RegistryEntry::Module { imports }) = registry.get(&path) {
+            stack.push(imports.clone());
+        }
+        path.pop();
+    }
+    stack.reverse();
+    stack
+}
+
+fn find_member(ctx: &ExecutorContext, current_path: QualifiedName, member: &String, visited: &mut std::collections::HashSet<QualifiedName>, visited_queries: &mut std::collections::HashSet<Query>) -> Option<QualifiedName> {
+    let mut candidate = current_path.clone();
+    candidate.push(member.clone());
+    
+    // 1. Direct match
+    if ctx.registry.exists(&candidate) {
+        return Some(candidate);
+    }
+
+    // Cycle check for MRO and Transitive Imports
+    let check_cycles = ctx.current_lang.as_deref().map(|l| ctx.config.get_for(l).cyclic_mro_check).unwrap_or(true);
+    if check_cycles {
+        if !visited.insert(current_path.clone()) {
+            return None; // Cycle detected
+        }
+    }
+    
+    let entry = ctx.registry.get(&current_path);
+
+    // 2. Transitive Imports Fallback (if current_path is a Module)
+    let allow_transitive = ctx.current_lang.as_deref().map(|l| ctx.config.get_for(l).transitive_imports).unwrap_or(false);
+    if allow_transitive {
+        if let Some(crate::resolver::registry::RegistryEntry::Module { imports }) = entry {
+            for imp in imports {
+                if imp.is_wildcard {
+                    // Wildcard import: search recursively in the imported module
+                    if let Some(found) = find_member(ctx, imp.path.clone(), member, visited, visited_queries) {
+                        return Some(found);
+                    }
+                } else if let Some(alias) = &imp.alias {
+                    if alias == member {
+                        return Some(imp.path.clone());
+                    }
+                } else if let Some(last) = imp.path.last() {
+                    if last == member {
+                        return Some(imp.path.clone());
+                    }
+                }
+            }
+        }
+    }
+
+    // 3. Inheritance fallback (MRO: Depth-First, Left-to-Right)
+    if let Some(crate::resolver::registry::RegistryEntry::StructuredType { super_types }) = entry {
+        for sup in super_types {
+            if let TypeRef::ResolutionQuery(q) = sup {
+                // If it's a ResolutionQuery inside super_types, we must resolve it mathematically
+                // To avoid cycles, we use evaluate_query_internal here.
+                let new_ctx = ExecutorContext {
+                    registry: ctx.registry,
+                    current_prefix: current_path.clone(),
+                    imports_stack: get_all_module_imports(ctx.registry, current_path.clone()),
+                    config: ctx.config,
+                    current_lang: ctx.current_lang.clone(),
+                    primitives: ctx.primitives,
+                };
+                if let Some(sup_path) = evaluate_query_internal(&new_ctx, q, true, visited_queries) {
+                    if let Some(found) = find_member(ctx, sup_path, member, visited, visited_queries) {
+                        return Some(found);
+                    }
+                }
+            } else if let TypeRef::Resolved(to) = sup {
+                if let Some(found) = find_member(ctx, to.clone(), member, visited, visited_queries) {
+                    return Some(found);
+                }
+            }
+        }
+    }
+    None
+}
+
 /// If `resolve_type` is true, an operation (like `Call` or `Extract` of a field) evaluates to its resulting type.
 /// If false, it evaluates to the path itself (useful for logging dependency edges).
 fn evaluate_query(ctx: &ExecutorContext, query: &Query, resolve_type: bool) -> Option<QualifiedName> {
+    let mut visited_queries = std::collections::HashSet::new();
+    evaluate_query_internal(ctx, query, resolve_type, &mut visited_queries)
+}
+
+fn evaluate_query_internal(ctx: &ExecutorContext, query: &Query, resolve_type: bool, visited_queries: &mut std::collections::HashSet<Query>) -> Option<QualifiedName> {
+    if !visited_queries.insert(query.clone()) {
+        return None;
+    }
     match query {
         Query::Find(name) => {
+            // 0. Implicit this fallback (check if name is a member of the current class)
+            // If current_prefix is inside a function, the class is current_prefix - 1
+            if let Some(crate::resolver::registry::RegistryEntry::Function { .. }) = ctx.registry.get(&ctx.current_prefix) {
+                let mut class_path = ctx.current_prefix.clone();
+                class_path.pop(); // Pop function name
+                if ctx.registry.exists(&class_path) {
+                    let mut visited = std::collections::HashSet::new();
+                    if let Some(found) = find_member(ctx, class_path.clone(), name, &mut visited, visited_queries) {
+                        if resolve_type {
+                            if let Some(crate::resolver::registry::RegistryEntry::Field { field_type }) = ctx.registry.get(&found) {
+                                return match field_type {
+                                    TypeRef::ResolutionQuery(ret_q) => {
+                                        let mut base_path = found.clone();
+                                        base_path.pop(); // Pop field name
+                                        let new_ctx = ExecutorContext {
+                                            registry: ctx.registry,
+                                            current_prefix: base_path.clone(),
+                                            imports_stack: get_all_module_imports(ctx.registry, base_path.clone()),
+                                            config: ctx.config,
+                                            current_lang: ctx.current_lang.clone(),
+                                            primitives: ctx.primitives,
+                                        };
+                                        evaluate_query_internal(&new_ctx, ret_q, true, visited_queries)
+                                    },
+                                    TypeRef::Resolved(qn) | TypeRef::External(qn) => Some(qn.clone()),
+                                    TypeRef::Unresolved(qn) => {
+                                        let mut resolved = None;
+                                        let imports = get_module_imports(ctx.registry, found.clone());
+                                        for imp in &imports {
+                                            if let Some(last) = imp.path.last() {
+                                                if last == &qn[0] {
+                                                    let mut r = imp.path.clone();
+                                                    r.extend(qn.iter().skip(1).cloned());
+                                                    let mut root_r = vec!["root".to_string()];
+                                                    root_r.extend(r.clone());
+                                                    if ctx.registry.exists(&root_r) {
+                                                        resolved = Some(root_r);
+                                                        break;
+                                                    } else if ctx.registry.exists(&r) {
+                                                        resolved = Some(r);
+                                                        break;
+                                                    }
+                                                }
+                                            }
+                                        }
+                                        resolved.or_else(|| {
+                                            let mut root_cand = vec!["root".to_string()];
+                                            root_cand.extend(qn.clone());
+                                            if ctx.registry.exists(&root_cand) {
+                                                Some(root_cand)
+                                            } else {
+                                                Some(qn.clone())
+                                            }
+                                        })
+                                    },
+                                    _ => None,
+                                };
+                            }
+                        } else {
+                            return Some(found);
+                        }
+                    }
+                }
+            }
+
             // Find-going-up: Ascend the current prefix
             let mut prefix = ctx.current_prefix.clone();
             loop {
@@ -211,10 +378,20 @@ fn evaluate_query(ctx: &ExecutorContext, query: &Query, resolve_type: bool) -> O
                     for imp in level_imports {
                         if let Some(alias) = &imp.alias {
                             if alias == name {
+                                let mut r = vec!["root".to_string()];
+                                r.extend(imp.path.clone());
+                                if ctx.registry.exists(&r) {
+                                    return Some(r);
+                                }
                                 return Some(imp.path.clone());
                             }
                         } else if let Some(last) = imp.path.last() {
                             if last == name {
+                                let mut r = vec!["root".to_string()];
+                                r.extend(imp.path.clone());
+                                if ctx.registry.exists(&r) {
+                                    return Some(r);
+                                }
                                 return Some(imp.path.clone());
                             }
                         }
@@ -241,71 +418,13 @@ fn evaluate_query(ctx: &ExecutorContext, query: &Query, resolve_type: bool) -> O
         }
         Query::Extract(parent_query, member_name) => {
             // Find-going-down
-            let parent_path = evaluate_query(ctx, parent_query, true)?;
+            let parent_path = evaluate_query_internal(ctx, parent_query, true, visited_queries)?;
             
-            // Function to recursively search for a member in a class and its super_types
-            fn find_member(ctx: &ExecutorContext, current_path: QualifiedName, member: &String, visited: &mut std::collections::HashSet<QualifiedName>) -> Option<QualifiedName> {
-                let mut candidate = current_path.clone();
-                candidate.push(member.clone());
-                
-                // 1. Direct match
-                if ctx.registry.exists(&candidate) {
-                    return Some(candidate);
-                }
-
-                // Cycle check for MRO and Transitive Imports
-                let check_cycles = ctx.current_lang.as_deref().map(|l| ctx.config.get_for(l).cyclic_mro_check).unwrap_or(true);
-                if check_cycles {
-                    if !visited.insert(current_path.clone()) {
-                        return None; // Cycle detected
-                    }
-                }
-                
-                let entry = ctx.registry.get(&current_path);
-
-                // 2. Transitive Imports Fallback (if current_path is a Module)
-                let allow_transitive = ctx.current_lang.as_deref().map(|l| ctx.config.get_for(l).transitive_imports).unwrap_or(false);
-                if allow_transitive {
-                    if let Some(crate::resolver::registry::RegistryEntry::Module { imports }) = entry {
-                        for imp in imports {
-                            if imp.is_wildcard {
-                                // Wildcard import: search recursively in the imported module
-                                if let Some(found) = find_member(ctx, imp.path.clone(), member, visited) {
-                                    return Some(found);
-                                }
-                            } else if let Some(alias) = &imp.alias {
-                                if alias == member {
-                                    return Some(imp.path.clone());
-                                }
-                            } else if let Some(last) = imp.path.last() {
-                                if last == member {
-                                    return Some(imp.path.clone());
-                                }
-                            }
-                        }
-                    }
-                }
-
-                // 3. Inheritance fallback (MRO: Depth-First, Left-to-Right)
-                if let Some(crate::resolver::registry::RegistryEntry::StructuredType { super_types }) = entry {
-                    for sup in super_types {
-                        if let TypeRef::ResolutionQuery(q) = sup {
-                            if let Some(sup_path) = evaluate_query(ctx, q, true) {
-                                if let Some(found) = find_member(ctx, sup_path, member, visited) {
-                                    return Some(found);
-                                }
-                            }
-                        }
-                    }
-                }
-                None
-            }
-
             let mut target_path = parent_path.clone();
             target_path.push(member_name.clone());
 
             let mut visited = std::collections::HashSet::new();
-            if let Some(found_path) = find_member(ctx, parent_path.clone(), member_name, &mut visited) {
+            if let Some(found_path) = find_member(ctx, parent_path.clone(), member_name, &mut visited, visited_queries) {
                 target_path = found_path;
             }
 
@@ -313,10 +432,50 @@ fn evaluate_query(ctx: &ExecutorContext, query: &Query, resolve_type: bool) -> O
                 // If we need the type of this field (e.g. chained access `a.b.c`), look up the field in the registry
                 if let Some(crate::resolver::registry::RegistryEntry::Field { field_type }) = ctx.registry.get(&target_path) {
                     match field_type {
-                        TypeRef::ResolutionQuery(ret_q) => evaluate_query(ctx, ret_q, true),
-                        TypeRef::Resolved(qn) => Some(qn.clone()),
-                        TypeRef::External(qn) => Some(qn.clone()),
-                        TypeRef::Unresolved(qn) => Some(qn.clone()),
+                        TypeRef::ResolutionQuery(ret_q) => {
+                            let mut base_path = target_path.clone();
+                            base_path.pop(); // Pop field name
+                            let new_ctx = ExecutorContext {
+                                registry: ctx.registry,
+                                current_prefix: base_path.clone(),
+                                imports_stack: get_all_module_imports(ctx.registry, base_path),
+                                config: ctx.config,
+                                current_lang: ctx.current_lang.clone(),
+                                primitives: ctx.primitives,
+                            };
+                            evaluate_query_internal(&new_ctx, ret_q, true, visited_queries)
+                        },
+                        TypeRef::Resolved(qn) | TypeRef::External(qn) => Some(qn.clone()),
+                        TypeRef::Unresolved(qn) => {
+                            let mut resolved = None;
+                            let imports = get_module_imports(ctx.registry, target_path.clone());
+                            for imp in &imports {
+                                if let Some(last) = imp.path.last() {
+                                    if last == &qn[0] {
+                                        let mut r = imp.path.clone();
+                                        r.extend(qn.iter().skip(1).cloned());
+                                        let mut root_r = vec!["root".to_string()];
+                                        root_r.extend(r.clone());
+                                        if ctx.registry.exists(&root_r) {
+                                            resolved = Some(root_r);
+                                            break;
+                                        } else if ctx.registry.exists(&r) {
+                                            resolved = Some(r);
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
+                            resolved.or_else(|| {
+                                let mut root_cand = vec!["root".to_string()];
+                                root_cand.extend(qn.clone());
+                                if ctx.registry.exists(&root_cand) {
+                                    Some(root_cand)
+                                } else {
+                                    Some(qn.clone())
+                                }
+                            })
+                        },
                         _ => None,
                     }
                 } else {
@@ -329,17 +488,57 @@ fn evaluate_query(ctx: &ExecutorContext, query: &Query, resolve_type: bool) -> O
             }
         }
         Query::Call(target_query) => {
-            let target_path = evaluate_query(ctx, target_query, false)?;
+            let target_path = evaluate_query_internal(ctx, target_query, false, visited_queries)?;
 
             if resolve_type {
                 // If we need the return type (e.g. chained calls `a.f().g()`), we look up the target_path in the registry
                 if let Some(crate::resolver::registry::RegistryEntry::Function { return_type }) = ctx.registry.get(&target_path) {
                     // Try to evaluate the return type mathematically!
                     match return_type {
-                        TypeRef::ResolutionQuery(ret_q) => evaluate_query(ctx, ret_q, true),
-                        TypeRef::Resolved(qn) => Some(qn.clone()),
-                        TypeRef::External(qn) => Some(qn.clone()),
-                        TypeRef::Unresolved(qn) => Some(qn.clone()), // Fallback, though builder substitutes all
+                        TypeRef::ResolutionQuery(ret_q) => {
+                            let mut base_path = target_path.clone();
+                            base_path.pop(); // Pop method name
+                            let new_ctx = ExecutorContext {
+                                registry: ctx.registry,
+                                current_prefix: base_path,
+                                imports_stack: ctx.imports_stack.clone(),
+                                config: ctx.config,
+                                current_lang: ctx.current_lang.clone(),
+                                primitives: ctx.primitives,
+                            };
+                            evaluate_query_internal(&new_ctx, ret_q, true, visited_queries)
+                        },
+                        TypeRef::Resolved(qn) | TypeRef::External(qn) => Some(qn.clone()),
+                        TypeRef::Unresolved(qn) => {
+                            let mut resolved = None;
+                            let imports = get_module_imports(ctx.registry, target_path.clone());
+                            for imp in &imports {
+                                if let Some(last) = imp.path.last() {
+                                    if last == &qn[0] {
+                                        let mut r = imp.path.clone();
+                                        r.extend(qn.iter().skip(1).cloned());
+                                        let mut root_r = vec!["root".to_string()];
+                                        root_r.extend(r.clone());
+                                        if ctx.registry.exists(&root_r) {
+                                            resolved = Some(root_r);
+                                            break;
+                                        } else if ctx.registry.exists(&r) {
+                                            resolved = Some(r);
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
+                            resolved.or_else(|| {
+                                let mut root_cand = vec!["root".to_string()];
+                                root_cand.extend(qn.clone());
+                                if ctx.registry.exists(&root_cand) {
+                                    Some(root_cand)
+                                } else {
+                                    Some(qn.clone())
+                                }
+                            })
+                        },
                         _ => None,
                     }
                 } else {

@@ -9,6 +9,15 @@ pub fn is_module(node: Node) -> bool {
     kind.contains("mod_item") || kind.contains("module") || kind.contains("namespace")
 }
 
+/// Heuristically determines if a node is a file-level package declaration.
+pub fn is_package_declaration(node: Node) -> bool {
+    if !node.is_named() {
+        return false;
+    }
+    let kind = node.kind();
+    kind == "package_declaration" || kind == "package_clause"
+}
+
 /// Heuristically determines if a node is a structured type definition (Struct, Class, Interface, etc.).
 pub fn is_structured_type(node: Node) -> bool {
     if !node.is_named() {
@@ -46,7 +55,8 @@ pub fn is_function(node: Node) -> bool {
     (kind.contains("function")
         || kind.contains("method")
         || kind.contains("fn_item")
-        || kind.contains("func"))
+        || kind.contains("func")
+        || kind.contains("constructor"))
         && !kind.contains("class")
 }
 

@@ -81,7 +81,7 @@ $$ \texttt{Call(Extract(Extract(Extract(Find('a'), 'b'), 'T'), 'f'))} $$
 
 Al termine dell'attraversamento, l'ambiente lessicale $\rho$ viene
 completamente distrutto, lasciando l'IR popolato unicamente da
-espressioni algebriche pure.
+espressioni che non dipendono dalle variabili locali.
 
 \section{Fase 2b: Esecuzione delle Query (Navigation Phase)}
 
@@ -106,9 +106,7 @@ dove:
   \item $\mathcal{GR}$ è il \textbf{Global Registry}: un indice
     piatto creato a tempo zero, appena prima dell'esecuzione. Mappa
     ogni percorso assoluto ($\mathcal{QN}$) ai suoi metadati
-    architetturali (es. tipi di ritorno e firme ereditate). È il
-    motore che garantisce tempi di accesso costanti $\mathcal{O}(1)$,
-    eliminando il degrado prestazionale delle navigazioni ad albero.
+    architetturali (es. tipi di ritorno e firme ereditate).
   \item $\mathcal{PR}$ è il \textbf{Primitive Registry}, il
     dizionario data-driven contenente le parole chiave dei tipi base
     del linguaggio in uso.
