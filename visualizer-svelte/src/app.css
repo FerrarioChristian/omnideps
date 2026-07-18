@@ -16,7 +16,7 @@ body {
   left: 20px;
   background: rgba(30, 30, 30, 0.85);
   color: #ecf0f1;
-  padding: 20px;
+  padding: 12px 15px;
   border-radius: 12px;
   border: 1px solid #444;
   z-index: 10;
@@ -26,21 +26,22 @@ body {
 }
 
 #info h3 {
-  margin: 0 0 15px 0;
-  font-size: 16px;
+  margin: 0 0 0 0;
+  font-size: 15px;
   color: #bdc3c7;
   text-transform: uppercase;
   letter-spacing: 1px;
 }
 
 #status {
-  font-size: 13px;
+  font-size: 12px;
   color: #2ecc71;
-  margin-bottom: 15px;
+  margin-bottom: 10px;
   word-break: break-all;
 }
 
-select {
+select,
+input[type="text"] {
   padding: 8px 12px;
   width: 100%;
   background: #2c3e50;
@@ -51,19 +52,21 @@ select {
   outline: none;
   cursor: pointer;
   transition: border-color 0.2s;
+  box-sizing: border-box;
 }
 
-select:hover {
+select:hover,
+input[type="text"]:focus {
   border-color: #0969da;
 }
 
 .toggles-container {
-  margin-top: 20px;
-  padding-top: 15px;
+  margin-top: 12px;
+  padding-top: 10px;
   border-top: 1px solid #444;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
 }
 
 .toggle-row {
@@ -83,9 +86,9 @@ select:hover {
 
 /* Accordion (Details) */
 details.advanced-filters {
-  margin-top: 15px;
+  margin-top: 10px;
   border-top: 1px solid #444;
-  padding-top: 10px;
+  padding-top: 8px;
 }
 details.advanced-filters summary {
   cursor: pointer;
@@ -130,7 +133,7 @@ details.advanced-filters[open] summary::before {
   width: 280px;
   background: rgba(30, 30, 30, 0.85);
   color: #ecf0f1;
-  padding: 25px;
+  padding: 15px 20px;
   border-radius: 12px;
   border: 1px solid #444;
   z-index: 10;
@@ -143,31 +146,31 @@ details.advanced-filters[open] summary::before {
 }
 #sidebar h2 {
   margin: 0;
-  font-size: 22px;
+  font-size: 18px;
   color: #fff;
   word-break: break-word;
 }
 #sidebar h3 {
-  font-size: 14px;
+  font-size: 12px;
   color: #bdc3c7;
   text-transform: uppercase;
   margin-bottom: 5px;
-  margin-top: -5px;
+  margin-top: 0;
 }
 .sidebar-stat {
   display: flex;
   justify-content: space-between;
   align-items: center;
   border-bottom: 1px solid #444;
-  padding: 10px 0;
-  font-size: 14px;
+  padding: 8px 0;
+  font-size: 13px;
 }
 .sidebar-stat strong {
   color: #0969da;
-  font-size: 20px;
+  font-size: 18px;
 }
 #sb-extra {
-  margin-top: 20px;
+  margin-top: 15px;
   font-size: 13px;
   color: #95a5a6;
   background: rgba(0, 0, 0, 0.3);
@@ -180,53 +183,86 @@ details.advanced-filters[open] summary::before {
   position: absolute;
   bottom: 20px;
   right: 20px;
-  background: #0969da;
-  color: white;
-  width: 4rem;
-  height: 4rem;
+  background: rgba(30, 30, 30, 0.85);
+  color: #bdc3c7;
+  width: 3.5rem;
+  height: 3.5rem;
+  border: 1px solid #444;
   text-decoration: none;
   border-radius: 999px;
   font-weight: bold;
   font-family: sans-serif;
-  font-size: 32px;
+  font-size: 24px;
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 10;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(5px);
+  transition: all 0.2s;
 }
 
 .legendBtn:hover {
-  background: #0a7af0;
+  background: #0969da;
+  color: white;
+  border-color: #0969da;
   cursor: pointer;
 }
 
-#search-container {
+#node-search-box {
+  padding: 8px 12px;
+  font-size: 13px;
+  width: 100%;
+  border-radius: 6px;
+  border: 1px solid #444;
+  background: rgba(20, 20, 20, 0.9);
+  color: white;
+  outline: none;
+  transition: all 0.2s ease;
+  box-sizing: border-box;
+}
+
+#node-search-box:focus {
+  border-color: #0969da;
+}
+
+#node-search-box::placeholder {
+  color: #888;
+}
+
+/* Nav Menu Styles */
+.nav-menu {
   position: absolute;
-  top: 20px;
+  bottom: 20px;
   left: 50%;
   transform: translateX(-50%);
+  display: flex;
+  gap: 15px;
+  background: rgba(30, 30, 30, 0.85);
+  padding: 10px 20px;
+  border-radius: 30px;
+  border: 1px solid #444;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(5px);
   z-index: 10;
 }
 
-#search-box {
-  padding: 12px 24px;
-  font-size: 16px;
-  width: 400px;
-  border-radius: 30px;
-  border: 1px solid #444;
-  background: rgba(30, 30, 30, 0.9);
-  color: white;
-  outline: none;
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
-  transition: all 0.2s ease;
-  backdrop-filter: blur(5px);
+.nav-menu a {
+  color: #bdc3c7;
+  text-decoration: none;
+  font-weight: bold;
+  font-size: 14px;
+  padding: 8px 16px;
+  border-radius: 20px;
+  transition: all 0.2s;
 }
 
-#search-box:focus {
-  border-color: #0969da;
-  box-shadow: 0 4px 20px rgba(9, 105, 218, 0.4);
+.nav-menu a:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.1);
 }
 
-#search-box::placeholder {
-  color: #888;
+.nav-menu a.active {
+  color: #fff;
+  background: #0969da;
 }

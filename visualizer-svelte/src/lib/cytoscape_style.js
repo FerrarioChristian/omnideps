@@ -88,6 +88,16 @@ const style = [
 		}
 	},
 	{
+		selector: 'node[type = "StaticVariable"]',
+		style: {
+			'background-color': '#f1c40f',
+			'shape': 'round-rectangle',
+			'padding': '6px',
+            'color': '#333',
+            'text-outline-width': 0
+		}
+	},
+	{
 		selector: 'node[type = "External"]',
 		style: {
 			'background-color': '#34495e',
