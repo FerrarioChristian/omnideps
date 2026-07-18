@@ -74,6 +74,8 @@ pub fn try_parse_function(node: Node, source: &str) -> Option<Function> {
     }
 
     let name = extract_identifier(node, source).unwrap_or_else(|| "unnamed_function".to_string());
+    let is_constructor = node.kind().contains("constructor");
+    
     let parameters = extract_parameters(node, source);
     let return_type = extract_return_type(node, source);
 
@@ -103,6 +105,7 @@ pub fn try_parse_function(node: Node, source: &str) -> Option<Function> {
             return_type,
         },
         body,
+        is_constructor,
     })
 }
 
@@ -197,78 +200,6 @@ pub fn try_parse_import(node: Node, source: &str) -> Option<Import> {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn try_parse_java_constructor() {
-        let source = std::fs::read_to_string(
-            "tests/benchmark-java/src/domain/direct/violating/CallInstance.java",
-        )
-        .unwrap();
-        let mut parser = tree_sitter::Parser::new();
-        parser
-            .set_language(&tree_sitter_java::LANGUAGE.into())
-            .unwrap();
-        let tree = parser.parse(&source, None).unwrap();
-
-        let mut cursor = tree.root_node().walk();
-        for child in tree.root_node().children(&mut cursor) {
-            if child.kind() == "class_declaration" {
-                if let Some(body) = child.child_by_field_name("body") {
-                    let mut c2 = body.walk();
-                    for c in body.children(&mut c2) {
-                        if c.kind() == "constructor_declaration" {
-                            if let Some(func) = try_parse_function(c, &source) {
-                                println!(
-                                    "Extracted function body calls size: {}",
-                                    func.body.map_or(0, |b| b.calls.len())
-                                );
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-#[cfg(test)]
 mod parse_tests {
-    use super::*;
-    #[test]
-    fn print_calls() {
-        let source = std::fs::read_to_string(
-            "tests/benchmark-java/src/domain/direct/violating/CallInstance.java",
-        )
-        .unwrap();
-        let mut parser = tree_sitter::Parser::new();
-        parser
-            .set_language(&tree_sitter_java::LANGUAGE.into())
-            .unwrap();
-        let tree = parser.parse(&source, None).unwrap();
-
-        let mut cursor = tree.root_node().walk();
-        for child in tree.root_node().children(&mut cursor) {
-            if child.kind() == "class_declaration" {
-                if let Some(body) = child.child_by_field_name("body") {
-                    let mut c2 = body.walk();
-                    for c in body.children(&mut c2) {
-                        if c.kind() == "constructor_declaration" {
-                            if let Some(_func) = try_parse_function(c, &source) {
-                                if let Some(p) = c.child_by_field_name("parameters") {
-                                    println!("parameters node: {}", p.to_sexp());
-
-                                    let mut cc = p.walk();
-                                    for child in p.children(&mut cc) {
-                                        println!("  child kind: {}", child.kind());
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
+    // Tests vuoti per ora, quelli temporanei di debug sono stati rimossi.
 }

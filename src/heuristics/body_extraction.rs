@@ -150,21 +150,7 @@ fn find_behavioral_deps(
 
     // --- Calls ---
     if matches!(kind, "call_expression" | "call") {
-        if let Some(f) = node.child_by_field_name("function") {
-            let f_kind = f.kind();
-            if matches!(f_kind, "qualified_identifier" | "scoped_identifier") {
-                if let Some(scope) = f
-                    .child_by_field_name("scope")
-                    .or_else(|| f.child_by_field_name("path"))
-                {
-                    calls.push(extract_type_ref(scope, source));
-                }
-            } else if matches!(f_kind, "field_expression" | "attribute") {
-                calls.push(extract_type_ref(f, source));
-            } else if matches!(f_kind, "identifier" | "type_identifier") {
-                calls.push(extract_type_ref(f, source));
-            }
-        }
+        extract_call_dependency(node, source, calls);
     } else if kind == "method_invocation" {
         // Java
         let mut parts = vec![];
@@ -184,8 +170,14 @@ fn find_behavioral_deps(
     }
 
     // --- Accesses ---
-    if matches!(kind, "field_access" | "member_expression" | "property_identifier" | "member_access" | "identifier") {
+    if matches!(kind, "field_access" | "member_expression" | "property_identifier" | "member_access" | "identifier" | "field_expression") {
         accesses.push(extract_type_ref(node, source));
+    }
+
+    // --- Token Tree Coalescing (e.g. for Rust macros or generic unparsed blocks) ---
+    if kind == "token_tree" {
+        parse_token_tree_macro(node, source, calls, instantiates, accesses);
+        return;
     }
 
     let mut cursor = node.walk();
@@ -233,4 +225,81 @@ pub fn infer_variable_type(node: Node, source: &str) -> TypeRef {
         }
     }
     TypeRef::Failed(vec![])
+}
+
+/// Extracts a method or function call dependency from a call expression node.
+///
+/// It correctly handles `qualified_identifier` and `scoped_identifier` nodes by 
+/// extracting the full path to the function being called, ensuring that static 
+/// method calls (e.g., `StructA::static_method`) are correctly resolved instead of just their scope.
+fn extract_call_dependency(
+    node: Node,
+    source: &str,
+    calls: &mut Vec<TypeRef>,
+) {
+    if let Some(f) = node.child_by_field_name("function") {
+        let f_kind = f.kind();
+        if matches!(
+            f_kind,
+            "qualified_identifier" | "scoped_identifier" | "field_expression" | "attribute" | "identifier" | "type_identifier"
+        ) {
+            calls.push(extract_type_ref(f, source));
+        }
+    }
+}
+
+/// Extracts behavioral dependencies (calls and accesses) from a `token_tree` node.
+/// 
+/// In Tree-sitter (especially for Rust macros like `println!`), `token_tree` nodes 
+/// contain a flat list of tokens without semantic grouping. This function implements 
+/// a state machine (Token Coalescing) to reconstruct qualified paths 
+/// (e.g., `StructA::method().x`) and correctly categorize them as method calls or field accesses.
+fn parse_token_tree_macro(
+    node: Node,
+    source: &str,
+    calls: &mut Vec<TypeRef>,
+    instantiates: &mut Vec<TypeRef>,
+    accesses: &mut Vec<TypeRef>,
+) {
+    let mut current_path: Vec<String> = vec![];
+    let mut expect_ident = true;
+
+    let mut i = 0;
+    let count = node.child_count();
+    while i < count {
+        let child = node.child(i as u32).unwrap();
+        let c_kind = child.kind();
+        
+        if expect_ident && (c_kind == "identifier" || c_kind == "type_identifier" || c_kind == "scoped_identifier") {
+            let text = node_text(child, source);
+            if c_kind == "scoped_identifier" {
+                current_path.extend(split_qualified_name(&text));
+            } else {
+                current_path.push(text);
+            }
+            expect_ident = false;
+        } else if !expect_ident && (c_kind == "." || c_kind == "::") {
+            expect_ident = true;
+        } else if !expect_ident && c_kind == "token_tree" {
+            calls.push(TypeRef::Unresolved(current_path.clone()));
+            // Path does not break on method calls if followed by .
+        } else {
+            if current_path.len() > 1 {
+                accesses.push(TypeRef::Unresolved(current_path.clone()));
+            } else if current_path.len() == 1 {
+                accesses.push(TypeRef::Unresolved(current_path.clone()));
+            }
+            
+            current_path.clear();
+            expect_ident = true;
+            
+            // Recurse into this child
+            find_behavioral_deps(child, source, calls, instantiates, accesses);
+        }
+        i += 1;
+    }
+    
+    if !current_path.is_empty() {
+        accesses.push(TypeRef::Unresolved(current_path));
+    }
 }

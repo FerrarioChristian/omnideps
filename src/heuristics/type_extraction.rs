@@ -22,6 +22,10 @@ pub fn determine_structured_kind(kind: &str, text: &str) -> StructuredTypeKind {
         StructuredTypeKind::Trait
     } else if kind.contains("struct") || text.contains("struct") {
         StructuredTypeKind::Struct
+    } else if kind.contains("enum_variant") {
+        StructuredTypeKind::EnumVariant
+    } else if kind.contains("enum") || text.contains("enum") {
+        StructuredTypeKind::Enum
     } else {
         StructuredTypeKind::Class
     }
@@ -53,16 +57,8 @@ pub fn extract_type_ref(node: Node, source: &str) -> TypeRef {
     }
 
     // 1. Try with common Tree-sitter fields
-    if let Some(type_node) = node
-        .child_by_field_name("type")
-        .or_else(|| node.child_by_field_name("return_type"))
-        .or_else(|| node.child_by_field_name("field_type"))
-        .or_else(|| node.child_by_field_name("value_type"))
-    {
-        let text = node_text(type_node, source);
-        if !text.is_empty() {
-            return TypeRef::Unresolved(split_qualified_name(&text));
-        }
+    if let Some(type_ref) = try_extract_from_type_field(node, source) {
+        return type_ref;
     }
 
     // 2. Fallback: look for generic identifier types
@@ -96,4 +92,22 @@ pub fn extract_type_ref(node: Node, source: &str) -> TypeRef {
     }
 
     TypeRef::Failed(vec![])
+}
+
+/// Attempts to extract a `TypeRef` by inspecting common Tree-sitter type fields.
+///
+/// Fields like `type`, `return_type`, `field_type`, or `value_type` often contain 
+/// the actual type node. This function recursively calls `extract_type_ref` on 
+/// these fields to properly resolve nested types (e.g., unwrapping references like `&StructA`).
+fn try_extract_from_type_field(node: Node, source: &str) -> Option<TypeRef> {
+    if let Some(type_node) = node
+        .child_by_field_name("type")
+        .or_else(|| node.child_by_field_name("return_type"))
+        .or_else(|| node.child_by_field_name("field_type"))
+        .or_else(|| node.child_by_field_name("value_type"))
+    {
+        Some(extract_type_ref(type_node, source))
+    } else {
+        None
+    }
 }

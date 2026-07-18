@@ -2,17 +2,18 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub enum ModuleStrategy {
-    DirectoryBased,
-    PackageBased,
-    SingleRoot,
+pub struct ModuleConfig {
+    pub implicit_file_modules: bool,
+    pub file_level_declarations: bool,
+    pub inline_module_blocks: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LanguageConfig {
-    pub module_strategy: ModuleStrategy,
+    pub modules: ModuleConfig,
     pub transitive_imports: bool,
-    pub cyclic_mro_check: bool,
+    pub support_impl_blocks: bool,
+    pub self_keyword: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -34,42 +35,72 @@ impl AnalyzerConfig {
         
         // Python: Directory Based, transitive imports allowed
         languages.insert("python".to_string(), LanguageConfig {
-            module_strategy: ModuleStrategy::DirectoryBased,
+            modules: ModuleConfig {
+                implicit_file_modules: true,
+                file_level_declarations: false,
+                inline_module_blocks: false,
+            },
             transitive_imports: true,
-            cyclic_mro_check: true,
+            support_impl_blocks: false,
+            self_keyword: "self".to_string(),
         });
 
         // Rust: Directory Based, no transitive imports
         languages.insert("rust".to_string(), LanguageConfig {
-            module_strategy: ModuleStrategy::DirectoryBased,
+            modules: ModuleConfig {
+                implicit_file_modules: true,
+                file_level_declarations: false,
+                inline_module_blocks: true,
+            },
             transitive_imports: false,
-            cyclic_mro_check: true,
+            support_impl_blocks: true,
+            self_keyword: "self".to_string(),
         });
 
         // Java: Package Based
         languages.insert("java".to_string(), LanguageConfig {
-            module_strategy: ModuleStrategy::PackageBased,
+            modules: ModuleConfig {
+                implicit_file_modules: false,
+                file_level_declarations: true,
+                inline_module_blocks: false,
+            },
             transitive_imports: false,
-            cyclic_mro_check: true,
+            support_impl_blocks: false,
+            self_keyword: "this".to_string(),
         });
 
         // C++ / C: Package/Namespace Based
         languages.insert("cpp".to_string(), LanguageConfig {
-            module_strategy: ModuleStrategy::PackageBased,
+            modules: ModuleConfig {
+                implicit_file_modules: false,
+                file_level_declarations: false,
+                inline_module_blocks: true,
+            },
             transitive_imports: false,
-            cyclic_mro_check: true,
+            support_impl_blocks: true, // C++ can implement methods outside class declaration
+            self_keyword: "this".to_string(),
         });
         languages.insert("c".to_string(), LanguageConfig {
-            module_strategy: ModuleStrategy::PackageBased,
+            modules: ModuleConfig {
+                implicit_file_modules: false,
+                file_level_declarations: false,
+                inline_module_blocks: false,
+            },
             transitive_imports: false,
-            cyclic_mro_check: true,
+            support_impl_blocks: false,
+            self_keyword: "this".to_string(),
         });
 
         Self {
             default_config: LanguageConfig {
-                module_strategy: ModuleStrategy::SingleRoot,
+                modules: ModuleConfig {
+                    implicit_file_modules: false,
+                    file_level_declarations: false,
+                    inline_module_blocks: false,
+                },
                 transitive_imports: false,
-                cyclic_mro_check: true,
+                support_impl_blocks: false,
+                self_keyword: "this".to_string(),
             },
             languages,
         }

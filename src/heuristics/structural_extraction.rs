@@ -33,7 +33,8 @@ where
             && (child.kind().contains("body")
                 || child.kind().contains("list")
                 || child.kind().contains("block")
-                || child.kind().contains("declaration"))
+                || child.kind().contains("declaration")
+                || child.kind().contains("variant"))
         {
             items.extend(extract_list_of(child, source, parser));
         }
@@ -43,7 +44,7 @@ where
 
 /// Extracts all field (property) declarations from a given node.
 pub fn extract_fields(node: Node, source: &str) -> Vec<Field> {
-    extract_list_of(node, source, |child, src| {
+    let mut fields = extract_list_of(node, source, |child, src| {
         if matches!(
             child.kind(),
             "field_declaration"
@@ -59,7 +60,41 @@ pub fn extract_fields(node: Node, source: &str) -> Vec<Field> {
             }
         }
         None
-    })
+    });
+
+    // Handle Rust's Tuple Structs / Enum Tuple Variants
+    fn extract_tuple_fields(n: Node, src: &str, fds: &mut Vec<Field>) {
+        if n.kind() == "ordered_field_declaration_list" {
+            let mut index = 0;
+            let mut c = n.walk();
+            for child in n.children(&mut c) {
+                let kind = child.kind();
+                if kind == "visibility_modifier"
+                    || kind == ","
+                    || kind == "("
+                    || kind == ")"
+                    || kind.contains("attribute")
+                {
+                    continue;
+                }
+                fds.push(Field {
+                    name: index.to_string(),
+                    ty: extract_type_ref(child, src),
+                });
+                index += 1;
+            }
+        } else {
+            let mut c = n.walk();
+            for child in n.children(&mut c) {
+                if !crate::heuristics::classifiers::is_function(child) {
+                    extract_tuple_fields(child, src, fds);
+                }
+            }
+        }
+    }
+    extract_tuple_fields(node, source, &mut fields);
+
+    fields
 }
 
 /// Extracts all method declarations from a given node.
@@ -230,4 +265,3 @@ pub fn extract_implements_trait(node: Node, source: &str) -> Option<TypeRef> {
     }
     None
 }
-

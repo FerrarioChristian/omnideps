@@ -90,7 +90,8 @@ pub fn export_graphs(graphs: &[DependencyGraph], out_path: &Path) -> anyhow::Res
                     let name = f.name.last().cloned().unwrap_or_else(|| "".to_string());
                     let label = format!("{}()", name);
                     let parent = get_parent_id(&f.name);
-                    add_node(&mut elements, &mut added_nodes, id, label, "Function".to_string(), parent);
+                    let ty_str = if f.is_constructor { "Constructor".to_string() } else { "Function".to_string() };
+                    add_node(&mut elements, &mut added_nodes, id, label, ty_str, parent);
                 }
                 Component::Field(name, _ty) => {
                     let id = qn_to_id(name);

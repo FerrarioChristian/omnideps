@@ -12,7 +12,7 @@ use std::collections::HashMap;
 pub enum RegistryEntry {
     Module { imports: Vec<crate::model::Import> },
     StructuredType { super_types: Vec<TypeRef> },
-    Function { return_type: TypeRef },
+    Function { return_type: TypeRef, is_constructor: bool },
     Field { field_type: TypeRef },
 }
 
@@ -50,7 +50,7 @@ impl GlobalRegistry {
         for ff in &m.free_functions {
             let mut ff_prefix = prefix.clone();
             ff_prefix.extend(ff.name.clone());
-            self.paths.insert(ff_prefix, RegistryEntry::Function { return_type: ff.signature.return_type.clone() });
+            self.paths.insert(ff_prefix, RegistryEntry::Function { return_type: ff.signature.return_type.clone(), is_constructor: ff.is_constructor });
         }
         for ib in &m.impl_blocks {
             // Register ImplBlock methods and nested types
@@ -65,7 +65,7 @@ impl GlobalRegistry {
                 for method in &ib.methods {
                     let mut m_prefix = target_prefix.clone();
                     m_prefix.extend(method.name.clone());
-                    self.paths.insert(m_prefix, RegistryEntry::Function { return_type: method.signature.return_type.clone() });
+                    self.paths.insert(m_prefix, RegistryEntry::Function { return_type: method.signature.return_type.clone(), is_constructor: method.is_constructor });
                 }
                 for nested in &ib.nested_types {
                     self.register_structured_type(nested, target_prefix.clone());
@@ -91,7 +91,7 @@ impl GlobalRegistry {
         for method in &st.methods {
             let mut m_prefix = prefix.clone();
             m_prefix.extend(method.name.clone());
-            self.paths.insert(m_prefix, RegistryEntry::Function { return_type: method.signature.return_type.clone() });
+            self.paths.insert(m_prefix, RegistryEntry::Function { return_type: method.signature.return_type.clone(), is_constructor: method.is_constructor });
         }
         for nested in &st.nested_types {
             self.register_structured_type(nested, prefix.clone());

@@ -224,11 +224,8 @@ fn find_member(ctx: &ExecutorContext, current_path: QualifiedName, member: &Stri
     }
 
     // Cycle check for MRO and Transitive Imports
-    let check_cycles = ctx.current_lang.as_deref().map(|l| ctx.config.get_for(l).cyclic_mro_check).unwrap_or(true);
-    if check_cycles {
-        if !visited.insert(current_path.clone()) {
-            return None; // Cycle detected
-        }
+    if !visited.insert(current_path.clone()) {
+        return None; // Cycle detected
     }
     
     let entry = ctx.registry.get(&current_path);
@@ -369,7 +366,11 @@ fn evaluate_query_internal(ctx: &ExecutorContext, query: &Query, resolve_type: b
                 let mut candidate = prefix.clone();
                 candidate.push(name.clone());
                 if ctx.registry.exists(&candidate) {
-                    return Some(candidate);
+                    if let Some(crate::resolver::registry::RegistryEntry::Function { is_constructor: true, .. }) = ctx.registry.get(&candidate) {
+                        // Skip constructors in Find-going-up to prevent shadowing the class
+                    } else {
+                        return Some(candidate);
+                    }
                 }
                 
                 // Check imports at this level
@@ -492,7 +493,7 @@ fn evaluate_query_internal(ctx: &ExecutorContext, query: &Query, resolve_type: b
 
             if resolve_type {
                 // If we need the return type (e.g. chained calls `a.f().g()`), we look up the target_path in the registry
-                if let Some(crate::resolver::registry::RegistryEntry::Function { return_type }) = ctx.registry.get(&target_path) {
+                if let Some(crate::resolver::registry::RegistryEntry::Function { return_type, .. }) = ctx.registry.get(&target_path) {
                     // Try to evaluate the return type mathematically!
                     match return_type {
                         TypeRef::ResolutionQuery(ret_q) => {
