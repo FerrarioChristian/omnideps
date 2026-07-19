@@ -12,7 +12,7 @@ export async function POST({ request }) {
         }
 
         // Validate benchmark name to avoid directory traversal
-        if (benchmark !== 'tests/benchmark-rust' && benchmark !== 'tests/benchmark-java') {
+        if (!benchmark.startsWith('tests/benchmarks/benchmark-') || benchmark.includes('..')) {
             return json({ error: 'Invalid benchmark path' }, { status: 400 });
         }
 

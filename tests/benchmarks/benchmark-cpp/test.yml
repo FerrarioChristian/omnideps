@@ -1,0 +1,92 @@
+files:
+- src/main.cpp
+- src/Vehicle.h
+- src/Vehicle.cpp
+- src/Car.h
+- src/Car.cpp
+nodes:
+- name: Transport
+  kind: namespace
+- name: Transport.Vehicle
+  kind: class
+- name: Transport.Car
+  kind: class
+- name: Transport.Vehicle.brand
+  kind: field
+- name: Transport.Vehicle.speed
+  kind: field
+- name: Transport.Car.numDoors
+  kind: field
+- name: Transport.Vehicle.accelerate
+  kind: method
+- name: Transport.Vehicle.displayInfo
+  kind: method
+- name: Transport.Vehicle.getBrand
+  kind: method
+- name: Transport.Car.accelerate
+  kind: method
+- name: Transport.Car.displayInfo
+  kind: method
+- name: main.main
+  kind: function
+edges:
+- testid: CPP-INC-1
+  source: Vehicle.cpp
+  sink: Vehicle.h
+  kind: includes
+- testid: CPP-INC-2
+  source: Car.h
+  sink: Vehicle.h
+  kind: includes
+- testid: CPP-INC-3
+  source: Car.cpp
+  sink: Car.h
+  kind: includes
+- testid: CPP-INC-4
+  source: main.cpp
+  sink: Car.h
+  kind: includes
+- testid: CPP-INH-1
+  source: Transport.Car
+  sink: Transport.Vehicle
+  kind: inherits
+- testid: CPP-CALL-1
+  source: Transport.Car.displayInfo
+  sink: Transport.Vehicle.displayInfo
+  kind: calls
+- testid: CPP-CALL-2
+  source: main.main
+  sink: Transport.Car.accelerate
+  kind: calls
+- testid: CPP-CALL-3
+  source: main.main
+  sink: Transport.Car.displayInfo
+  kind: calls
+- testid: CPP-USE-1
+  source: Transport.Car
+  sink: Transport.Vehicle
+  kind: uses_type
+- testid: CPP-USE-2
+  source: main.main
+  sink: Transport.Vehicle
+  kind: uses_type
+- testid: CPP-USE-3
+  source: main.main
+  sink: Transport.Car
+  kind: uses_type
+- testid: CPP-ACC-1
+  source: Transport.Vehicle.displayInfo
+  sink: Transport.Vehicle.brand
+  kind: accesses_field
+- testid: CPP-ACC-2
+  source: Transport.Vehicle.displayInfo
+  sink: Transport.Vehicle.speed
+  kind: accesses_field
+- testid: CPP-ACC-3
+  source: Transport.Car.accelerate
+  sink: Transport.Vehicle.speed
+  kind: accesses_field
+- testid: CPP-ACC-4
+  source: Transport.Car.displayInfo
+  sink: Transport.Car.numDoors
+  kind: accesses_field

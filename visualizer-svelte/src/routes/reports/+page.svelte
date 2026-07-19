@@ -1,7 +1,31 @@
 <script>
     import { marked } from 'marked';
+    import { onMount } from 'svelte';
 
-    let selectedBenchmark = $state('tests/benchmark-rust');
+    let benchmarkSuites = $state([]);
+    let selectedBenchmark = $state('');
+    let isFetchingSuites = $state(true);
+
+    onMount(async () => {
+        try {
+            const res = await fetch('/api/benchmark-suites?t=' + Date.now(), {
+                headers: {
+                    'Cache-Control': 'no-cache, no-store, must-revalidate',
+                    'Pragma': 'no-cache',
+                    'Expires': '0'
+                }
+            });
+            const data = await res.json();
+            benchmarkSuites = data || [];
+            if (benchmarkSuites.length > 0) {
+                selectedBenchmark = benchmarkSuites[0];
+            }
+        } catch (err) {
+            console.error('Failed to fetch benchmark suites:', err);
+        } finally {
+            isFetchingSuites = false;
+        }
+    });
     let isRunning = $state(false);
     let error = $state(null);
     let reportMarkdown = $state('');
@@ -230,9 +254,16 @@
     <div class="controls">
         <div class="form-group">
             <label for="benchmark-select">Seleziona Suite di Benchmark</label>
-            <select id="benchmark-select" bind:value={selectedBenchmark}>
-                <option value="tests/benchmark-rust">Benchmark Rust</option>
-                <option value="tests/benchmark-java">Benchmark Java</option>
+            <select id="benchmark-select" bind:value={selectedBenchmark} disabled={isFetchingSuites || isRunning}>
+                {#if isFetchingSuites}
+                    <option value="">Caricamento...</option>
+                {:else if benchmarkSuites.length === 0}
+                    <option value="">Nessun benchmark trovato</option>
+                {:else}
+                    {#each benchmarkSuites as suite}
+                        <option value={suite}>{suite.split('/').pop().replace('benchmark-', 'Benchmark ')}</option>
+                    {/each}
+                {/if}
             </select>
         </div>
         

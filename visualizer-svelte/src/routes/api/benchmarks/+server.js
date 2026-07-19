@@ -20,19 +20,15 @@ function walkDir(dir, filesList = []) {
 
 export async function GET() {
     const projectRoot = path.resolve(process.cwd(), '..');
-    const benchMain = path.join(projectRoot, 'benchmarks');
-    const benchRust = path.join(projectRoot, 'tests', 'benchmark-rust', 'src');
-    const benchJava = path.join(projectRoot, 'tests', 'benchmark-java', 'src');
+    const benchGenerics = path.join(projectRoot, 'tests', 'generics');
+    const benchSuites = path.join(projectRoot, 'tests', 'benchmarks');
     
     let files = [];
-    if (fs.existsSync(benchMain)) {
-        files = files.concat(walkDir(benchMain));
+    if (fs.existsSync(benchGenerics)) {
+        files = files.concat(walkDir(benchGenerics));
     }
-    if (fs.existsSync(benchRust)) {
-        files = files.concat(walkDir(benchRust));
-    }
-    if (fs.existsSync(benchJava)) {
-        files = files.concat(walkDir(benchJava));
+    if (fs.existsSync(benchSuites)) {
+        files = files.concat(walkDir(benchSuites));
     }
     
     // Make paths relative to project root for nicer display

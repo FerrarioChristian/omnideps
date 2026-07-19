@@ -1,4 +1,4 @@
-use language_agnostic_analyzer::analyzer::{parse_source, analyze_project};
+use language_agnostic_analyzer::analyzer::{analyze_project, parse_source};
 use language_agnostic_analyzer::language::SupportedLanguage;
 use std::fs;
 use std::path::Path;
@@ -6,7 +6,7 @@ use walkdir::WalkDir;
 
 #[test]
 fn test_benchmarks_analysis() {
-    let benchmarks_dir = Path::new("benchmarks");
+    let benchmarks_dir = Path::new("tests/generics");
     assert!(
         benchmarks_dir.exists(),
         "La directory benchmarks non esiste!"

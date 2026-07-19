@@ -8,17 +8,22 @@ The visualizer provides three primary workflows via the top navigation bar:
 
 1. **Graphs (`/`)**:
    - Visualize pre-calculated JSON output graphs located in `tests/outputs/`.
-   - Execute and visualize lightweight language benchmarks directly from the `benchmarks/` directory on the fly.
+   - Execute and visualize lightweight language benchmarks directly from the `tests/generics/` and `tests/benchmarks/` directories on the fly.
    - Includes a **Fuzzy Finder** (Cmd/Ctrl + K or Button) to quickly search and switch between available graphs.
    - Features a collapsible sidebar, node/edge search, and an interactive legend.
 
 2. **Reports (`/reports`)**:
-   - Run full benchmark suites (`tests/benchmark-rust` and `tests/benchmark-java`) via `cargo run --release --bin benchmark_runner`.
+   - Dynamically discover and run any full benchmark suite located in `tests/benchmarks/benchmark-*` via `cargo run --release --bin benchmark_runner`.
    - Automatically reads the generated `report.md` files and renders the Markdown tables natively into a beautiful, compact UI to easily spot adherence to expectations.
 
 3. **Custom Input (`/custom`)**:
    - Interactively paste raw source code in the browser and instantly render the dependency graph.
    - Point the visualizer to an absolute path on your local filesystem and trigger a real-time `cargo run` analysis for immediate visualization.
+
+4. **Docs (`/docs`)**:
+   - Browse the project's documentation via a collapsible file tree representing the `docs/` directory.
+   - Natively render Markdown files with matching UI styles.
+   - Safely display HTML documentation while dynamically overriding the CSS to enforce a seamless dark-theme experience without breaking document flow.
 
 ## Technologies Used
 
