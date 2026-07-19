@@ -1,0 +1,94 @@
+files:
+- src/main.c
+- src/math_utils.h
+- src/math_utils.c
+- src/shapes.h
+- src/shapes.c
+nodes:
+- name: math_utils
+  kind: file
+- name: shapes
+  kind: file
+- name: main
+  kind: file
+- name: math_utils.add
+  kind: function
+- name: math_utils.multiply
+  kind: function
+- name: shapes.Rectangle
+  kind: struct
+- name: shapes.Rectangle.width
+  kind: field
+- name: shapes.Rectangle.height
+  kind: field
+- name: shapes.calculate_area
+  kind: function
+- name: main.main
+  kind: function
+- name: main.global_counter
+  kind: variable
+edges:
+- testid: C-INC-1
+  source: math_utils.c
+  sink: math_utils.h
+  kind: includes
+- testid: C-INC-2
+  source: shapes.c
+  sink: shapes.h
+  kind: includes
+- testid: C-INC-3
+  source: shapes.c
+  sink: math_utils.h
+  kind: includes
+- testid: C-INC-4
+  source: main.c
+  sink: shapes.h
+  kind: includes
+- testid: C-INC-5
+  source: main.c
+  sink: math_utils.h
+  kind: includes
+- testid: C-CALL-1
+  source: math_utils.multiply
+  sink: math_utils.add
+  kind: calls
+- testid: C-CALL-2
+  source: shapes.calculate_area
+  sink: math_utils.multiply
+  kind: calls
+- testid: C-CALL-3
+  source: main.main
+  sink: shapes.calculate_area
+  kind: calls
+- testid: C-CALL-4
+  source: main.main
+  sink: math_utils.add
+  kind: calls
+- testid: C-USE-1
+  source: shapes.calculate_area
+  sink: shapes.Rectangle
+  kind: uses_type
+- testid: C-USE-2
+  source: main.main
+  sink: shapes.Rectangle
+  kind: uses_type
+- testid: C-ACC-1
+  source: shapes.calculate_area
+  sink: shapes.Rectangle.width
+  kind: accesses_field
+- testid: C-ACC-2
+  source: shapes.calculate_area
+  sink: shapes.Rectangle.height
+  kind: accesses_field
+- testid: C-ACC-3
+  source: main.main
+  sink: shapes.Rectangle.width
+  kind: accesses_field
+- testid: C-ACC-4
+  source: main.main
+  sink: shapes.Rectangle.height
+  kind: accesses_field
+- testid: C-ACC-5
+  source: main.main
+  sink: main.global_counter
+  kind: accesses_variable

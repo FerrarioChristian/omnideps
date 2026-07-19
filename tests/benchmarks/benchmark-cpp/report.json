@@ -1,0 +1,249 @@
+{
+  "files": [
+    "src/main.cpp",
+    "src/Vehicle.h",
+    "src/Vehicle.cpp",
+    "src/Car.h",
+    "src/Car.cpp"
+  ],
+  "nodes": [
+    {
+      "name": "Transport",
+      "kind": "namespace",
+      "exists": true,
+      "same_kind": true,
+      "actual_kind": "Module"
+    },
+    {
+      "name": "Transport.Vehicle",
+      "kind": "class",
+      "exists": false,
+      "same_kind": false,
+      "actual_kind": "-"
+    },
+    {
+      "name": "Transport.Car",
+      "kind": "class",
+      "exists": false,
+      "same_kind": false,
+      "actual_kind": "-"
+    },
+    {
+      "name": "Transport.Vehicle.brand",
+      "kind": "field",
+      "exists": false,
+      "same_kind": false,
+      "actual_kind": "-"
+    },
+    {
+      "name": "Transport.Vehicle.speed",
+      "kind": "field",
+      "exists": false,
+      "same_kind": false,
+      "actual_kind": "-"
+    },
+    {
+      "name": "Transport.Car.numDoors",
+      "kind": "field",
+      "exists": false,
+      "same_kind": false,
+      "actual_kind": "-"
+    },
+    {
+      "name": "Transport.Vehicle.accelerate",
+      "kind": "method",
+      "exists": false,
+      "same_kind": false,
+      "actual_kind": "-"
+    },
+    {
+      "name": "Transport.Vehicle.displayInfo",
+      "kind": "method",
+      "exists": false,
+      "same_kind": false,
+      "actual_kind": "-"
+    },
+    {
+      "name": "Transport.Vehicle.getBrand",
+      "kind": "method",
+      "exists": false,
+      "same_kind": false,
+      "actual_kind": "-"
+    },
+    {
+      "name": "Transport.Car.accelerate",
+      "kind": "method",
+      "exists": false,
+      "same_kind": false,
+      "actual_kind": "-"
+    },
+    {
+      "name": "Transport.Car.displayInfo",
+      "kind": "method",
+      "exists": false,
+      "same_kind": false,
+      "actual_kind": "-"
+    },
+    {
+      "name": "main.main",
+      "kind": "function",
+      "exists": false,
+      "same_kind": false,
+      "actual_kind": "-"
+    }
+  ],
+  "edges": [
+    {
+      "testid": "CPP-INC-1",
+      "source": "Vehicle.cpp",
+      "sink": "Vehicle.h",
+      "kind": "includes",
+      "source_exists": false,
+      "sink_exists": false,
+      "edge_exists": false,
+      "same_kind": false
+    },
+    {
+      "testid": "CPP-INC-2",
+      "source": "Car.h",
+      "sink": "Vehicle.h",
+      "kind": "includes",
+      "source_exists": false,
+      "sink_exists": false,
+      "edge_exists": false,
+      "same_kind": false
+    },
+    {
+      "testid": "CPP-INC-3",
+      "source": "Car.cpp",
+      "sink": "Car.h",
+      "kind": "includes",
+      "source_exists": false,
+      "sink_exists": false,
+      "edge_exists": false,
+      "same_kind": false
+    },
+    {
+      "testid": "CPP-INC-4",
+      "source": "main.cpp",
+      "sink": "Car.h",
+      "kind": "includes",
+      "source_exists": false,
+      "sink_exists": false,
+      "edge_exists": false,
+      "same_kind": false
+    },
+    {
+      "testid": "CPP-INH-1",
+      "source": "Transport.Car",
+      "sink": "Transport.Vehicle",
+      "kind": "inherits",
+      "source_exists": false,
+      "sink_exists": false,
+      "edge_exists": false,
+      "same_kind": false
+    },
+    {
+      "testid": "CPP-CALL-1",
+      "source": "Transport.Car.displayInfo",
+      "sink": "Transport.Vehicle.displayInfo",
+      "kind": "calls",
+      "source_exists": false,
+      "sink_exists": false,
+      "edge_exists": false,
+      "same_kind": false
+    },
+    {
+      "testid": "CPP-CALL-2",
+      "source": "main.main",
+      "sink": "Transport.Car.accelerate",
+      "kind": "calls",
+      "source_exists": false,
+      "sink_exists": false,
+      "edge_exists": false,
+      "same_kind": false
+    },
+    {
+      "testid": "CPP-CALL-3",
+      "source": "main.main",
+      "sink": "Transport.Car.displayInfo",
+      "kind": "calls",
+      "source_exists": false,
+      "sink_exists": false,
+      "edge_exists": false,
+      "same_kind": false
+    },
+    {
+      "testid": "CPP-USE-1",
+      "source": "Transport.Car",
+      "sink": "Transport.Vehicle",
+      "kind": "uses_type",
+      "source_exists": false,
+      "sink_exists": false,
+      "edge_exists": false,
+      "same_kind": false
+    },
+    {
+      "testid": "CPP-USE-2",
+      "source": "main.main",
+      "sink": "Transport.Vehicle",
+      "kind": "uses_type",
+      "source_exists": false,
+      "sink_exists": false,
+      "edge_exists": false,
+      "same_kind": false
+    },
+    {
+      "testid": "CPP-USE-3",
+      "source": "main.main",
+      "sink": "Transport.Car",
+      "kind": "uses_type",
+      "source_exists": false,
+      "sink_exists": false,
+      "edge_exists": false,
+      "same_kind": false
+    },
+    {
+      "testid": "CPP-ACC-1",
+      "source": "Transport.Vehicle.displayInfo",
+      "sink": "Transport.Vehicle.brand",
+      "kind": "accesses_field",
+      "source_exists": false,
+      "sink_exists": false,
+      "edge_exists": false,
+      "same_kind": false
+    },
+    {
+      "testid": "CPP-ACC-2",
+      "source": "Transport.Vehicle.displayInfo",
+      "sink": "Transport.Vehicle.speed",
+      "kind": "accesses_field",
+      "source_exists": false,
+      "sink_exists": false,
+      "edge_exists": false,
+      "same_kind": false
+    },
+    {
+      "testid": "CPP-ACC-3",
+      "source": "Transport.Car.accelerate",
+      "sink": "Transport.Vehicle.speed",
+      "kind": "accesses_field",
+      "source_exists": false,
+      "sink_exists": false,
+      "edge_exists": false,
+      "same_kind": false
+    },
+    {
+      "testid": "CPP-ACC-4",
+      "source": "Transport.Car.displayInfo",
+      "sink": "Transport.Car.numDoors",
+      "kind": "accesses_field",
+      "source_exists": false,
+      "sink_exists": false,
+      "edge_exists": false,
+      "same_kind": false
+    }
+  ],
+  "node_not_found_count": 11,
+  "edge_not_found_count": 15
+}

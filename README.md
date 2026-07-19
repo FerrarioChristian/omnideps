@@ -22,21 +22,26 @@ Opzioni utili:
 - `--config [FILE_CONFIG.json]`: Permette di utilizzare file di configurazione custom per l'analizzatore.
 - `--debug-refs`: Abilita il debug delle reference risolte/non risolte.
 
-### 3. Suite di Benchmark (Java / Rust)
-Il progetto include benchmark custom per misurare accuratamente i falsi positivi/negativi sull'astrazione AST di Java e Rust. I risultati vengono salvati nelle rispettive sottocartelle di benchmark in formato `report.md` e `report.json`.
+### 3. Suite di Benchmark (Java / Rust / C / C++ / Python)
+Il progetto include benchmark custom per misurare accuratamente i falsi positivi/negativi sull'astrazione AST di tutti i linguaggi supportati. I risultati vengono salvati nelle rispettive sottocartelle di benchmark all'interno di `tests/benchmarks/` in formato `report.md` e `report.json`.
 
-**Benchmark Java:**
+**Eseguire un Benchmark (es. Rust):**
 ```bash
-cargo run --bin benchmark_runner tests/benchmark-java
+cargo run --release --bin benchmark_runner tests/benchmarks/benchmark-rust
 ```
 
-**Benchmark Rust:**
+**Eseguire un Benchmark (es. Java):**
 ```bash
-cargo run --bin benchmark_runner tests/benchmark-rust
+cargo run --release --bin benchmark_runner tests/benchmarks/benchmark-java
 ```
 
 ## Visualizer
-Il visualizer (basato su Cytoscape.js) può essere lanciato dalla root del progetto. Visualizzerà tutti i file `cyto_*.json` presenti in `tests/outputs/` o generati custom.
+Il visualizer web (ora basato su SvelteKit e Node.js) permette di esplorare in tempo reale i grafi e visualizzare in modo interattivo i report di benchmark e la documentazione del progetto.
+
+Per avviarlo, spostati nella cartella dedicata ed esegui i seguenti comandi (è richiesto Node.js e NPM):
 ```bash
-python3 visualizer/start_visualizer.py
+cd visualizer-svelte
+npm install
+npm run dev
 ```
+Dopodiché apri `http://localhost:5173` nel tuo browser.
