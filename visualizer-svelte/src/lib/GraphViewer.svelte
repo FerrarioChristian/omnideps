@@ -5,7 +5,7 @@
     import style from '$lib/cytoscape_style.js';
     import LegendModal from '$lib/LegendModal.svelte';
 
-    let { elements = [], statusMessage = '', controls } = $props();
+    let { elements = [], rawOutput = null, statusMessage = '', controls } = $props();
 
     let cy = null;
     let cyContainer = null;
@@ -22,17 +22,37 @@
     
     let structFilters = $state({
         'IsA': true,
+        'Implements': true,
         'Imports': true,
         'UsesFieldType': true,
         'UsesParamType': true,
         'UsesReturnType': true,
-        'UsesLocalType': true
+        'UsesLocalType': true,
+        'NestedIn': true,
+        'ModuleContainment': true
     });
     
     let behavFilters = $state({
         'Calls': true,
         'Instantiates': true,
         'AccessesField': true
+    });
+
+    let allNodesChecked = $state(true);
+    let nodeFilters = $state({
+        'Module': true,
+        'Class': true,
+        'Struct': true,
+        'Interface': true,
+        'Trait': true,
+        'Enum': true,
+        'EnumVariant': true,
+        'Function': true,
+        'StaticVariable': true,
+        'StructField': true,
+        'ClassField': true,
+        'Field': true,
+        'External': true
     });
 
     let searchQuery = $state('');
@@ -58,27 +78,8 @@
         cy = cytoscape({
             container: cyContainer,
             elements: elements,
-            style: style,
-            layout: {
-                name: 'fcose',
-                quality: "proof",
-                randomize: true,
-                animate: true,
-                animationDuration: 1000,
-                fit: true,
-                padding: 30,
-                nodeDimensionsIncludeLabels: true,
-                uniformNodeDimensions: false,
-                packComponents: true,
-                step: "all",
-                idealEdgeLength: () => 50,
-                edgeElasticity: () => 0.45,
-                nodeRepulsion: () => 4500,
-                gravity: 0.25,
-                gravityRange: 3.8,
-                gravityCompound: 1.0,
-                gravityRangeCompound: 1.5,
-            }
+            style: style
+            // layout will be run after filters
         });
 
         cy.on('tap', 'node', function(e) {
@@ -109,25 +110,58 @@
         });
 
         applyFilters();
+
+        cy.layout({
+            name: 'fcose',
+            quality: "proof",
+            randomize: true,
+            animate: true,
+            animationDuration: 1000,
+            fit: true,
+            padding: 30,
+            nodeDimensionsIncludeLabels: true,
+            uniformNodeDimensions: false,
+            packComponents: true,
+            step: "all",
+            idealEdgeLength: () => 50,
+            edgeElasticity: () => 0.45,
+            nodeRepulsion: () => 4500,
+            gravity: 0.25,
+            gravityRange: 3.8,
+            gravityCompound: 1.0,
+            gravityRangeCompound: 1.5,
+        }).run();
     }
 
     function applyFilters() {
         if (!cy) return;
         
-        cy.edges().style('display', 'none'); // Reset
-        
-        let activeFilters = [];
-        for (const [key, val] of Object.entries(structFilters)) {
-            if (val) activeFilters.push(key);
-        }
-        for (const [key, val] of Object.entries(behavFilters)) {
-            if (val) activeFilters.push(key);
-        }
-        
-        if (activeFilters.length > 0) {
-            const selector = activeFilters.map(val => `[label = "${val}"]`).join(', ');
-            cy.edges(selector).style('display', 'element');
-        }
+        cy.batch(() => {
+            cy.edges().addClass('filtered-out');
+            cy.nodes().addClass('filtered-out');
+            
+            let activeEdgeFilters = [];
+            for (const [key, val] of Object.entries(structFilters)) {
+                if (val) activeEdgeFilters.push(key);
+            }
+            for (const [key, val] of Object.entries(behavFilters)) {
+                if (val) activeEdgeFilters.push(key);
+            }
+            
+            if (activeEdgeFilters.length > 0) {
+                const edgeSelector = activeEdgeFilters.map(val => `[label = "${val}"]`).join(', ');
+                cy.edges(edgeSelector).removeClass('filtered-out');
+            }
+
+            let activeNodeFilters = [];
+            for (const [key, val] of Object.entries(nodeFilters)) {
+                if (val) activeNodeFilters.push(key);
+            }
+            if (activeNodeFilters.length > 0) {
+                const nodeSelector = activeNodeFilters.map(val => `[type = "${val}"]`).join(', ');
+                cy.nodes(nodeSelector).removeClass('filtered-out');
+            }
+        });
     }
 
     function toggleStructural() {
@@ -144,9 +178,17 @@
         applyFilters();
     }
 
+    function toggleAllNodes() {
+        for (let k in nodeFilters) {
+            nodeFilters[k] = allNodesChecked;
+        }
+        applyFilters();
+    }
+
     function onFilterChange() {
         structChecked = Object.values(structFilters).some(v => v);
         behavChecked = Object.values(behavFilters).some(v => v);
+        allNodesChecked = Object.values(nodeFilters).some(v => v);
         applyFilters();
     }
 
@@ -177,7 +219,18 @@
         const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(elements, null, 2));
         const downloadAnchorNode = document.createElement('a');
         downloadAnchorNode.setAttribute("href", dataStr);
-        downloadAnchorNode.setAttribute("download", "graph_export.json");
+        downloadAnchorNode.setAttribute("download", "cytoscape_graph.json");
+        document.body.appendChild(downloadAnchorNode);
+        downloadAnchorNode.click();
+        downloadAnchorNode.remove();
+    }
+
+    function exportRawJson() {
+        if (!rawOutput) return;
+        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(rawOutput, null, 2));
+        const downloadAnchorNode = document.createElement('a');
+        downloadAnchorNode.setAttribute("href", dataStr);
+        downloadAnchorNode.setAttribute("download", "analyzer_raw_output.json");
         document.body.appendChild(downloadAnchorNode);
         downloadAnchorNode.click();
         downloadAnchorNode.remove();
@@ -221,15 +274,15 @@
         top: 20px;
         left: 20px;
         background: rgba(30, 30, 30, 0.85);
-        color: #ecf0f1;
-        padding: 10px 15px;
-        border-radius: 8px;
+        color: #bdc3c7;
+        padding: 6px 12px;
+        border-radius: 6px;
         border: 1px solid #444;
         z-index: 10;
         box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
         backdrop-filter: blur(5px);
         font-weight: bold;
-        font-size: 14px;
+        font-size: 12px;
         cursor: pointer;
         transition: all 0.2s;
         display: flex;
@@ -237,8 +290,45 @@
         gap: 8px;
     }
     .open-btn:hover {
-        background: #0969da;
+        color: #fff;
         border-color: #0969da;
+    }
+    .export-btn {
+        flex: 1;
+        padding: 6px 12px;
+        background: rgba(30, 30, 30, 0.85);
+        color: #bdc3c7;
+        border: 1px solid #444;
+        border-radius: 6px;
+        cursor: pointer;
+        font-weight: bold;
+        transition: all 0.2s;
+        font-size: 12px;
+    }
+    .export-btn:hover {
+        color: #fff;
+        border-color: #0969da;
+    }
+    
+    .filter-section {
+        margin-bottom: 10px;
+        background: rgba(40, 40, 40, 0.5);
+        border: 1px solid #444;
+        border-radius: 6px;
+        overflow: hidden;
+    }
+    .filter-section summary {
+        padding: 10px;
+        cursor: pointer;
+        font-weight: bold;
+        background: rgba(50, 50, 50, 0.5);
+        user-select: none;
+    }
+    .filter-section summary:hover {
+        background: rgba(60, 60, 60, 0.8);
+    }
+    .filter-section .filter-content {
+        padding: 10px;
     }
 </style>
 
@@ -268,35 +358,69 @@
     {/if}
 
     {#if elements && elements.length > 0}
-        <button onclick={exportJson} style="width: 100%; padding: 10px; margin-bottom: 15px; background: #27ae60; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; transition: opacity 0.2s;">
-            ⬇️ Export Graph to JSON
-        </button>
+        <div style="display: flex; gap: 10px; margin-bottom: 15px; margin-top: 10px;">
+            <button class="export-btn" onclick={exportJson}>
+                Export Cytoscape
+            </button>
+            {#if rawOutput}
+                <button class="export-btn" onclick={exportRawJson}>
+                    Export Raw JSON
+                </button>
+            {/if}
+        </div>
 
         <div class="toggles-container" id="toggles-panel">
-            <label class="toggle-row">
-                <input type="checkbox" bind:checked={structChecked} onchange={toggleStructural}>
-                <span>Struttura (IsA, Uses)</span>
-            </label>
-            <label class="toggle-row">
-                <input type="checkbox" bind:checked={behavChecked} onchange={toggleBehavioral}>
-                <span>Comportamento (Calls, Instantiates)</span>
-            </label>
+            <details class="filter-section">
+                <summary>Filtri Archi (Relazioni)</summary>
+                <div class="filter-content">
+                    <label class="toggle-row" style="font-weight:bold; border-bottom: 1px solid #555; padding-bottom: 5px; margin-bottom: 5px;">
+                        <input type="checkbox" bind:checked={structChecked} onchange={toggleStructural}>
+                        <span>Strutturali (IsA, Uses, Imports...)</span>
+                    </label>
+                    <div class="filters-grid" style="margin-bottom: 15px;">
+                        {#each Object.keys(structFilters) as key}
+                            <label class="toggle-row">
+                                <input type="checkbox" bind:checked={structFilters[key]} onchange={onFilterChange}> 
+                                <span>{key}</span>
+                            </label>
+                        {/each}
+                    </div>
 
-            <details class="advanced-filters">
-                <summary>Filtri Avanzati</summary>
-                <div class="filters-grid">
-                    {#each Object.keys(structFilters) as key}
-                        <label class="toggle-row">
-                            <input type="checkbox" bind:checked={structFilters[key]} onchange={onFilterChange}> 
-                            <span>{key}</span>
-                        </label>
-                    {/each}
-                    {#each Object.keys(behavFilters) as key}
-                        <label class="toggle-row">
-                            <input type="checkbox" bind:checked={behavFilters[key]} onchange={onFilterChange}> 
-                            <span>{key}</span>
-                        </label>
-                    {/each}
+                    <label class="toggle-row" style="font-weight:bold; border-bottom: 1px solid #555; padding-bottom: 5px; margin-bottom: 5px;">
+                        <input type="checkbox" bind:checked={behavChecked} onchange={toggleBehavioral}>
+                        <span>Comportamentali (Calls, Instantiates...)</span>
+                    </label>
+                    <div class="filters-grid">
+                        {#each Object.keys(behavFilters) as key}
+                            <label class="toggle-row">
+                                <input type="checkbox" bind:checked={behavFilters[key]} onchange={onFilterChange}> 
+                                <span>{key}</span>
+                            </label>
+                        {/each}
+                    </div>
+                </div>
+            </details>
+
+            <details class="filter-section">
+                <summary>Filtri Nodi (Entità)</summary>
+                <div class="filter-content">
+                    <label class="toggle-row" style="font-weight:bold; border-bottom: 1px solid #555; padding-bottom: 5px; margin-bottom: 5px;">
+                        <input type="checkbox" bind:checked={allNodesChecked} onchange={toggleAllNodes}>
+                        <span>Tutti i Nodi</span>
+                    </label>
+                    <div class="filters-grid">
+                        {#each Object.keys(nodeFilters) as key}
+                            <label class="toggle-row">
+                                <input type="checkbox" bind:checked={nodeFilters[key]} onchange={onFilterChange}> 
+                                <span title={key === 'Module' || key === 'Enum' ? 'Nascondendo questo nodo si nasconderà anche il suo contenuto' : ''}>
+                                    {key} {key === 'Module' || key === 'Enum' ? ' ⚠️' : ''}
+                                </span>
+                            </label>
+                        {/each}
+                    </div>
+                    <div style="font-size: 0.8em; color: #aaa; margin-top: 10px; line-height: 1.3;">
+                        ⚠️ Nascondere un nodo "contenitore" (es. Module, Enum) nasconderà automaticamente anche tutti i nodi contenuti al suo interno.
+                    </div>
                 </div>
             </details>
         </div>

@@ -30,6 +30,7 @@ where
         if let Some(item) = parser(child, source) {
             items.push(item);
         } else if !crate::heuristics::classifiers::is_function(child)
+            && !crate::heuristics::classifiers::is_structured_type(child)
             && (child.kind().contains("body")
                 || child.kind().contains("list")
                 || child.kind().contains("block")
@@ -86,7 +87,9 @@ pub fn extract_fields(node: Node, source: &str) -> Vec<Field> {
         } else {
             let mut c = n.walk();
             for child in n.children(&mut c) {
-                if !crate::heuristics::classifiers::is_function(child) {
+                if !crate::heuristics::classifiers::is_function(child) 
+                    && !crate::heuristics::classifiers::is_structured_type(child) 
+                {
                     extract_tuple_fields(child, src, fds);
                 }
             }

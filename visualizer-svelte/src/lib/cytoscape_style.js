@@ -50,6 +50,14 @@ const style = [
 		}
 	},
 	{
+		selector: ':parent[type = "Enum"]',
+		style: {
+			'background-color': '#e84393',
+			'border-color': '#e84393',
+            'border-style': 'solid'
+		}
+	},
+	{
 		selector: ':parent[type = "Interface"], :parent[type = "Trait"]',
 		style: {
 			'background-color': '#27ae60',
@@ -68,6 +76,15 @@ const style = [
 		selector: 'node[type = "Struct"], node[type = "Class"]',
 		style: {
 			'background-color': '#2980b9'
+		}
+	},
+	{
+		selector: 'node[type = "Enum"]',
+		style: {
+			'background-color': '#e84393',
+            'border-style': 'solid',
+            'border-width': 2,
+            'border-color': '#e84393'
 		}
 	},
 	{
@@ -95,6 +112,32 @@ const style = [
 			'padding': '6px',
             'color': '#333',
             'text-outline-width': 0
+		}
+	},
+	{
+		selector: 'node[type = "Field"], node[type = "StructField"], node[type = "ClassField"]',
+		style: {
+			'background-color': '#16a085',
+			'shape': 'round-rectangle',
+			'padding': '6px'
+		}
+	},
+	{
+		selector: 'node[type = "EnumVariant"]',
+		style: {
+			'background-color': '#e84393',
+			'shape': 'round-rectangle',
+			'padding': '6px'
+		}
+	},
+	{
+		selector: ':parent[type = "EnumVariant"]',
+		style: {
+			'background-color': '#e84393',
+			'background-opacity': 1,
+			'border-width': 0,
+            'text-valign': 'top',
+            'padding': '10px'
 		}
 	},
 	{
@@ -132,6 +175,16 @@ const style = [
 			'line-style': 'solid',
 			'line-color': '#e74c3c',
 			'target-arrow-color': '#e74c3c',
+			'target-arrow-shape': 'triangle'
+		}
+	},
+	{
+		selector: 'edge[label = "Implements"]',
+		style: {
+			'width': 3,
+			'line-style': 'dashed',
+			'line-color': '#f39c12',
+			'target-arrow-color': '#f39c12',
 			'target-arrow-shape': 'triangle'
 		}
 	},
@@ -181,9 +234,25 @@ const style = [
 		}
 	},
 	{
+		selector: 'edge[label = "NestedIn"], edge[label = "ModuleContainment"]',
+		style: {
+			'line-color': '#7f8c8d',
+			'target-arrow-color': '#7f8c8d',
+			'line-style': 'solid',
+			'width': 1,
+			'opacity': 0.5
+		}
+	},
+	{
 		selector: '.dimmed',
 		style: {
 			'opacity': 0.15
+		}
+	},
+	{
+		selector: '.filtered-out',
+		style: {
+			'display': 'none'
 		}
 	}
 ]

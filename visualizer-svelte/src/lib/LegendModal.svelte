@@ -126,14 +126,22 @@
     .node-struct {
         width: 80px;
         height: 40px;
-        background-color: #2980b9;
+        background-color: rgba(41, 128, 185, 0.15);
+        border: 2px solid #2980b9;
+        border-radius: 8px;
+    }
+    .node-enum {
+        width: 80px;
+        height: 40px;
+        background-color: rgba(232, 67, 147, 0.15); /* #e84393 with 15% opacity to match container logic if needed, but the user didn't explicitly ask for background change, I'll keep it transparent or just match the 15% like others */
+        border: 2px solid #e84393;
         border-radius: 8px;
     }
     .node-trait {
         width: 80px;
         height: 40px;
-        background-color: #27ae60;
-        border: 2px solid #2ecc71;
+        background-color: rgba(39, 174, 96, 0.15);
+        border: 2px solid #27ae60;
         border-radius: 8px;
     }
     .node-function {
@@ -145,8 +153,20 @@
     .node-field {
         width: 80px;
         height: 40px;
+        background-color: #16a085;
+        border-radius: 8px;
+    }
+    .node-static {
+        width: 80px;
+        height: 40px;
         background-color: #f1c40f;
         color: #333;
+        border-radius: 8px;
+    }
+    .node-enum-variant {
+        width: 80px;
+        height: 40px;
+        background-color: #e84393;
         border-radius: 8px;
     }
     .node-external {
@@ -183,6 +203,9 @@
     .edge-isa .edge-line { height: 3px; background-color: #e74c3c; }
     .edge-isa .edge-arrow { border-left: 10px solid #e74c3c; }
 
+    .edge-implements .edge-line { height: 3px; border-top: 3px dashed #f39c12; background: transparent; }
+    .edge-implements .edge-arrow { border-left: 10px solid #f39c12; }
+
     .edge-calls .edge-line { height: 2px; background-color: #2ecc71; }
     .edge-calls .edge-arrow { border-left: 8px solid #2ecc71; }
 
@@ -197,6 +220,9 @@
 
     .edge-imports .edge-line { height: 2px; background-color: #8e44ad; }
     .edge-imports .edge-arrow { border-left: 8px solid #8e44ad; }
+    
+    .edge-nested .edge-line { height: 1px; background-color: #7f8c8d; opacity: 0.5; }
+    .edge-nested .edge-arrow { border-left: 6px solid #7f8c8d; opacity: 0.5; }
     
     .interaction-box {
         background: rgba(20, 20, 20, 0.5);
@@ -232,7 +258,14 @@
                     <div class="visual-element node-struct">Struct/Class</div>
                     <div class="description">
                         <h3>Tipo Strutturato (Classi, Struct)</h3>
-                        <p>Rappresenta una struttura dati (es. <code>class</code> in Java/Python, <code>struct</code> in Rust/C). Sono i nodi blu dai bordi smussati.</p>
+                        <p>Rappresenta una struttura dati. Sono i nodi blu dai bordi smussati.</p>
+                    </div>
+                </div>
+                <div class="legend-card">
+                    <div class="visual-element node-enum">Enum</div>
+                    <div class="description">
+                        <h3>Enum Container</h3>
+                        <p>Rappresenta una enumerazione. Contorno magenta/rosa tratteggiato, contiene le singole varianti al suo interno.</p>
                     </div>
                 </div>
                 <div class="legend-card">
@@ -252,8 +285,22 @@
                 <div class="legend-card">
                     <div class="visual-element node-field">Field</div>
                     <div class="description">
-                        <h3>Variabile Globale / Statica</h3>
-                        <p>Nodi gialli dai bordi smussati. Rappresentano variabili globali o statiche definite a livello di modulo.</p>
+                        <h3>Campo di Struct / Classe</h3>
+                        <p>Nodi color foglia di tè (teal). Rappresentano attributi di classe in Java/Python o campi di una struct in Rust/C.</p>
+                    </div>
+                </div>
+                <div class="legend-card">
+                    <div class="visual-element node-static">Static<br/>Variable</div>
+                    <div class="description">
+                        <h3>Variabile Statica / Globale</h3>
+                        <p>Nodi gialli. Rappresentano variabili globali o costanti definite a livello di modulo.</p>
+                    </div>
+                </div>
+                <div class="legend-card">
+                    <div class="visual-element node-enum-variant">Enum<br/>Variant</div>
+                    <div class="description">
+                        <h3>Variante Enum</h3>
+                        <p>Nodi magenta/rosa pieni. Rappresentano le singole opzioni (varianti) all'interno di una Enum.</p>
                     </div>
                 </div>
                 <div class="legend-card">
@@ -275,6 +322,16 @@
                     <div class="description">
                         <h3>IsA (Ereditarietà)</h3>
                         <p>Una spessa linea rossa continua. Rappresenta la dipendenza più forte dell'OOP: ereditarietà di classi o implementazione rigorosa di un'interfaccia/trait.</p>
+                    </div>
+                </div>
+                <div class="legend-card">
+                    <div class="visual-element edge-container edge-implements">
+                        <div class="edge-line"></div>
+                        <div class="edge-arrow"></div>
+                    </div>
+                    <div class="description">
+                        <h3>Implements</h3>
+                        <p>Linea arancione/gialla tratteggiata spessa. Rappresenta l'implementazione formale di un'Interfaccia o di un Trait.</p>
                     </div>
                 </div>
                 <div class="legend-card">
@@ -325,6 +382,16 @@
                     <div class="description">
                         <h3>Imports (Inclusione)</h3>
                         <p>Linea viola solida. Generata dalle dichiarazioni di importazione/use esplicite a livello di modulo.</p>
+                    </div>
+                </div>
+                <div class="legend-card">
+                    <div class="visual-element edge-container edge-nested">
+                        <div class="edge-line"></div>
+                        <div class="edge-arrow"></div>
+                    </div>
+                    <div class="description">
+                        <h3>NestedIn / ModuleContainment</h3>
+                        <p>Linea grigia sottile e semi-trasparente. Indica il contenimento fisico/logico di un elemento dentro un altro (es. classe annidata, file nel modulo).</p>
                     </div>
                 </div>
             </div>

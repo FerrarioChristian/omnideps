@@ -48,8 +48,9 @@ fn analyze_single_file(
         .ok_or_else(|| anyhow::anyhow!("Language not supported for file: {}", path.display()))?;
     let source = fs::read_to_string(path)?;
     
+    let rel_path = path.file_name().map(std::path::Path::new).unwrap_or(path);
     // Phase 1: Parse
-    let (modules, primitives) = parse_source(lang, &source, path, config)?;
+    let (modules, primitives) = parse_source(lang, &source, rel_path, config)?;
     // Phase 2-4: Resolve and Graph
     let (resolved_modules, graph, summary) = analyze_project(modules, primitives, config);
 
@@ -104,7 +105,8 @@ fn analyze_directory(
             && let Some(lang) = SupportedLanguage::from_path(entry.path())
         {
             if let Ok(source) = fs::read_to_string(entry.path()) {
-                if let Ok((mut file_modules, file_primitives)) = parse_source(lang, &source, entry.path(), config) {
+                let rel_path = entry.path().strip_prefix(dir).unwrap_or(entry.path());
+                if let Ok((mut file_modules, file_primitives)) = parse_source(lang, &source, rel_path, config) {
                     all_modules.append(&mut file_modules);
                     combined_primitives.merge(file_primitives);
                 }

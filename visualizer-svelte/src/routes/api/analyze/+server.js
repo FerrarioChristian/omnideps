@@ -52,6 +52,9 @@ export async function POST({ request }) {
         const cytoData = fs.readFileSync(cytoOutJson, 'utf-8');
         const elements = JSON.parse(cytoData);
 
+        const rawData = fs.readFileSync(outJson, 'utf-8');
+        const rawOutput = JSON.parse(rawData);
+
         // Cleanup
         if (isTemp) {
             fs.rmSync(tempDir, { recursive: true, force: true });
@@ -59,7 +62,7 @@ export async function POST({ request }) {
             fs.rmSync(outDir, { recursive: true, force: true });
         }
 
-        return json({ elements });
+        return json({ elements, rawOutput });
     } catch (err) {
         console.error("Analyzer Error:", err);
         
