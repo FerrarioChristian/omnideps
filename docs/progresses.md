@@ -13,6 +13,8 @@ Questo documento traccia lo stato di implementazione e riconoscimento dei vari c
   - *Note:* Estrazione perfetta in Rust. In C++ estrae le classi. In Java estrae Classi e Interfacce. In Python ora le classi vengono estratte correttamente (Risolto bug `!kind.contains("argument")`). In C le struct vengono riconosciute correttamente includendo il parsing ricorsivo.
 - [x] **Funzioni e Metodi** (`Function` con `Signature` indipendente)
   - *Note:* Funziona in Rust, Java, e Python. In C++ i metodi venivano estratti senza nome, ma ora l'estrattore cerca all'interno di `function_declarator` per estrarre l'identificatore corretto. In C le funzioni all'interno delle struct tramite puntatore sono correttamente categorizzate come campi.
+- [x] **Variabili Globali e Statiche** (`free_variables`)
+  - *Note:* Supportate e integrate nell'Indice Globale. I field level-module (come costanti o `static` in Rust) vengono catturati, tipizzati e resi accessibili agli altri componenti. Modificati i renderer (Cytoscape) per mostrarle con uno stile dedicato e distinto dai normali struct fields.
 
 ## 2. Relazioni e Dipendenze (Grafo $\mathcal{G}$)
 - [x] **IsA** (Ereditarietà di classi/struct)
@@ -55,6 +57,7 @@ Questo documento traccia lo stato di implementazione e riconoscimento dei vari c
 - **Bug Ereditarietà (Super Types) in Java/C++/Python**: L'euristica non riconosceva i nomi dei campi CST specifici dei linguaggi non-Rust. Aggiornata `extract_super_types` in `heuristics.rs` per interrogare esplicitamente `superclass`, `interfaces`, `superclasses` e `base_class_clause`.
 - **Bug Falso Positivo Tipi di Ritorno**: In caso di mancato `return_type` esplicito (come nei costruttori Python o C++), l'analizzatore prendeva per sbaglio l'identificatore della funzione come tipo di ritorno. Aggiornata l'euristica per restituire `TypeRef::Primitive(PrimitiveType::Void)` in maniera sicura se fallisce il parse esplicito o tramite la sintassi `->`.
 - **Fix conteggio Nested Types nel Summary**: Il resoconto `AnalysisSummary` riportava zero `StructuredType` per Python e C++ nonostante comparissero nel grafo, a causa del fatto che il parser del summary non navigava ricorsivamente nei sottomoduli né contava i `nested_types`. Aggiornato `build_analysis_summary` per scansionare ricorsivamente tutto l'albero.
+- **Feature Variabili Globali e Statiche**: Implementata la cattura e la risoluzione delle variabili a livello di modulo (es. `static` in Rust). Aggiornato il `GlobalRegistry` per supportarle e migliorato l'estrattore AST per i blocchi macro/token_tree (es. `println!`) per non perdersi i path intermedi durante il token coalescing. Aggiornati i visualizzatori Cytoscape per differenziarle chiaramente dai campi di struct.
 
 ## Aggiustamenti post incontro (Pianificazione)
 

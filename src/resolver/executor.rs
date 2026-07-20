@@ -45,6 +45,10 @@ fn execute_module(ctx: &ExecutorContext, mut m: Module) -> Module {
 
     m.structured_types = m.structured_types.into_iter().map(|st| execute_structured_type(&new_ctx, st)).collect();
     m.free_functions = m.free_functions.into_iter().map(|ff| execute_function(&new_ctx, ff)).collect();
+    m.free_variables = m.free_variables.into_iter().map(|mut fv| {
+        fv.ty = evaluate_typeref(&new_ctx, fv.ty);
+        fv
+    }).collect();
     m.impl_blocks = m.impl_blocks.into_iter().map(|ib| execute_impl_block(&new_ctx, ib)).collect();
     m.sub_modules = m.sub_modules.into_iter().map(|sub| execute_module(&new_ctx, sub)).collect();
 

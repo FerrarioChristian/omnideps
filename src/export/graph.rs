@@ -55,6 +55,23 @@ fn traverse_module_for_edges(
         add_function_edges(ff, edges);
     }
 
+    for fv in &m.free_variables {
+        let mut fv_name = m.name.clone();
+        fv_name.push(fv.name.clone());
+        edges.push(Dependency {
+            from: m.name.clone(),
+            to: fv_name.clone(),
+            kind: DependencyEdgeKind::ModuleContainment,
+        });
+        if let Some(to) = type_ref_target(&fv.ty) {
+            edges.push(Dependency {
+                from: fv_name,
+                to: to.clone(),
+                kind: DependencyEdgeKind::UsesFieldType,
+            });
+        }
+    }
+
     for sub in &m.sub_modules {
         traverse_module_for_edges(sub, Some(&m.name), edges);
     }
@@ -202,6 +219,11 @@ fn flatten_modules(modules: &[Module]) -> Vec<Component> {
             flat.extend(flatten_structured_type(st));
         }
         flat.extend(m.free_functions.iter().cloned().map(Component::Function));
+        for fv in &m.free_variables {
+            let mut fv_name = m.name.clone();
+            fv_name.push(fv.name.clone());
+            flat.push(Component::Field(fv_name, fv.ty.clone()));
+        }
         flat.extend(flatten_modules(&m.sub_modules));
     }
     flat

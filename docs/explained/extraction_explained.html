@@ -424,6 +424,7 @@
     pub sub_modules: Vec&lt;Module&gt;,              // Moduli annidati
     pub structured_types: Vec&lt;StructuredType&gt;, // Struct, class, interface, ecc.
     pub free_functions: Vec&lt;Function&gt;,         // Funzioni non legate a un tipo
+    pub free_variables: Vec&lt;Field&gt;,            // Variabili statiche/globali del modulo
     pub impl_blocks: Vec&lt;ImplBlock&gt;,           // Blocchi impl (specifici di Rust)
 }</code></pre>
 
@@ -542,7 +543,9 @@ pub struct ImplBlock {
      │
      ├─ <span class="node">ImplBlock</span> → inserisce in <code>modules[0].impl_blocks</code>.
      │
-     └─ <span class="node">Import</span> → inserisce in <code>modules[0].imports</code>.
+     ├─ <span class="node">Import</span> → inserisce in <code>modules[0].imports</code>.
+     │
+     └─ <span class="node">Field</span> → inserisce in <code>modules[0].free_variables</code> (Variabili Globali/Statiche).
 
      <span class="red">return;</span>  <span class="dim">// STOP — non scende nei figli (per i casi non-Module/Function)</span>
 

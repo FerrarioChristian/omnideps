@@ -112,6 +112,8 @@ pub struct Module {
     pub free_functions: Vec<Function>,
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub impl_blocks: Vec<ImplBlock>,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub free_variables: Vec<Field>,
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]

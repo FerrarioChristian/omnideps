@@ -78,3 +78,12 @@ pub fn is_import(node: Node) -> bool {
         "use_declaration" | "import_declaration" | "import_statement" | "import_from_statement" | "preproc_include"
     )
 }
+
+/// Identifies global or static variables.
+pub fn is_free_variable(node: Node) -> bool {
+    if !node.is_named() {
+        return false;
+    }
+    let kind = node.kind();
+    kind == "static_item" || kind == "const_item" || kind == "global_variable_declaration"
+}
