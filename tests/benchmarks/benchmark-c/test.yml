@@ -5,90 +5,58 @@ files:
 - src/shapes.h
 - src/shapes.c
 nodes:
-- name: math_utils
-  kind: file
-- name: shapes
-  kind: file
-- name: main
-  kind: file
-- name: math_utils.add
+- name: add
   kind: function
-- name: math_utils.multiply
+- name: multiply
   kind: function
-- name: shapes.Rectangle
+- name: Rectangle
   kind: struct
-- name: shapes.Rectangle.width
+- name: Rectangle.width
   kind: field
-- name: shapes.Rectangle.height
+- name: Rectangle.height
   kind: field
-- name: shapes.calculate_area
+- name: calculate_area
   kind: function
-- name: main.main
+- name: main
   kind: function
-- name: main.global_counter
-  kind: variable
 edges:
-- testid: C-INC-1
-  source: math_utils.c
-  sink: math_utils.h
-  kind: includes
-- testid: C-INC-2
-  source: shapes.c
-  sink: shapes.h
-  kind: includes
-- testid: C-INC-3
-  source: shapes.c
-  sink: math_utils.h
-  kind: includes
-- testid: C-INC-4
-  source: main.c
-  sink: shapes.h
-  kind: includes
-- testid: C-INC-5
-  source: main.c
-  sink: math_utils.h
-  kind: includes
 - testid: C-CALL-1
-  source: math_utils.multiply
-  sink: math_utils.add
+  source: multiply
+  sink: add
   kind: calls
 - testid: C-CALL-2
-  source: shapes.calculate_area
-  sink: math_utils.multiply
+  source: calculate_area
+  sink: multiply
   kind: calls
 - testid: C-CALL-3
-  source: main.main
-  sink: shapes.calculate_area
+  source: main
+  sink: calculate_area
   kind: calls
 - testid: C-CALL-4
-  source: main.main
-  sink: math_utils.add
+  source: main
+  sink: add
   kind: calls
 - testid: C-USE-1
-  source: shapes.calculate_area
-  sink: shapes.Rectangle
+  source: calculate_area
+  sink: Rectangle
   kind: uses_type
 - testid: C-USE-2
-  source: main.main
-  sink: shapes.Rectangle
+  source: main
+  sink: Rectangle
   kind: uses_type
 - testid: C-ACC-1
-  source: shapes.calculate_area
-  sink: shapes.Rectangle.width
+  source: calculate_area
+  sink: Rectangle.width
   kind: accesses_field
 - testid: C-ACC-2
-  source: shapes.calculate_area
-  sink: shapes.Rectangle.height
+  source: calculate_area
+  sink: Rectangle.height
   kind: accesses_field
 - testid: C-ACC-3
-  source: main.main
-  sink: shapes.Rectangle.width
+  source: main
+  sink: Rectangle.width
   kind: accesses_field
 - testid: C-ACC-4
-  source: main.main
-  sink: shapes.Rectangle.height
+  source: main
+  sink: Rectangle.height
   kind: accesses_field
-- testid: C-ACC-5
-  source: main.main
-  sink: main.global_counter
-  kind: accesses_variable

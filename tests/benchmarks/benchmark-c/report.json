@@ -8,245 +8,157 @@
   ],
   "nodes": [
     {
-      "name": "math_utils",
-      "kind": "file",
-      "exists": false,
-      "same_kind": false,
-      "actual_kind": "-"
-    },
-    {
-      "name": "shapes",
-      "kind": "file",
-      "exists": false,
-      "same_kind": false,
-      "actual_kind": "-"
-    },
-    {
-      "name": "main",
-      "kind": "file",
+      "name": "add",
+      "kind": "function",
       "exists": true,
       "same_kind": true,
       "actual_kind": "Function"
     },
     {
-      "name": "math_utils.add",
+      "name": "multiply",
       "kind": "function",
-      "exists": false,
-      "same_kind": false,
-      "actual_kind": "-"
+      "exists": true,
+      "same_kind": true,
+      "actual_kind": "Function"
     },
     {
-      "name": "math_utils.multiply",
-      "kind": "function",
-      "exists": false,
-      "same_kind": false,
-      "actual_kind": "-"
-    },
-    {
-      "name": "shapes.Rectangle",
+      "name": "Rectangle",
       "kind": "struct",
-      "exists": false,
-      "same_kind": false,
-      "actual_kind": "-"
+      "exists": true,
+      "same_kind": true,
+      "actual_kind": "Struct"
     },
     {
-      "name": "shapes.Rectangle.width",
+      "name": "Rectangle.width",
       "kind": "field",
-      "exists": false,
-      "same_kind": false,
-      "actual_kind": "-"
+      "exists": true,
+      "same_kind": true,
+      "actual_kind": "Field"
     },
     {
-      "name": "shapes.Rectangle.height",
+      "name": "Rectangle.height",
       "kind": "field",
-      "exists": false,
-      "same_kind": false,
-      "actual_kind": "-"
+      "exists": true,
+      "same_kind": true,
+      "actual_kind": "Field"
     },
     {
-      "name": "shapes.calculate_area",
+      "name": "calculate_area",
       "kind": "function",
-      "exists": false,
-      "same_kind": false,
-      "actual_kind": "-"
+      "exists": true,
+      "same_kind": true,
+      "actual_kind": "Function"
     },
     {
-      "name": "main.main",
+      "name": "main",
       "kind": "function",
-      "exists": false,
-      "same_kind": false,
-      "actual_kind": "-"
-    },
-    {
-      "name": "main.global_counter",
-      "kind": "variable",
-      "exists": false,
-      "same_kind": false,
-      "actual_kind": "-"
+      "exists": true,
+      "same_kind": true,
+      "actual_kind": "Function"
     }
   ],
   "edges": [
     {
-      "testid": "C-INC-1",
-      "source": "math_utils.c",
-      "sink": "math_utils.h",
-      "kind": "includes",
-      "source_exists": false,
-      "sink_exists": false,
-      "edge_exists": false,
-      "same_kind": false
-    },
-    {
-      "testid": "C-INC-2",
-      "source": "shapes.c",
-      "sink": "shapes.h",
-      "kind": "includes",
-      "source_exists": false,
-      "sink_exists": false,
-      "edge_exists": false,
-      "same_kind": false
-    },
-    {
-      "testid": "C-INC-3",
-      "source": "shapes.c",
-      "sink": "math_utils.h",
-      "kind": "includes",
-      "source_exists": false,
-      "sink_exists": false,
-      "edge_exists": false,
-      "same_kind": false
-    },
-    {
-      "testid": "C-INC-4",
-      "source": "main.c",
-      "sink": "shapes.h",
-      "kind": "includes",
-      "source_exists": false,
-      "sink_exists": false,
-      "edge_exists": false,
-      "same_kind": false
-    },
-    {
-      "testid": "C-INC-5",
-      "source": "main.c",
-      "sink": "math_utils.h",
-      "kind": "includes",
-      "source_exists": false,
-      "sink_exists": false,
-      "edge_exists": false,
-      "same_kind": false
-    },
-    {
       "testid": "C-CALL-1",
-      "source": "math_utils.multiply",
-      "sink": "math_utils.add",
+      "source": "multiply",
+      "sink": "add",
       "kind": "calls",
-      "source_exists": false,
-      "sink_exists": false,
+      "source_exists": true,
+      "sink_exists": true,
       "edge_exists": false,
       "same_kind": false
     },
     {
       "testid": "C-CALL-2",
-      "source": "shapes.calculate_area",
-      "sink": "math_utils.multiply",
+      "source": "calculate_area",
+      "sink": "multiply",
       "kind": "calls",
-      "source_exists": false,
-      "sink_exists": false,
-      "edge_exists": false,
-      "same_kind": false
+      "source_exists": true,
+      "sink_exists": true,
+      "edge_exists": true,
+      "same_kind": true
     },
     {
       "testid": "C-CALL-3",
-      "source": "main.main",
-      "sink": "shapes.calculate_area",
+      "source": "main",
+      "sink": "calculate_area",
       "kind": "calls",
-      "source_exists": false,
-      "sink_exists": false,
-      "edge_exists": false,
-      "same_kind": false
+      "source_exists": true,
+      "sink_exists": true,
+      "edge_exists": true,
+      "same_kind": true
     },
     {
       "testid": "C-CALL-4",
-      "source": "main.main",
-      "sink": "math_utils.add",
+      "source": "main",
+      "sink": "add",
       "kind": "calls",
-      "source_exists": false,
-      "sink_exists": false,
-      "edge_exists": false,
-      "same_kind": false
+      "source_exists": true,
+      "sink_exists": true,
+      "edge_exists": true,
+      "same_kind": true
     },
     {
       "testid": "C-USE-1",
-      "source": "shapes.calculate_area",
-      "sink": "shapes.Rectangle",
+      "source": "calculate_area",
+      "sink": "Rectangle",
       "kind": "uses_type",
-      "source_exists": false,
-      "sink_exists": false,
-      "edge_exists": false,
-      "same_kind": false
+      "source_exists": true,
+      "sink_exists": true,
+      "edge_exists": true,
+      "same_kind": true
     },
     {
       "testid": "C-USE-2",
-      "source": "main.main",
-      "sink": "shapes.Rectangle",
+      "source": "main",
+      "sink": "Rectangle",
       "kind": "uses_type",
-      "source_exists": false,
-      "sink_exists": false,
+      "source_exists": true,
+      "sink_exists": true,
       "edge_exists": false,
       "same_kind": false
     },
     {
       "testid": "C-ACC-1",
-      "source": "shapes.calculate_area",
-      "sink": "shapes.Rectangle.width",
+      "source": "calculate_area",
+      "sink": "Rectangle.width",
       "kind": "accesses_field",
-      "source_exists": false,
-      "sink_exists": false,
+      "source_exists": true,
+      "sink_exists": true,
       "edge_exists": false,
       "same_kind": false
     },
     {
       "testid": "C-ACC-2",
-      "source": "shapes.calculate_area",
-      "sink": "shapes.Rectangle.height",
+      "source": "calculate_area",
+      "sink": "Rectangle.height",
       "kind": "accesses_field",
-      "source_exists": false,
-      "sink_exists": false,
+      "source_exists": true,
+      "sink_exists": true,
       "edge_exists": false,
       "same_kind": false
     },
     {
       "testid": "C-ACC-3",
-      "source": "main.main",
-      "sink": "shapes.Rectangle.width",
+      "source": "main",
+      "sink": "Rectangle.width",
       "kind": "accesses_field",
-      "source_exists": false,
-      "sink_exists": false,
+      "source_exists": true,
+      "sink_exists": true,
       "edge_exists": false,
       "same_kind": false
     },
     {
       "testid": "C-ACC-4",
-      "source": "main.main",
-      "sink": "shapes.Rectangle.height",
+      "source": "main",
+      "sink": "Rectangle.height",
       "kind": "accesses_field",
-      "source_exists": false,
-      "sink_exists": false,
-      "edge_exists": false,
-      "same_kind": false
-    },
-    {
-      "testid": "C-ACC-5",
-      "source": "main.main",
-      "sink": "main.global_counter",
-      "kind": "accesses_variable",
-      "source_exists": false,
-      "sink_exists": false,
+      "source_exists": true,
+      "sink_exists": true,
       "edge_exists": false,
       "same_kind": false
     }
   ],
-  "node_not_found_count": 10,
-  "edge_not_found_count": 16
+  "node_not_found_count": 0,
+  "edge_not_found_count": 6
 }
