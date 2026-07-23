@@ -54,6 +54,8 @@ if imp.is_wildcard {
 }
 ```
 
+**[Risolto]**: Implementato in `executor.rs` aggiungendo un branch per gestire `imp.is_wildcard` ricorsivamente all'interno di `find_member`.
+
 ---
 
 ## 🟡 Problema 2 (NUOVO): Dichiarazioni locali e parametri registrati solo se `ResolutionQuery`
@@ -71,8 +73,17 @@ if let TypeRef::ResolutionQuery(ref q) = p.ty {
 
 Se il tipo è `Primitive(String)` o `Unresolved` che non viene trasformato (es. vuoto), la variabile non viene registrata nello stack.
 
-### Conseguenza
-Se `let s: String = ...` e poi si usa `s.len()`, la variabile `s` non sarà nello stack perché `String` potrebbe non generare una `ResolutionQuery` (dipende dal flusso). In pratica, il pattern `Unresolved → substitute_type → ResolutionQuery` copre la maggior parte dei casi, ma edge cases con tipi primitivi rimangono.
+### Conseguenza e Limitazione Architetturale
+Se consideriamo questo snippet:
+```rust
+let s: String = "test".to_string();
+let len = s.len();
+```
+La variabile `s` viene processata. Essendo `String` un tipo primitivo riconosciuto, `substitute_type` non genererà una `ResolutionQuery`, ma restituirà direttamente un `TypeRef::Primitive(PrimitiveType::String)`.
+Poiché il `SymbolStack` attuale memorizza esclusivamente una mappa da `String` a `Query`, non ha modo di immagazzinare il tipo di `s`. Di conseguenza, `s` non viene mai iniettato nello scope locale. 
+Quando l'analizzatore processa l'espressione `s.len()`, proverà a fare `Query::Extract(Find("s"), "len")`. Il `Find("s")` fallirà esplorando tutto il `SymbolStack` (poiché `s` non c'è), scartando la risoluzione e non arrivando mai a processare `"len"`.
+
+**[Aperto]**: Il problema permane in `builder.rs`. Per risolverlo, il sistema dei tipi andrebbe esteso. Ad esempio, il `SymbolStack` potrebbe mappare da `String` a un enum più ampio `enum StackEntry { Alias(Query), Type(TypeRef) }`. In questo modo, l'Executor potrebbe leggere direttamente il `TypeRef::Primitive` dallo stack e (tramite il PrimitiveRegistry) risolvere la dipendenza, chiudendo il loop sull'inferenza locale dei primitivi.
 
 ---
 
@@ -96,6 +107,8 @@ Il commento nel codice dice: "We don't check existence immediately, because it m
 
 ### Conseguenza
 Potenziali falsi `External` per catene multi-livello con nomi errati. Il trade-off è accettabile per supportare catene esterne come `std::vec::Vec`, ma produce rumore nell'output.
+
+**[Risolto]**: In `executor.rs`, la valutazione di `Query::Extract` ora invoca `find_member`. Questo scende nel Global Registry e valida l'effettiva esistenza del nodo anche per scope annidati, risolvendo il problema.
 
 ---
 
@@ -157,9 +170,9 @@ Rimuovere il campo `imports` da `StackFrame` se non viene mai usato, oppure docu
 
 | # | Problema | Gravità | File | Stato |
 |---|----------|---------|------|-------|
-| 1 | Import wildcard non gestiti nell'Executor | 🟡 Media | `executor.rs` | Nuovo |
-| 2 | Dichiarazioni registrate solo se ResolutionQuery | 🟡 Media | `builder.rs` | Nuovo |
-| 3 | Extract non verifica esistenza nel registry | 🟡 Media | `executor.rs` | Nuovo (trade-off) |
-| 4 | Call con resolve_call_return=false | 🟡 Media | `executor.rs` | **[Risolto]**: Implementata Type Inference per le chiamate a catena |
+| 1 | Import wildcard non gestiti nell'Executor | 🟡 Media | `executor.rs` | **[Risolto]** |
+| 2 | Dichiarazioni registrate solo se ResolutionQuery | 🟡 Media | `builder.rs` | **[Aperto]** |
+| 3 | Extract non verifica esistenza nel registry | 🟡 Media | `executor.rs` | **[Risolto]** |
+| 4 | Call con resolve_call_return=false | 🟡 Media | `executor.rs` | **[Design Choice]** |
 | 5 | Campo imports vestigiale in StackFrame | 🟢 Bassa | `stack.rs` | **[Risolto]**: Rimosso per pulizia del codice |
 | 6 | Inherits vs Implements ereditato | 🟢 Bassa | `executor.rs` | Ereditato dalla v2 |

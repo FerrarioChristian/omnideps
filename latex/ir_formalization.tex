@@ -37,10 +37,13 @@ Un riferimento a un tipo $\tau$ nell'IR modella il ciclo di vita
 della scoperta e della risoluzione dei simboli. Per garantire la
 \textit{Type Safety} tra le fasi di estrazione e la generazione del
 grafo, definiamo $\tau$ come un tipo somma a cinque stati:
-$$\tau ::= \text{Prim}(\mathcal{T}_{p}) \mid
-\text{Unresolved}(\mathcal{QN}_{raw}) \mid
-\text{Resolved}(\mathcal{QN}_{abs}) \mid
-\text{External}(\mathcal{QN}_{ext}) \mid \text{Failed}$$
+\begin{align*}
+  \tau ::=&\ \text{Prim}(\mathcal{T}_{p}) \\
+  &\mid \text{Unresolved}(\mathcal{QN}_{raw}) \\
+  &\mid \text{Resolved}(\mathcal{QN}_{abs}) \\
+  &\mid \text{External}(\mathcal{QN}_{ext}) \\
+  &\mid \text{Failed}
+\end{align*}
 Dove:
 \begin{itemize}
   \item \textbf{Prim}: Rappresenta i tipi primitivi fondamentali
@@ -246,7 +249,8 @@ configurazione per i principali linguaggi supportati:
   \centering
   \begin{tabular}{|l|c|c|c|}
     \hline
-    \textbf{Linguaggio} & \textbf{ImplicitFile} & \textbf{FileDecl} & \textbf{InlineBlocks} \\ \hline
+    \textbf{Linguaggio} & \textbf{ImplicitFile} & \textbf{FileDecl} &
+    \textbf{InlineBlocks} \\ \hline
     \textbf{Java} & False & True & False \\ \hline
     \textbf{Rust} & True & False & True \\ \hline
     \textbf{Python} & True & False & False \\ \hline

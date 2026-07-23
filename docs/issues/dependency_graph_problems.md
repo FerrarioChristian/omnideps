@@ -304,6 +304,8 @@ for decl in &block.declarations {
 ### Soluzione suggerita
 Creare un nuovo `DependencyEdgeKind::UsesLocalVariable` per le dichiarazioni locali, separando la semantica strutturale da quella comportamentale.
 
+**[Risolto]**: Introdotto e applicato `DependencyEdgeKind::UsesLocalType` in `graph.rs`, risolvendo completamente l'ambiguità semantica.
+
 ---
 
 ## ✅ Miglioramenti nel refactoring recente
@@ -332,5 +334,5 @@ Anche il summary ora attraversa ricorsivamente i blocchi per contare accuratamen
 | 5 | Summary non conta refs risolti/falliti né metodi | 🟡 Media | `summary.rs` | Campi sempre a 0 | **[Risolto]** |
 | 6 | Nodi Cytoscape External generici | 🟢 Bassa | `cytoscape.rs` | Perdita di informazione | **[Design Choice]** |
 | 7 | Pattern match ripetitivo per TypeRef | 🟢 Bassa | `graph.rs` | Manutenibilità | **[Risolto]** |
-| 8 | `UsesFieldType` per variabili locali | 🟡 Media | `graph.rs` | Semantica arco errata | **Nuovo** |
+| 8 | `UsesFieldType` per variabili locali | 🟡 Media | `graph.rs` | Semantica arco errata | **[Risolto]** |
 

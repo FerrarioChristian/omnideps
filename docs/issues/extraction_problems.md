@@ -167,8 +167,12 @@ crate::heuristics::ParsedItem::Component(crate::ir::Component::Function(ff)) => 
 ### Conseguenza
 Se una struct è definita dentro il corpo di una funzione (possibile in linguaggi come Rust, Python, ecc.), essa viene inserita in `modules[0].structured_types` — cioè al **livello del modulo**, non dentro la funzione. Nell'IR risultante, la struct sembra essere una struct top-level del modulo, perdendo la relazione con la funzione contenitrice.
 
-### Stato aggiornamento
-**Parzialmente mitigato.** Con l'introduzione del tipo `Block` e della funzione `extract_block`, l'IR ora modella i blocchi lessicali interni alle funzioni (`body: Option<Block>` con `sub_blocks` ricorsivi). Tuttavia, `walk_cst` in `analyzer.rs` continua a promuovere le struct trovate nei body al livello del modulo. La nuova architettura `Block` traccia le *variabili locali* (`declarations`), le *chiamate* e le *istanziazioni* all'interno dei body, ma le definizioni di tipi strutturati continuano a essere promosse. Questo è accettabile come design choice dato che le struct locali alle funzioni sono comunque visibili a livello di modulo per la name resolution.
+### Stato aggiornamento e Valutazione Architetturale
+**[Parzialmente mitigato]**: Con l'introduzione del tipo `Block` e della funzione `extract_block`, l'IR ora modella perfettamente i blocchi lessicali interni alle funzioni (`body: Option<Block>` con `sub_blocks` ricorsivi). Tuttavia, `walk_cst` in `analyzer.rs` continua a "sollevare" (Hoisting) le struct trovate nei body al livello del modulo. 
+
+Questo comportamento, all'apparenza un limite, è in realtà una **precisa scelta di design (Design Choice)** tollerata per due motivi:
+1. **Limiti dell'Analisi Statica Agnostica:** In linguaggi come Rust o Python le definizioni annidate possono comportarsi come vere e proprie chiusure o entità module-level isolate. Costruire una struttura dati in cui una `Struct` appartiene a una `Function` complicherebbe enormemente l'Intermediate Representation, rompendo la simmetria dove "i Moduli contengono Tipi, e i Tipi contengono Funzioni".
+2. **Name Resolution Visibile:** Poiché la struct promossa si posiziona al livello del modulo, la name resolution locale continua a funzionare inalterata. I metodi della funzione possono istanziare la struct locale senza problemi, e le dipendenze comportamentali (Calls/Instantiates) puntano correttamente all'entità sollevata, preservando il grafo delle chiamate.
 
 ---
 
