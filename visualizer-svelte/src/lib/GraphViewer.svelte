@@ -52,6 +52,7 @@
         'StructField': true,
         'ClassField': true,
         'Field': true,
+        'Primitive': true,
         'External': true
     });
 
@@ -140,6 +141,15 @@
             cy.edges().addClass('filtered-out');
             cy.nodes().addClass('filtered-out');
             
+            let activeNodeFilters = [];
+            for (const [key, val] of Object.entries(nodeFilters)) {
+                if (val) activeNodeFilters.push(key);
+            }
+            if (activeNodeFilters.length > 0) {
+                const nodeSelector = activeNodeFilters.map(val => `[type = "${val}"]`).join(', ');
+                cy.nodes(nodeSelector).removeClass('filtered-out');
+            }
+
             let activeEdgeFilters = [];
             for (const [key, val] of Object.entries(structFilters)) {
                 if (val) activeEdgeFilters.push(key);
@@ -150,16 +160,9 @@
             
             if (activeEdgeFilters.length > 0) {
                 const edgeSelector = activeEdgeFilters.map(val => `[label = "${val}"]`).join(', ');
-                cy.edges(edgeSelector).removeClass('filtered-out');
-            }
-
-            let activeNodeFilters = [];
-            for (const [key, val] of Object.entries(nodeFilters)) {
-                if (val) activeNodeFilters.push(key);
-            }
-            if (activeNodeFilters.length > 0) {
-                const nodeSelector = activeNodeFilters.map(val => `[type = "${val}"]`).join(', ');
-                cy.nodes(nodeSelector).removeClass('filtered-out');
+                cy.edges(edgeSelector).filter(ele => {
+                    return !ele.source().hasClass('filtered-out') && !ele.target().hasClass('filtered-out');
+                }).removeClass('filtered-out');
             }
         });
     }
@@ -418,7 +421,7 @@
                             </label>
                         {/each}
                     </div>
-                    <div style="font-size: 0.8em; color: #aaa; margin-top: 10px; line-height: 1.3;">
+                    <div style="font-size: 0.8em; color: #aaa; margin-top: 10px; line-height: 1.3; max-width: 300px;">
                         ⚠️ Nascondere un nodo "contenitore" (es. Module, Enum) nasconderà automaticamente anche tutti i nodi contenuti al suo interno.
                     </div>
                 </div>
