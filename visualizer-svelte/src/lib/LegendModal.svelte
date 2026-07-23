@@ -177,6 +177,12 @@
         border: 1px solid #95a5a6;
         border-radius: 8px;
     }
+    .node-primitive {
+        width: 80px;
+        height: 80px;
+        background-color: #1abc9c;
+        clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+    }
 
     /* Frecce (Archi) */
     .edge-container {
@@ -308,6 +314,13 @@
                     <div class="description">
                         <h3>Dipendenza Esterna</h3>
                         <p>Grigi e semi-trasparenti. Rappresentano componenti che l'analizzatore ha rilevato tramite <code>import</code>, ma che non sono definiti all'interno dei file scansionati (es. classi della Standard Library o pacchetti esterni).</p>
+                    </div>
+                </div>
+                <div class="legend-card">
+                    <div class="visual-element node-primitive">Primitive</div>
+                    <div class="description">
+                        <h3>Tipo Primitivo</h3>
+                        <p>Esagoni turchesi. Rappresentano i tipi fondamentali del linguaggio (es. <code>int</code>, <code>String</code>, <code>boolean</code>) che vengono referenziati direttamente dal codice.</p>
                     </div>
                 </div>
             </div>

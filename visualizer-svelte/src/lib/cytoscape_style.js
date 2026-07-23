@@ -150,6 +150,14 @@ const style = [
 		}
 	},
 	{
+		selector: 'node[type = "Primitive"]',
+		style: {
+			'background-color': '#1abc9c',
+			'shape': 'hexagon',
+			'padding': '5px'
+		}
+	},
+	{
 		selector: 'edge',
 		style: {
 			'width': 2,
