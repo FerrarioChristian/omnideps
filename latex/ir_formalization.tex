@@ -185,7 +185,8 @@ disgiunta (sum type) dei costrutti strutturali definitivi del
 sistema. Ogni componente rappresenta l'unità logica che può comparire
 come vertice nel grafo delle dipendenze:
 $$\mathcal{C} ::= \text{Mod}(\mathcal{M}) \mid
-\text{StructuredType}(\mathcal{S}) \mid \text{Function}(\mathcal{F}) \mid \text{Field}(F)$$
+\text{StructuredType}(\mathcal{S}) \mid \text{Function}(\mathcal{F})
+\mid \text{Field}(F)$$
 
 \subsection{Modulo ($\mathcal{M}$)}
 L'intera struttura del programma è catturata dal tipo \textbf{Modulo}
@@ -193,7 +194,8 @@ L'intera struttura del programma è catturata dal tipo \textbf{Modulo}
 del file system o dei namespace:
 $$\mathcal{M} = \langle \mathcal{QN}, \mathcal{I}_{imports},
 \vec{\mathcal{M}_{nest}},
-\vec{\mathcal{S}}, \vec{\mathcal{F}}, \vec{F}_{free}, \vec{\mathcal{B}}_{lk} \rangle$$
+\vec{\mathcal{S}}, \vec{\mathcal{F}}, \vec{F}_{free},
+\vec{\mathcal{B}}_{lk} \rangle$$
 dove $\mathcal{I}_{imports}$ è l'insieme delle dipendenze esplicite
 (import/use/include) definite nel modulo. Ogni elemento in
 $\mathcal{I}_{imports}$ contiene il percorso qualificato, un
@@ -210,18 +212,28 @@ $$\mathcal{K}_{cfg} = \langle \text{ModuleConfig},
 \text{SupportImplBlocks}, \text{SelfKeyword} \rangle$$
 dove:
 \begin{itemize}
-  \item \textbf{ModuleConfig} modella le regole di raggruppamento
-    logico ed è composto da tre dimensioni ortogonali:
-    $\langle \text{ImplicitFile}, \text{FileDecl}, \text{InlineBlocks} \rangle$.
+  \item \textbf{ModuleStrategies} modella le regole di raggruppamento
+    logico ed è composto da una tupla di flag booleani ortogonali:
+    $\langle \text{FileBased}, \text{DirectoryBased},
+    \text{PackageDeclBased}, \text{NamespaceBased},
+    \text{InlineModBased} \rangle$. Se tutti i flag sono falsi, il
+    linguaggio (es. C) non prevede un sistema di moduli.
   \item \textbf{TransitiveImports} indica se le importazioni
     esportano transitivamente i propri membri (es. Python).
-
   \item \textbf{SupportImplBlocks} determina se il linguaggio
     supporta l'estrazione di blocchi di implementazione scorporati
     dalla dichiarazione del tipo strutturato.
   \item \textbf{SelfKeyword} definisce la convenzione usata dal
     linguaggio per il riferimento all'istanza corrente (\texttt{this}
-    o \texttt{self}).
+    o \texttt{self}), utile se \textbf{ImplicitFirstParamAsSelf} non è
+    applicabile.
+  \item \textbf{ImplicitFirstParamAsSelf} indica se il linguaggio (come Python)
+    utilizza il primo parametro dei metodi di istanza per riferirsi
+    all'oggetto corrente.
+  \item \textbf{ForwardDeclarations} indica se il linguaggio permette
+    di separare
+    la dichiarazione dei metodi (nella definizione della classe)
+    dalla loro implementazione (es. C++ out-of-line methods).
 \end{itemize}
 
 A scopo illustrativo, la seguente tabella riassume i profili di
@@ -247,17 +259,17 @@ configurazione per i principali linguaggi supportati:
 
 \begin{table}[h]
   \centering
-  \begin{tabular}{|l|c|c|c|}
+  \begin{tabular}{|l|c|c|c|c|c|}
     \hline
-    \textbf{Linguaggio} & \textbf{ImplicitFile} & \textbf{FileDecl} &
-    \textbf{InlineBlocks} \\ \hline
-    \textbf{Java} & False & True & False \\ \hline
-    \textbf{Rust} & True & False & True \\ \hline
-    \textbf{Python} & True & False & False \\ \hline
-    \textbf{C++} & False & False & True \\ \hline
-    \textbf{C} & False & False & False \\ \hline
+    \textbf{Linguaggio} & \textbf{FileBased} & \textbf{DirBased} &
+    \textbf{PkgDecl} & \textbf{Namespace} & \textbf{InlineMod} \\ \hline
+    \textbf{Java} & False & False & True & False & False \\ \hline
+    \textbf{Rust} & True & True & False & False & True \\ \hline
+    \textbf{Python} & True & True & False & False & False \\ \hline
+    \textbf{C++} & False & False & False & True & False \\ \hline
+    \textbf{C} & False & False & False & False & False \\ \hline
   \end{tabular}
-  \caption{Dettaglio di ModuleConfig per i linguaggi supportati}
+  \caption{Dettaglio delle ModuleStrategies per i linguaggi supportati}
 \end{table}
 
 \section{Costruzione del Grafo e Trait Bounds}

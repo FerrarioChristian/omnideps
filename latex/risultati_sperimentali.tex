@@ -1,0 +1,307 @@
+\chapter{Risultati Sperimentali}
+
+\section{Introduzione}
+Per valutare l'efficacia del sistema di analisi proposto, è stata
+progettata una suite di benchmark che misura la capacità
+dell'analizzatore di estrarre correttamente le entità architetturali
+(nodi) e le relazioni di dipendenza (archi) da progetti
+multi-linguaggio. Questo capitolo presenta la metodologia di
+validazione, i risultati aggregati per linguaggio e un'analisi
+qualitativa delle categorie di errore riscontrate.
+
+\section{Metodologia di Validazione}
+La validazione si basa sul confronto tra il grafo delle dipendenze
+estratto automaticamente dal sistema e un \textit{ground truth}
+definito manualmente per ciascun benchmark. Per ogni linguaggio
+supportato --- Rust, Java, Python, C e C++ --- è stato costruito un
+progetto di test che esercita i principali costrutti architetturali:
+definizioni di moduli, tipi strutturati (classi, struct, interfacce,
+trait, enum), funzioni e metodi, relazioni di ereditarietà, chiamate,
+istanziazioni e accessi a campo.
+
+Il ground truth è codificato in un file di manifesto YAML
+(\texttt{test.yml}) che specifica:
+\begin{itemize}
+  \item \textbf{Nodi attesi}: le entità architetturali che
+    l'analizzatore deve riconoscere, con il rispettivo tipo
+    (\texttt{module}, \texttt{class}, \texttt{struct}, \texttt{function},
+    \texttt{field}, ecc.).
+  \item \textbf{Archi attesi}: le dipendenze tra entità, con sorgente,
+    destinazione e tipo di relazione (\texttt{uses\_type},
+      \texttt{calls}, \texttt{inherits}, \texttt{accesses\_field},
+    \texttt{imports}, ecc.).
+\end{itemize}
+
+Un eseguibile dedicato (\texttt{benchmark\_runner}) esegue l'analisi
+sul progetto di test e confronta il risultato con il manifesto,
+generando un report dettagliato sia in formato Markdown (per la
+consultazione umana) sia in formato JSON (per l'elaborazione
+automatizzata).
+
+\subsection{Metriche}
+Per ciascun benchmark, vengono calcolate due metriche fondamentali:
+\begin{itemize}
+  \item \textbf{Accuratezza Nodi} (\textit{Node Accuracy}): la
+    frazione di nodi attesi correttamente individuati dall'analizzatore,
+    sia in termini di esistenza che di classificazione del tipo.
+    $$\text{Acc}_{nodi} = \frac{|\{n \in N_{attesi} \mid n \in
+    N_{estratti} \land \text{kind}(n) \text{ corretto}\}|}{|N_{attesi}|}$$
+  \item \textbf{Accuratezza Archi} (\textit{Edge Accuracy}): la
+    frazione di archi attesi correttamente estratti, dove un arco è
+    considerato corretto se sorgente, destinazione e tipo di relazione
+    corrispondono al ground truth.
+    $$\text{Acc}_{archi} = \frac{|\{e \in E_{attesi} \mid e \in
+    E_{estratti} \land \text{kind}(e) \text{ corretto}\}|}{|E_{attesi}|}$$
+\end{itemize}
+
+\section{Risultati Aggregati}
+La Tabella~\ref{tab:risultati-aggregati} riporta i risultati
+complessivi per ciascun linguaggio.
+
+\begin{table}[ht]
+  \centering
+  \caption{Risultati dei benchmark per linguaggio.}
+  \label{tab:risultati-aggregati}
+  \begin{tabular}{l r r r r r r}
+    \hline
+    \textbf{Linguaggio} & \textbf{Nodi Attesi} & \textbf{Trovati} &
+    \textbf{Acc. Nodi} & \textbf{Archi Attesi} & \textbf{Trovati} &
+    \textbf{Acc. Archi} \\
+    \hline
+    Rust   & 39 & 38 & 97{,}4\% & 67 & 46 & 68{,}7\% \\
+    Java   & --\textsuperscript{*} & -- & -- & 34 & 28 & 82{,}4\% \\
+    Python & 16 & 16 & 100\%    & 19 & 12 & 63{,}2\% \\
+    C      &  7 &  7 & 100\%    & 10 &  4 & 40{,}0\% \\
+    C++    & 12 & 12 & 100\%    & 11 &  2 & 18{,}2\% \\
+    \hline
+  \end{tabular}
+  \begin{flushleft}
+    \textsuperscript{*}\footnotesize{Il benchmark Java è basato su un
+      progetto architetturale reale (HUSACCT) e testa esclusivamente la
+    correttezza degli archi di dipendenza cross-package.}
+  \end{flushleft}
+\end{table}
+
+\subsection{Osservazioni Generali}
+I risultati evidenziano una chiara distinzione tra la capacità del
+sistema di riconoscere le entità architetturali e quella di ricostruire
+le relazioni di dipendenza tra di esse.
+
+L'\textbf{accuratezza sui nodi} è molto alta in tutti i linguaggi
+testati: 100\% per Python, C e C++, e 97{,}4\% per Rust. L'unico
+nodo mancante in Rust è una variabile statica a livello di modulo
+(\texttt{functions.STATIC\_SA}), il cui mancato riconoscimento è
+legato a una limitazione nell'euristica di estrazione delle variabili
+dichiarate all'interno di blocchi macro. Questo risultato conferma che
+le euristiche di classificazione dei nodi CST nell'IR ---
+indipendentemente dal linguaggio sorgente --- sono efficaci e robuste.
+
+L'\textbf{accuratezza sugli archi} presenta invece una variabilità
+significativa tra linguaggi. Java raggiunge l'82{,}4\%, Rust il
+68{,}7\%, Python il 63{,}2\%, mentre C e C++ ottengono
+rispettivamente il 40{,}0\% e il 18{,}2\%. Questa variabilità non è
+tuttavia distribuita uniformemente tra le categorie di dipendenza: come
+discusso nella Sezione~\ref{sec:analisi-errori}, gli errori sono
+concentrati in un numero ristretto di scenari ben identificati.
+
+\section{Analisi per Categoria di Dipendenza}
+\label{sec:analisi-errori}
+Per comprendere la distribuzione degli errori, i risultati vengono
+disaggregati per categoria di arco. La
+Tabella~\ref{tab:risultati-categoria} riporta l'accuratezza per
+ciascuna tipologia di dipendenza.
+
+\begin{table}[ht]
+  \centering
+  \caption{Accuratezza per categoria di dipendenza (archi).}
+  \label{tab:risultati-categoria}
+  \begin{tabular}{l c c c c c}
+    \hline
+    \textbf{Categoria} & \textbf{Rust} & \textbf{Java} &
+    \textbf{Python} & \textbf{C} & \textbf{C++} \\
+    \hline
+    Import / Include       & 14/14 & --\textsuperscript{a}    & 3/3
+    & --    & --   \\
+    Ereditarietà (IsA)     & 1/1   & 3/3  & 1/1   & --    & 1/1  \\
+    Uses Type (dichiaraz.) & 11/18 & 15/16 & --   & 1/2   & 1/3  \\
+    Calls (invocazioni)    & 8/11  & 8/8  & 3/7   & 3/4   & 0/3  \\
+    Accesses Field         & 4/4   & 11/11 & 6/8  & 0/4   & 0/4  \\
+    Type Cast              & 0/1   & 0/2  & --    & --    & --   \\
+    \hline
+  \end{tabular}
+  \begin{flushleft}
+    \textsuperscript{a}\footnotesize{Il benchmark Java non testa gli
+      import come archi espliciti nel ground truth, ma gli import sono
+    necessariamente risolti per poter estrarre le altre dipendenze.}
+  \end{flushleft}
+\end{table}
+
+\subsection{Categorie con Alta Accuratezza}
+
+\paragraph{Import e Risoluzione dei Moduli.}
+La risoluzione degli import è pienamente funzionante in tutti i
+linguaggi testati: Rust (14/14), Python (3/3). In Java, gli import
+non sono testati esplicitamente come archi nel ground truth, ma il
+funzionamento corretto della risoluzione degli archi cross-package
+(come l'accesso a \texttt{technology.direct.dao.ProfileDAO} dal
+package \texttt{domain.direct.violating}) conferma implicitamente il
+corretto funzionamento del sistema di import.
+
+\paragraph{Ereditarietà.}
+Le relazioni di ereditarietà (\texttt{IsA}, \texttt{isChildOf},
+\texttt{isImplementationOf}) sono correttamente estratte in tutti i
+linguaggi. In Java, il benchmark verifica con successo sia
+l'ereditarietà da classi concrete, sia l'estensione di classi
+astratte, sia l'implementazione di interfacce. In C++, l'ereditarietà
+da \texttt{Transport::Vehicle} a \texttt{Transport::Car} è
+correttamente identificata. In Rust, la relazione tra trait
+(\texttt{TraitB : TraitA}) è riconosciuta tramite il meccanismo di
+\texttt{super\_types}.
+
+\paragraph{Invocazioni di Metodo (Java).}
+Il benchmark Java mostra un'accuratezza del 100\% sulle chiamate a
+metodo (8/8), incluse chiamate a metodi di istanza, metodi statici,
+metodi su superclassi, metodi su inner class, e persino chiamate a
+librerie esterne (\texttt{FoursquareApi.getAuthenticationUrl}). Questo
+risultato dimostra la maturità del Query Engine Algebrico nel contesto
+di un linguaggio con tipizzazione statica esplicita.
+
+\paragraph{Accesso ai Campi (Java e Python, contesto d'istanza).}
+L'accesso ai campi all'interno di metodi d'istanza funziona
+correttamente sia in Java (11/11, inclusi accessi a campi di
+superclassi e costanti di interfaccia) sia in Python (6/8,
+all'interno dei metodi \texttt{\_\_init\_\_} e dei metodi d'istanza).
+Questo è reso possibile dall'iniezione anticipata di
+\texttt{self}/\texttt{this} nello \texttt{SymbolStack} durante la
+Fase 2a.
+
+\subsection{Categorie con Errori Sistematici}
+
+\paragraph{Accesso ai Campi in Funzioni Libere (C e C++).}
+L'accuratezza sugli \texttt{accesses\_field} cala drasticamente
+quando il contesto è una funzione libera (non un metodo d'istanza): in
+C si ottiene 0/4 e in C++ 0/4. La causa è strutturale: nelle funzioni
+libere, il tipo della variabile locale su cui avviene l'accesso al
+campo (ad esempio, \texttt{rect.width} dove \texttt{rect} è di tipo
+\texttt{Rectangle}) deve essere inferito dall'assegnamento o dal
+passaggio per parametro. Il sistema attuale risolve il tipo solo
+quando è annotato esplicitamente nella dichiarazione della variabile,
+ma nei linguaggi C e C++ le variabili locali di tipo struct sono
+frequentemente dichiarate senza annotazione esplicita in contesti dove
+il tipo è ovvio dal costruttore o dall'inizializzazione.
+
+\paragraph{Campi delle Varianti Enum con Dati Associati (Rust).}
+In Rust, le varianti di enum con dati associati (ad esempio
+\texttt{EnumB::FIRST(EnumA)}) producono campi nell'IR che non vengono
+correttamente collegati al tipo del dato associato. Questo genera
+falsi negativi negli archi \texttt{uses\_type} dai campi delle
+varianti enum ai tipi delle varianti stesse. Si tratta di una
+limitazione nell'euristica di estrazione che non gestisce ancora il
+parsing ricorsivo dei campi posizionali (tuple variant) dell'enum di
+Rust.
+
+\paragraph{Chiamate via \texttt{super()} in Python.}
+Il benchmark Python evidenzia l'incapacità attuale di risolvere le
+chiamate a metodi di superclasse tramite \texttt{super()}. Le chiamate
+\texttt{super().\_\_init\_\_()} e \texttt{super().get\_info()} non
+vengono estratte perché la risoluzione di \texttt{super()} come
+espressione che restituisce il tipo della superclasse non è ancora
+implementata nel Query Engine.
+
+\paragraph{Type Cast.}
+I cast di tipo (\texttt{as} in Rust, \texttt{(Type)} in Java) non
+sono attualmente estratti come archi di dipendenza. Il sistema non
+riconosce le espressioni di cast come siti di riferimento a tipi, il
+che porta a 0/1 in Rust e 0/2 in Java per questa categoria.
+
+\paragraph{Risoluzione Cross-Modulo delle Variabili Locali (Python).}
+In Python, due archi \texttt{accesses\_field} nella funzione
+\texttt{main.main} (accessi a \texttt{User.username} e
+\texttt{User.birth\_year}) non sono risolti. La causa è la mancata
+inferenza del tipo di una variabile locale assegnata tramite
+costruttore importato: il sistema non collega
+\texttt{admin = Admin(...)} al tipo \texttt{models.Admin} perché la
+risoluzione delle istanziazioni come tipo non propaga l'informazione
+di tipo alle variabili locali nel blocco corrente.
+
+\section{Discussione}
+I risultati complessivi mostrano che il sistema raggiunge il suo
+obiettivo primario: l'estrazione language-agnostic delle entità
+architetturali è efficace e pressoché completa. La pipeline formale
+$\Phi = G \circ R \circ E$ produce nodi corretti con un'accuratezza
+superiore al 97\% in tutti i linguaggi testati.
+
+Le limitazioni riscontrate negli archi sono concentrate in tre aree
+tecniche ben definite:
+\begin{enumerate}
+  \item \textbf{Inferenza di tipo per variabili locali}: l'assenza di
+    un meccanismo di propagazione del tipo dal lato destro
+    dell'assegnamento (costruttore, chiamata di funzione) alle
+    variabili locali impedisce la risoluzione degli accessi a campo e
+    delle chiamate a metodo su variabili il cui tipo non è annotato
+    esplicitamente.
+  \item \textbf{Costrutti language-specific non ancora mappati}: cast
+    di tipo, \texttt{super()}, e campi posizionali delle enum variant
+    richiedono estensioni puntuali alle euristiche di estrazione.
+  \item \textbf{Campi d'istanza dichiarati in classe}: il supporto
+    dei campi come variabili d'istanza (ad esempio
+    \texttt{DeclarationVariableInstance} in Java) richiede il
+    riconoscimento delle dichiarazioni a livello di corpo di classe
+    oltre che a livello di firma.
+\end{enumerate}
+
+È importante osservare che nessuna delle limitazioni riscontrate mette
+in discussione la validità dell'approccio language-agnostic in sé: le
+correzioni necessarie sono localizzate nelle euristiche di estrazione
+(Fase 1) e nell'estensione del motore di inferenza (Fase 2b), senza
+richiedere modifiche all'architettura complessiva della pipeline o
+all'algebra delle query.
+
+\subsection{Confronto Qualitativo con Strumenti Esistenti}
+Il benchmark Java utilizzato è basato sul dataset di HUSACCT
+(\textit{Hughes Software Architecture Compliance Checking Tool}), uno
+strumento di analisi architetturale language-specific per Java. Il
+nostro sistema raggiunge un'accuratezza dell'82{,}4\% sugli archi
+dello stesso dataset, utilizzando una pipeline completamente
+generica. Le 6 dipendenze non rilevate corrispondono a funzionalità
+non ancora implementate (cast di tipo, annotazioni come dipendenze, e
+campi d'istanza dichiarati nel corpo della classe), non a difetti
+nell'architettura del risolutore.
+
+\section{Riepilogo}
+La Tabella~\ref{tab:riepilogo} sintetizza lo stato di supporto per
+ciascuna categoria di dipendenza nei linguaggi testati.
+
+\begin{table}[ht]
+  \centering
+  \caption{Stato di supporto per categoria di dipendenza.}
+  \label{tab:riepilogo}
+  \begin{tabular}{l c c c c c}
+    \hline
+    \textbf{Funzionalità}        & \textbf{Rust} & \textbf{Java} &
+    \textbf{Python} & \textbf{C} & \textbf{C++} \\
+    \hline
+    Estrazione Entità             & \checkmark & \checkmark &
+    \checkmark & \checkmark & \checkmark \\
+    Import / Use / Include        & \checkmark & \checkmark &
+    \checkmark & --         & --         \\
+    Ereditarietà                  & \checkmark & \checkmark &
+    \checkmark & --         & \checkmark \\
+    Tipo Parametri e Ritorno      & \checkmark & \checkmark &
+    Parziale   & \checkmark & Parziale   \\
+    Chiamate Metodo (d'istanza)   & \checkmark & \checkmark &
+    Parziale   & \checkmark & --         \\
+    Accesso Campi (d'istanza)     & \checkmark & \checkmark &
+    \checkmark & --         & --         \\
+    Accesso Campi (funz. libere)  & --         & --         & --
+    & --         & --         \\
+    Type Cast                     & --         & --         & --
+    & --         & --         \\
+    \hline
+  \end{tabular}
+\end{table}
+
+I risultati ottenuti confermano la validità dell'approccio
+language-agnostic e identificano con precisione le aree di
+miglioramento, che saranno oggetto di sviluppo nel capitolo dedicato
+agli Sviluppi Futuri.

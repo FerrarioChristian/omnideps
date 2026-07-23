@@ -86,9 +86,9 @@
             <li><a href="#query-algebra">L'Algebra delle Query (𝒬)</a></li>
             <li><a href="#symbol-stack">L'Environment (ρ): Il Symbol Stack</a></li>
             <li><a href="#builder">Fase 2a: Query Building (<code>builder.rs</code>)</a></li>
-            <li><a href="#registry">Il Global Registry</a></li>
-            <li><a href="#executor">Fase 2b: Query Execution (<code>executor.rs</code>)</a></li>
-            <li><a href="#primitives">Il Primitive Registry</a></li>
+            <li><a href="#registry">6. Lo Scope Tree (Arena Allocator)</a></li>
+            <li><a href="#executor">7. Fase 2b: Query Execution (<code>executor.rs</code>)</a></li>
+            <li><a href="#primitives">8. Il Primitive Registry</a></li>
             <li><a href="#traversal">Attraversamento Ricorsivo dell'IR</a></li>
             <li><a href="#impl-flattening">Flattening degli Impl Blocks</a></li>
             <li><a href="#full-example">Esempio Completo End-to-End</a></li>
@@ -104,7 +104,7 @@
 
     <p>La <strong>Name Resolution</strong> (Risoluzione dei Riferimenti) è il cuore logico dell'analizzatore architetturale. È la fase che trasforma nomi grezzi e ambigui — estratti dal parser nella Fase 1 — in identificatori univoci e globalmente validi. Senza questa fase, l'analizzatore non saprebbe se <code>Veicolo</code> scritto in un file si riferisce alla struct <code>root::core::Veicolo</code>, a un tipo esterno importato, o a un tipo inesistente.</p>
 
-    <p><strong>Perché è il cuore del sistema?</strong> Perché l'intero grafo delle dipendenze (Fase 3) si basa sui risultati della risoluzione. Se un tipo viene marcato erroneamente come <code>Failed</code>, scompare un arco dal grafo. Se viene marcato come <code>External</code> invece di <code>Resolved</code>, il grafo mostra una dipendenza verso una libreria esterna inesistente. La qualità dell'analisi architetturale dipende interamente dalla correttezza della risoluzione.</p>
+    <p><strong>Perché è il cuore del sistema?</strong> Perché l'intero grafo delle dipendenze (Fase 3) si basa sui risultati della risoluzione. Se un tipo viene marcato erroneamente come <code>Failed</code>, scompare un arco dal grafo. Se viene marcato come <code>External</code> invece di <code>Resolved</code>, il grafo mostra una dipendenza verso una libreria esterna inesistente. La qualità dell'analisi architetturale dipende interamente dalla correttezza della risoluzione locale e globale.</p>
 
     <h3>1.1 Il Problema Fondamentale</h3>
     <p>Quando il parser estrae dall'AST un riferimento come <code>Veicolo</code>, non sa quale <code>Veicolo</code> sia. Potrebbe essere:</p>
@@ -209,7 +209,7 @@
             <tr>
                 <td><strong>v3</strong> (attuale)</td>
                 <td>Query Engine bifase</td>
-                <td><code>SymbolStack</code> con <code>String → Query</code> + <code>GlobalRegistry</code> con <code>RegistryEntry</code></td>
+                <td><code>SymbolStack</code> con <code>String → Query</code> + <code>Scope Tree</code> con <code>RegistryEntry</code></td>
                 <td>—</td>
             </tr>
         </tbody>
@@ -238,7 +238,7 @@
 
     <div class="purple-box">
         <h4 style="margin-top: 0; color: var(--purple);">Fondamento Teorico: Lazy Evaluation Applicata alla Risoluzione</h4>
-        <p>La <code>Query</code> algebrica è concettualmente una <em>thunk</em> — un'espressione non ancora valutata che cattura l'intento del programmatore. Come nell'evaluazione lazy dei linguaggi funzionali, la valutazione viene rinviata al momento in cui <strong>tutto il contesto è disponibile</strong>. Questo elimina il problema dei forward-references per costruzione: quando l'Executor valuta le query, l'intero IR è già stato letto e indicizzato nel GlobalRegistry.</p>
+        <p>La <code>Query</code> algebrica è concettualmente una <em>thunk</em> — un'espressione non ancora valutata che cattura l'intento del programmatore. Come nell'evaluazione lazy dei linguaggi funzionali, la valutazione viene rinviata al momento in cui <strong>tutto il contesto è disponibile</strong>. Questo elimina il problema dei forward-references per costruzione: quando l'Executor valuta le query, l'intero IR è già stato letto e indicizzato nel Scope Tree.</p>
     </div>
 
     <div class="success-box">
@@ -249,7 +249,7 @@
 
     <div class="success-box">
         <h4 style="margin-top: 0; color: var(--success);">Fase 2b: Query Execution (Navigation) — <code>executor.rs</code></h4>
-        <p><strong>Responsabilità unica:</strong> valutare algebricamente ogni <code>Query</code> navigando l'IR completo (tramite il <code>GlobalRegistry</code>), classificando il risultato in <code>Resolved</code>, <code>External</code>, <code>Primitive</code>, o <code>Failed</code>.</p>
+        <p><strong>Responsabilità unica:</strong> valutare algebricamente ogni <code>Query</code> navigando l'IR completo (tramite il <code>Scope Tree</code>), classificando il risultato in <code>Resolved</code>, <code>External</code>, <code>Primitive</code>, o <code>Failed</code>.</p>
         <p><strong>Invariante:</strong> dopo questa fase, l'IR non contiene più <code>TypeRef::ResolutionQuery</code> — tutti sono stati classificati.</p>
     </div>
 
@@ -273,7 +273,7 @@
 │  │  substitute, pop. Produce ResolutionQuery.                │  │
 │  └────────────────────────────────────────────────────────────┘  │
 │                                                                  │
-│  <span class="node">③ GlobalRegistry</span>  <span class="dim">(registry.rs) — Costruito all'inizio Fase 2b</span>  │
+│  <span class="node">③ Scope Tree</span>  <span class="dim">(registry.rs) — Costruito all'inizio Fase 2b</span>  │
 │  ┌────────────────────────────────────────────────────────────┐  │
 │  │  HashMap&lt;QN, RegistryEntry&gt;. "Elenco telefonico" di      │  │
 │  │  tutto il progetto. Ogni componente ha un percorso        │  │
@@ -333,7 +333,7 @@
         <li><code>a.f()</code> restituisce un oggetto di tipo <code>T</code> (il return type di <code>f</code>)</li>
         <li><code>.g()</code> deve essere cercato nei metodi di <code>T</code>, non nei metodi di <code>a</code></li>
     </ul>
-    <p>Senza <code>Call</code>, non c'è modo di esprimere "il risultato di una chiamata". L'Executor, quando incontra <code>Call</code> all'interno di un <code>Extract</code>, consulta il <code>GlobalRegistry</code> per il tipo di ritorno della funzione, permettendo la risoluzione transitiva.</p>
+    <p>Senza <code>Call</code>, non c'è modo di esprimere "il risultato di una chiamata". L'Executor, quando incontra <code>Call</code> all'interno di un <code>Extract</code>, consulta il <code>Scope Tree</code> per il tipo di ritorno della funzione, permettendo la risoluzione transitiva.</p>
 
     <h3>3.4 Perché Tre Primitive Sono Sufficienti</h3>
     <p>Ogni espressione di accesso in un linguaggio di programmazione può essere scomposta in sequenze di:</p>
@@ -599,85 +599,60 @@ block.instantiates = block.instantiates.into_iter().map(|i| substitute_type(ctx,
     <!-- ============================================================ -->
     <!-- SEZIONE 6 -->
     <!-- ============================================================ -->
-    <h2 id="registry">6. Il Global Registry</h2>
-    <p class="ref">Riferimento: <code>src/resolver/registry.rs:1-95</code></p>
+            <h2 id="registry">6. Lo Scope Tree (Arena Allocator)</h2>
+    <p class="ref">Riferimento: <code>src/resolver/scope.rs:1-120</code></p>
 
-    <h3>6.1 A Cosa Serve — L'Elenco Telefonico del Progetto</h3>
-    <p>Il GlobalRegistry è un indice piatto che contiene il <strong>percorso assoluto di ogni componente nel progetto</strong>. Viene costruito all'inizio della Fase 2b, <strong>prima di qualsiasi risoluzione</strong>, leggendo l'IR prodotto dalla Fase 2a.</p>
-    <p><strong>Analogia:</strong> se l'IR è una città con strade e edifici, il GlobalRegistry è l'elenco telefonico — contiene tutti gli indirizzi ma non i dettagli degli edifici. L'Executor lo consulta per rispondere alla domanda: "esiste un componente all'indirizzo X?"</p>
+    <h3>6.1 A Cosa Serve — Rappresentazione Esatta del Lexical Scoping</h3>
+    <p>Lo Scope Tree è una struttura ad albero che mappa fedelmente l'annidamento lessicale del codice sorgente. Viene costruito all'inizio della Fase 2b (prima di qualsiasi risoluzione) leggendo l'IR prodotto dalla Fase 2a.</p>
+    <p>A differenza del vecchio Global Registry (che era un dizionario piatto di percorsi assoluti), lo Scope Tree permette all'Executor di fare <strong>Lexical Climbing</strong> (risalita dello scope) vero e proprio. Quando l'Executor cerca un identificatore, parte dal nodo corrente dell'albero e sale di padre in padre fino a trovare la definizione, esattamente come fa il compilatore Rust o Java.</p>
 
-    <h3>6.2 Perché <code>HashMap&lt;QN, RegistryEntry&gt;</code> e Non <code>HashSet&lt;QN&gt;</code></h3>
-    <p>La v2 usava un <code>HashSet&lt;QualifiedName&gt;</code> — solo esistenza, nessuna informazione sul tipo. Questo era sufficiente per la risoluzione base ma impediva l'inferenza di tipo per le catene di chiamate.</p>
-    <pre><code>pub enum RegistryEntry {
-    Module,
-    StructuredType,
-    Function { return_type: TypeRef },  // ← Questo abilita Call(Q) + resolve_call_return
+    <h3>6.2 Allocazione tramite Arena (<code>Vec&lt;ScopeNode&gt;</code>)</h3>
+    <p>In Rust, implementare un albero con riferimenti reciproci (padre-figlio) usando puntatori come <code>Rc&lt;RefCell&lt;T&gt;&gt;</code> è lento e prono a memory leak. Per questo usiamo un <strong>Arena Allocator</strong>:</p>
+    <pre><code>pub struct ScopeTree {
+    pub arena: Vec&lt;ScopeNode&gt;,
+    pub root: ScopeId,
+}
+
+pub struct ScopeNode {
+    pub id: ScopeId,
+    pub parent: Option&lt;ScopeId&gt;,
+    pub children: HashMap&lt;String, ScopeId&gt;,
+    pub full_path: QualifiedName,
+    pub return_type: Option&lt;TypeRef&gt;,
 }</code></pre>
-    <p><strong>Perché salvare il <code>return_type</code>?</strong> Quando l'Executor incontra <code>Call(Extract(Find("Auto"), "calcola"))</code> con <code>resolve_call_return = true</code>, deve sapere cosa restituisce <code>calcola()</code>. Chiama <code>registry.get(["root","core","calcola"])</code> e legge <code>RegistryEntry::Function { return_type: ResolutionQuery(Find("Auto")) }</code>. Poi valuta ricorsivamente <code>Find("Auto")</code> per ottenere il tipo di ritorno assoluto.</p>
+    <p><strong>Come funziona:</strong> Ogni nodo è semplicemente salvato in un array lineare (<code>Vec</code>). Un <code>ScopeId</code> è solo un indice (<code>usize</code>) in questo array. Questo rende l'accesso O(1), senza overhead di puntatori, ed è <em>cache-friendly</em>.</p>
 
-    <h3>6.3 Costruzione: <code>register_module</code> Passo per Passo</h3>
-    <p>La funzione <code>register_module</code> attraversa l'IR ricorsivamente. Ad ogni livello:</p>
-
+    <h3>6.3 Costruzione: <code>build_scope_tree</code> Passo per Passo</h3>
+    <p>La funzione attraversa l'IR ricorsivamente e popola l'Arena. Ad ogni livello crea un nuovo <code>ScopeNode</code>, imposta il suo <code>parent</code> al nodo chiamante, e registra se stesso nei <code>children</code> del padre.</p>
+    
     <div class="step step-success">
-        <h3>I 5 passi di <code>register_module</code></h3>
+        <h3>I 5 passi della costruzione (<code>executor.rs</code>)</h3>
         <div class="tree-container">
 <span class="green">Passo 1 — Il modulo stesso:</span>
-  prefix.extend(m.name.clone());
-  paths.insert(prefix, <span class="green">RegistryEntry::Module</span>);
-  <span class="dim">Es: ["root", "core"] → Module</span>
+  Crea un nodo per il modulo, aggiungilo ai children del padre.
 
 <span class="green">Passo 2 — I tipi strutturati:</span>
   Per ogni st in m.structured_types:
-    register_structured_type(st, prefix)  <span class="dim">← funzione ricorsiva separata</span>
+    Crea nodo per st, ricorsione per i metodi e nested_types.
 
 <span class="green">Passo 3 — Le funzioni libere:</span>
-  Per ogni ff in m.free_functions:
-    ff_prefix = prefix + ff.name
-    paths.insert(ff_prefix, <span class="green">Function { return_type: ff.signature.return_type }</span>)
-  <span class="dim">Es: ["root", "core", "calcola"] → Function { ret: Find("Auto") }</span>
+  Crea nodo per ogni funzione. Salva il suo `return_type` nel nodo!
+  <span class="dim">Questo abilita l'inferenza per le catene di chiamate.</span>
 
 <span class="green">Passo 4 — Gli impl blocks:</span>
   Per ogni ib in m.impl_blocks:
-    target_name = <span class="import">ultimo segmento di ib.impl_for</span>
-    <span class="dim">↑ Estratto diversamente a seconda del tipo di TypeRef:</span>
-    <span class="dim">  Unresolved(qn) → qn.last()</span>
-    <span class="dim">  ResolutionQuery(q) → extract_base_name(q)  ← discende ricorsivamente</span>
-    target_prefix = prefix + target_name
-    Per ogni metodo: paths.insert(target_prefix + nome, Function{ret})
-    Per ogni nested: register_structured_type(nested, target_prefix)
+    Trova o crea il nodo del target_name (es. "Veicolo").
+    Per ogni metodo, crea un nodo figlio sotto "Veicolo" con il suo return_type.
 
 <span class="green">Passo 5 — I sotto-moduli (ricorsione):</span>
   Per ogni sub in m.sub_modules:
-    register_module(sub, prefix)  <span class="dim">← ricorsione nel sotto-modulo</span></div>
+    ricorsione nel sotto-modulo.</div>
     </div>
 
-    <div class="warn-box">
-        <h4 style="margin-top: 0; color: var(--warning);">Dettaglio critico: Passo 4 — Estrazione del target_name dagli ImplBlock</h4>
-        <p>I metodi di un <code>impl Block</code> devono essere registrati <strong>sotto il nome del tipo target</strong>, non sotto il nome dell'impl block. Se abbiamo <code>impl Veicolo { fn new() ... }</code>, il metodo <code>new</code> deve essere registrato come <code>["root","core","Veicolo","new"]</code>, non come <code>["root","core","impl_Veicolo","new"]</code>.</p>
-        <p>Ma il <code>impl_for</code> a questo punto è già un <code>ResolutionQuery</code> (prodotto dalla Fase 2a). Per estrarne il nome, si usa <code>extract_base_name(q)</code>, che discende ricorsivamente nella query fino a trovare il <code>Find(name)</code> alla base. <code>Extract(Find("Veicolo"), "new")</code> → "Veicolo".</p>
-    </div>
-
-    <h3>6.4 <code>register_structured_type</code> — Registrazione Ricorsiva</h3>
-    <pre><code>fn register_structured_type(&amp;mut self, st: &amp;StructuredType, mut prefix: QualifiedName) {
-    prefix.extend(st.name.clone());
-    self.paths.insert(prefix.clone(), RegistryEntry::StructuredType);
-    // Metodi del tipo
-    for method in &amp;st.methods {
-        let mut m_prefix = prefix.clone();
-        m_prefix.extend(method.name.clone());
-        self.paths.insert(m_prefix, RegistryEntry::Function { return_type: method.signature.return_type.clone() });
-    }
-    // Tipi annidati — RICORSIONE
-    for nested in &amp;st.nested_types {
-        self.register_structured_type(nested, prefix.clone());
-    }
-}</code></pre>
-    <p><strong>Perché la ricorsione su <code>nested_types</code>?</strong> Linguaggi come Java e C# permettono di definire classi all'interno di altre classi (inner classes). Queste devono essere registrate con il loro percorso completo (es. <code>["root","OuterClass","InnerClass"]</code>).</p>
-
-    <h3>6.5 Le Due API: <code>exists</code> vs <code>get</code></h3>
+    <h3>6.4 Le API dell'Albero: <code>find_child</code> e <code>get_node</code></h3>
     <ul>
-        <li><code>exists(path)</code> → <code>bool</code>: usato da <code>evaluate_typeref</code> per decidere se un path è <code>Resolved</code> (esiste nel registry) o <code>External</code> (non esiste). Costo: O(1) hash lookup.</li>
-        <li><code>get(path)</code> → <code>Option&lt;&amp;RegistryEntry&gt;</code>: usato da <code>evaluate_query</code> nel branch <code>Call</code> con <code>resolve_call_return = true</code> per leggere il <code>return_type</code> di una funzione. È l'unico punto dove il registry fornisce <em>informazione</em> oltre alla semplice esistenza.</li>
+        <li><code>get_node(id)</code>: restituisce una reference al nodo. O(1).</li>
+        <li><code>find_child(id, name)</code>: cerca "name" tra i figli diretti del nodo <code>id</code>. O(1).</li>
     </ul>
 
     <!-- ============================================================ -->
@@ -690,7 +665,7 @@ block.instantiates = block.instantiates.into_iter().map(|i| substitute_type(ctx,
     <pre><code>pub struct ExecutorContext&lt;'a&gt; {
     pub current_prefix: QualifiedName,
     pub imports_stack: Vec&lt;Vec&lt;Import&gt;&gt;,
-    pub registry: &amp;'a GlobalRegistry,
+    pub registry: &amp;'a Scope Tree,
     pub primitives: &amp;'a PrimitiveRegistry,
 }</code></pre>
     <table>
@@ -710,7 +685,7 @@ block.instantiates = block.instantiates.into_iter().map(|i| substitute_type(ctx,
             </tr>
             <tr>
                 <td><code>registry</code></td>
-                <td><code>&amp;GlobalRegistry</code></td>
+                <td><code>&amp;Scope Tree</code></td>
                 <td>Riferimento immutabile all'indice globale. Usato per <code>exists()</code> e <code>get()</code>.</td>
                 <td>Mai modificato</td>
             </tr>
@@ -906,7 +881,7 @@ block.instantiates = block.instantiates.into_iter().map(|i| substitute_type(ctx,
         <p>Questo flag booleano è la chiave dell'intera architettura di inferenza. Ha due modalità:</p>
         <ul>
             <li><strong><code>false</code></strong> (default, usato da <code>evaluate_typeref</code>): <code>Call(Find("f"))</code> produce <code>["root","core","f"]</code>. Il risultato è il <strong>path della funzione</strong>. Questo è ciò che serve per gli archi di dipendenza nel grafo (Fase 3).</li>
-            <li><strong><code>true</code></strong> (usato da <code>Extract</code> quando il genitore è un <code>Call</code>): <code>Call(Find("f"))</code> consulta il <code>GlobalRegistry</code> per il <code>return_type</code> di <code>f</code> e restituisce il <strong>tipo di ritorno</strong>. Questo è ciò che serve per le catene: in <code>f().g()</code>, <code>g</code> va cercato nel tipo di ritorno di <code>f</code>, non in <code>f</code> stessa.</li>
+            <li><strong><code>true</code></strong> (usato da <code>Extract</code> quando il genitore è un <code>Call</code>): <code>Call(Find("f"))</code> consulta il <code>Scope Tree</code> per il <code>return_type</code> di <code>f</code> e restituisce il <strong>tipo di ritorno</strong>. Questo è ciò che serve per le catene: in <code>f().g()</code>, <code>g</code> va cercato nel tipo di ritorno di <code>f</code>, non in <code>f</code> stessa.</li>
         </ul>
         <p><strong>Perché il target_query è sempre valutato con <code>false</code>?</strong> Perché <code>evaluate_query(ctx, target_query, false)</code> produce il path della funzione — quello che serve per fare <code>registry.get(path)</code> e leggere il <code>return_type</code>. Se usassimo <code>true</code>, otterremmo il tipo di ritorno del target, che non è la funzione stessa!</p>
         <p style="margin-bottom: 0;"><strong>Il caso <code>ResolutionQuery(ret_q)</code> nel return type:</strong> Se il tipo di ritorno della funzione è ancora una query (perché non è stato ancora risolto — siamo nel mezzo dell'esecuzione), viene valutato ricorsivamente con <code>evaluate_query(ctx, ret_q, true)</code>. Questo permette catene arbitrariamente lunghe.</p>
@@ -1092,9 +1067,9 @@ struct User { name: String }</code></pre>
         </tbody>
     </table>
 
-    <h3>11.4 GlobalRegistry Costruito (inizio Fase 2b)</h3>
+    <h3>11.4 Scope Tree Costruito (inizio Fase 2b)</h3>
     <div class="tree-container">
-<span class="symbol">GlobalRegistry.paths:</span>
+<span class="symbol">Scope Tree.paths:</span>
   <span class="green">✓</span> ["root"]                      → Module
   <span class="green">✓</span> ["root", "User"]              → StructuredType
   <span class="green">✓</span> ["root", "core"]              → Module
@@ -1184,7 +1159,23 @@ struct User { name: String }</code></pre>
     <!-- ============================================================ -->
     <!-- SEZIONE 13 -->
     <!-- ============================================================ -->
-    <h2 id="comparison">13. Confronto Architetturale: v2 (Monofase) vs v3 (Query Engine)</h2>
+    <h2 id="module-strategies">13. Gestione Modulare Agnostica (Module Strategies)</h2>
+    <p>I linguaggi di programmazione presentano differenze architetturali profonde nella definizione e organizzazione dei moduli. Per gestire questa diversità senza intaccare l'agnosticismo dell'albero degli scope, il motore fa affidamento su un sistema di strategie combinabili, rappresentate da <em>feature flags</em> booleane. Questa architettura consente di sovrapporre più comportamenti per linguaggi complessi.</p>
+    <table>
+        <thead><tr><th>Strategia (Flag)</th><th>Descrizione e Comportamento</th><th>Es. Linguaggio</th></tr></thead>
+        <tbody>
+            <tr><td><strong><code>file_based</code></strong></td><td>Ogni file fisico sorgente viene trattato come un modulo isolato. Il nome del file (senza estensione) funge da identificatore del modulo.</td><td>Rust, Python, Go</td></tr>
+            <tr><td><strong><code>directory_based</code></strong></td><td>Le directory fisiche vengono convertite in moduli padre, annidando i moduli dei file in base alla struttura della cartella.</td><td>Rust, Python</td></tr>
+            <tr><td><strong><code>package_decl_based</code></strong></td><td>Il file viene scannerizzato per dichiarazioni di pacchetto esplicite a livello di file (es. <code>package org.example;</code>). Il contenuto viene collocato all'interno di questo percorso logico.</td><td>Java, Go</td></tr>
+            <tr><td><strong><code>namespace_based</code></strong></td><td>Il sistema supporta blocchi di namespace testuali espliciti annidati (es. <code>namespace X { ... }</code>). In questo modello un singolo file può contenere frammenti di più moduli/namespace logici.</td><td>C++, C#</td></tr>
+            <tr><td><strong><code>inline_mod_based</code></strong></td><td>Il codice supporta la definizione di moduli inline all'interno del file, che fungono da delimitatori di scope (es. <code>mod tests { ... }</code> in Rust).</td><td>Rust</td></tr>
+        </tbody>
+    </table>
+
+    <!-- ============================================================ -->
+    <!-- SEZIONE 14 -->
+    <!-- ============================================================ -->
+    <h2 id="comparison">14. Confronto Architetturale: v2 (Monofase) vs v3 (Query Engine)</h2>
 
     <table>
         <thead><tr><th>Aspetto</th><th>v2 (Symbol Stack monofase)</th><th>v3 (Query Engine bifase)</th></tr></thead>
@@ -1193,7 +1184,7 @@ struct User { name: String }</code></pre>
             <tr><td><strong>SymbolStack mappa</strong></td><td><code>String → QualifiedName</code></td><td><code>String → Query</code></td></tr>
             <tr><td><strong>Stato intermedio</strong></td><td>Nessuno</td><td><code>TypeRef::ResolutionQuery(Query)</code></td></tr>
             <tr><td><strong>Forward references</strong></td><td>Problematici</td><td>Risolti nativamente</td></tr>
-            <tr><td><strong>GlobalRegistry</strong></td><td><code>HashSet&lt;QN&gt;</code></td><td><code>HashMap&lt;QN, RegistryEntry&gt;</code></td></tr>
+            <tr><td><strong>Scope Tree</strong></td><td><code>HashSet&lt;QN&gt;</code></td><td><code>Vec&lt;ScopeNode&gt;</code> (Arena)</td></tr>
             <tr><td><strong>Cache</strong></td><td><code>ResolutionCache</code></td><td>Rimossa — non necessaria</td></tr>
             <tr><td><strong>Catene <code>a.f().g()</code></strong></td><td>Non supportate</td><td>Supportate via <code>resolve_call_return</code></td></tr>
             <tr><td><strong>self/this</strong></td><td>Non gestiti</td><td>Iniettati automaticamente</td></tr>

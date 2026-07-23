@@ -90,82 +90,131 @@ letto e tradotto tutto il codice dell'intero Workspace. Questa
 posticipazione garantisce che l'ordine di dichiarazione delle classi
 nei file sorgenti sia ininfluente.
 
-Per valutare le query in modo deterministico e senza stati mutabili,
-l'algoritmo si avvale di un \textbf{Contesto di Esecuzione
-Immutabile} ($\Gamma$). Esso racchiude la conoscenza globale del
-progetto e lo stato della traversata, ed è formalmente definito come la tupla:
-$$ \Gamma = \langle \mathcal{P}_{curr}, \mathcal{I}_{stack},
-\mathcal{GR}, \mathcal{PR} \rangle $$
+Per valutare le query in modo deterministico e corretto rispetto allo
+scoping locale, l'algoritmo si avvale di un \textbf{Contesto di
+Esecuzione Immutabile} ($\Gamma$). Esso racchiude la conoscenza
+globale del progetto e lo stato della traversata, ed è formalmente
+definito come la tupla:
+$$ \Gamma = \langle \mathcal{E}, \mathcal{PR} \rangle $$
 dove:
 \begin{itemize}
-  \item $\mathcal{P}_{curr}$ è il prefisso gerarchico corrente (il
-      percorso $\mathcal{QN}$ del componente in cui ci si trova, es.
-    \texttt{root::core}).
-  \item $\mathcal{I}_{stack}$ è la pila gerarchica degli import
-    accessibili dallo scope attuale (i cosiddetti \textit{Jump Points}).
-  \item $\mathcal{GR}$ è il \textbf{Global Registry}: un indice
-    piatto creato a tempo zero, appena prima dell'esecuzione. Mappa
-    ogni percorso assoluto ($\mathcal{QN}$) ai suoi metadati
-    architetturali (es. tipi di ritorno e firme ereditate).
+  \item $\mathcal{E}$ è lo \textbf{Scope Tree} (o Environment Tree):
+    un albero gerarchico creato a tempo zero, appena prima
+    dell'esecuzione. Mappa l'annidamento reale dei costrutti del
+    codice (moduli, classi, funzioni, blocchi) e conserva i simboli locali.
   \item $\mathcal{PR}$ è il \textbf{Primitive Registry}, il
     dizionario data-driven contenente le parole chiave dei tipi base
     del linguaggio in uso.
 \end{itemize}
 
-\subsection{Formalizzazione del Global Registry ($\mathcal{GR}$)}
-Per permettere alla risoluzione di abbandonare l'oneroso approccio di
-ricerca ad albero  in favore di un lookup piú leggero,  il
-\textbf{Global Registry} è formalizzato come una mappa matematica
-iniettiva tra i percorsi assoluti e i metadati strutturali essenziali.
+\subsection{Formalizzazione dello Scope Tree ($\mathcal{E}$)}
+Per permettere alla risoluzione di supportare l'accesso ai parametri
+e alle variabili locali (che non sopravvivono a livello globale),
+abbiamo abbandonato l'uso di un registro globale piatto a favore di
+un \textbf{Albero degli Ambienti Lessicali} ($\mathcal{E}$). A causa
+dei rigidi controlli del \textit{Borrow Checker} del linguaggio Rust,
+che impediscono la creazione diretta di strutture ad albero
+pointer-based mutuamente ricorsive, lo Scope Tree è implementato
+tramite l'\textbf{Arena Pattern}.
 
-$$ \mathcal{GR} : \mathcal{QN} \to E_{reg} $$
-Dove $E_{reg}$ rappresenta il tipo somma delle entità architetturali
-registrabili:
-$$ E_{reg} = \text{Module} \mid \text{StructuredType} \mid
-\text{Function}(\tau_{ret} \mid \mathcal{Q}_{ret}) \mid \text{ImplBlock} $$
+Tutti i nodi dell'albero (gli \textit{Scope}) risiedono in un array
+contiguo di memoria (l'Arena) e sono referenziati unicamente dal loro
+indice (ScopeId):
+$$ \mathcal{E}_{arena} : \text{ScopeId} \to \text{Scope} $$
 
-L'intuizione architetturale fondamentale che distingue il
-$\mathcal{GR}$ da un banale *hash set* di stringhe risiede nel
-salvataggio del \textbf{tipo di ritorno} ($\tau_{ret}$ o la sua query
-non risolta $\mathcal{Q}_{ret}$) per le entità funzionali.
-Questa struttura dati permette al valutatore, incontrando l'operatore
-di invocazione $\texttt{Call(F)}$, di non limitarsi a validare
-l'esistenza della funzione $F$, ma di recuperarne istantaneamente il
-tipo di ritorno interrogando $\mathcal{GR}(F)$. Ciò costituisce la
-base algoritmica indispensabile per l'inferenza di tipo transitiva e
-la validazione delle catene di metodi (es. $\texttt{a.f().g()}$).
+Ogni Scope contiene un puntatore (indice) al padre, e una mappa dei
+\textbf{Simboli} definiti localmente:
+$$ \text{Scope} = \langle id, parent, \text{symbols} : \text{String}
+\to \text{Symbol} \rangle $$
+
+Dove un $\text{Symbol}$ rappresenta il tipo somma delle entità architetturali:
+$$ \text{Symbol} = \text{Module}(id) \mid \text{Type}(id) \mid
+\text{Value}(\tau) $$
+L'intuizione architetturale fondamentale risiede nell'entità
+\text{Value}, che conserva il tipo ($\tau$) o la sua query non
+risolta. Questa struttura permette al valutatore di inferire i tipi
+di ritorno attraversando l'albero bottom-up, partendo dallo scope più
+profondo (il blocco di codice corrente) fino alla radice globale.
 
 \subsection{Lexical Scope Climbing e Punti di Salto}
 Per valutare un operatore \texttt{Find}, il contesto di esecuzione
 $\Gamma$ applica l'algoritmo di \textit{Lexical Scope Climbing}. Partendo
-dal prefisso gerarchico corrente in cui la query è stata generata
-(es. \texttt{root::core}), l'algoritmo accoda il nome cercato e
-interroga il $\mathcal{GR}$.
-Se la risorsa non viene trovata, il prefisso viene "tagliato" (pop)
-risalendo di un livello (es. \texttt{root}), e il controllo viene
-ripetuto. Contestualmente, a ogni livello risalito, l'algoritmo
+dallo Scope corrente in cui la query è stata generata
+(es. il blocco di una funzione), l'algoritmo cerca il nome richiesto
+all'interno dei simboli locali.
+Se la risorsa non viene trovata, si sposta allo Scope padre
+ricorsivamente, fino ad arrivare alla radice (il Global Scope).
+Contestualmente, a ogni livello risalito, l'algoritmo
 ispeziona i \textbf{Jump Points} (le clausole di \texttt{import} o
 \texttt{use}), verificando se il nome è un \textit{alias} che punta a
 una risorsa esterna. Questo meccanismo riproduce fedelmente le regole
 di \textit{Lexical Scoping} presenti nei compilatori reali.
 
-\subsection{Method Resolution Order (MRO)}
+\subsection{Gestione Modulare Agnostica (Module Strategies)}
+I linguaggi di programmazione presentano differenze architetturali
+profonde nella definizione e organizzazione dei moduli. Per gestire
+questa diversità senza intaccare l'agnosticismo dell'albero degli
+scope, il motore fa affidamento su un sistema di strategie
+combinabili, rappresentate da \textit{feature flags} booleane. Questa
+architettura consente di sovrapporre più comportamenti per linguaggi complessi.
+
+\begin{table}[h!]
+  \centering
+  \begin{tabular}{|l|p{9cm}|l|}
+    \hline
+    \textbf{Strategia (Flag)} & \textbf{Descrizione e Comportamento}
+    & \textbf{Es. Linguaggio} \\ \hline
+    \texttt{file\_based} & Ogni file fisico sorgente viene trattato
+    come un modulo isolato. Il nome del file (senza estensione) funge
+    da identificatore del modulo. & Rust, Python, Go \\ \hline
+    \texttt{directory\_based} & Le directory fisiche vengono
+    convertite in moduli padre, annidando i moduli dei file in base
+    alla struttura della cartella. & Rust, Python \\ \hline
+    \texttt{package\_decl\_based} & Il file viene scannerizzato per
+    dichiarazioni di pacchetto esplicite a livello di file (es.
+    \texttt{package org.example;}). Il contenuto viene collocato
+    all'interno di questo percorso logico. & Java, Go \\ \hline
+    \texttt{namespace\_based} & Il sistema supporta blocchi di
+    namespace testuali espliciti annidati (es. \texttt{namespace X \{
+    ... \}}). In questo modello un singolo file può contenere
+    frammenti di più moduli/namespace logici. & C++, C\# \\ \hline
+    \texttt{inline\_mod\_based} & Il codice supporta la definizione
+    di moduli inline all'interno del file, che fungono da
+    delimitatori di scope (es. \texttt{mod tests \{ ... \}} in Rust).
+    & Rust \\ \hline
+  \end{tabular}
+  \caption{Strategie modulari combinabili del motore di risoluzione.}
+  \label{tab:module_strategies}
+\end{table}
+
+\subsection{Ereditarietà (MRO) e Astrazioni Specifiche per Linguaggio}
 L'operatore \texttt{Extract(P, m)} implementa nativamente la logica
 di \textit{Dynamic Dispatch Statica}. Se il membro $m$ non esiste
-direttamente nel perimetro del padre $P$, il valutatore estrae i
-super-tipi (\texttt{super\_types}) di $P$ dal $\mathcal{GR}$ e lancia
+nello Scope del padre $P$, il valutatore estrae i
+super-tipi (\texttt{super\_types}) di $P$ e lancia
 una ricerca ricorsiva \textit{Depth-First, Left-to-Right} (Profondità
 prima, da sinistra a destra) lungo l'albero genealogico.
-Questo approccio risolve due problematiche architetturali:
-\begin{enumerate}
-  \item \textbf{Polimorfismo di Default}: Garantisce il corretto
-    aggancio ai metodi definiti come default all'interno di Trait
-    (Rust) o Interfacce (Java).
-  \item \textbf{Diamond Problem}: Nei linguaggi che consentono
-    l'ereditarietà multipla (C++, Python), se più padri espongono la
-    stessa funzione, la discesa deterministica assicura l'estrazione
-    della prima implementazione valida, salvaguardando l'integrità del grafo.
-\end{enumerate}
+Questo approccio risolve il \textbf{Diamond Problem} nei linguaggi
+con ereditarietà multipla (es. C++, Python), garantendo il prelievo
+della prima implementazione valida.
+
+Per preservare l'agnosticismo dell'analizzatore e al contempo gestire
+casi peculiari, il motore implementa funzionalità guidate da
+\textit{feature flags}:
+\begin{itemize}
+  \item \textbf{Forward Declarations e Out-Of-Line Methods}: Per
+    linguaggi come C++, il sistema intercetta le \textit{free
+    functions} la cui firma indica un'appartenenza a una classe (es.
+    \texttt{Class::method()}) e le ricolloca chirurgicamente nello
+    scope della rispettiva classe, risolvendo la scissione tra header
+    e implementazione.
+  \item \textbf{Implicit First Parameter as Self}: Per linguaggi come
+    Python, il primo parametro di un metodo d'istanza viene
+    automaticamente registrato nello Scope della funzione come
+    puntatore alla classe contenitore, consentendo la risoluzione
+    trasparente di accessi come \texttt{self.field},
+    indipendentemente dal nome testuale del parametro.
+\end{itemize}
 
 \subsection{Inferenza Semantica e Decoppiamento Primitivo}
 Durante l'esecuzione, il valutatore si avvale di ulteriori euristiche.

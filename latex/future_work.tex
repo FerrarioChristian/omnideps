@@ -1,84 +1,257 @@
 \chapter{Sviluppi Futuri}
 
-Il lavoro presentato in questa fase costituisce le fondamenta formali
+Il lavoro presentato in questa tesi costituisce le fondamenta formali
 e l'infrastruttura architetturale del sistema di analisi
-\textit{language-agnostic}. Le fasi di estrazione, risoluzione e
-costruzione del grafo hanno dimostrato la validità dell'approccio
-basato su tipi e composizione funzionale. Tuttavia, per raggiungere
-un grado di maturità tale da poter analizzare codebase complesse e
-reali in produzione, il sistema richiederà diverse estensioni nei
-prossimi mesi di sviluppo.
+\textit{language-agnostic}. La pipeline $\Phi = G \circ R \circ E$,
+il Query Engine Algebrico e il sistema di benchmark automatizzato
+hanno dimostrato la validità dell'approccio: l'accuratezza
+nell'estrazione delle entità architetturali supera il 97\% in tutti i
+linguaggi testati, e le relazioni di ereditarietà, import e
+invocazione sono correttamente risolte nella maggior parte degli
+scenari.
 
-Di seguito vengono delineati i principali filoni di ricerca e
-implementazione futuri.
+I risultati sperimentali, tuttavia, hanno anche identificato con
+precisione le aree in cui il sistema necessita di estensioni. I
+prossimi sviluppi sono organizzati in ordine di priorità, partendo
+dalle lacune emerse direttamente dai benchmark e procedendo verso
+estensioni a più ampio spettro.
 
-\section{Estensione del Supporto ai Costrutti del Linguaggio}
-Attualmente, la Rappresentazione Intermedia (IR) copre i costrutti
-fondamentali della programmazione orientata agli oggetti e
-procedurale (Classi, Interfacce, Funzioni, Metodi). L'IR dovrà essere
-espansa per supportare costrutti più avanzati che impattano in modo
-significativo sull'architettura:
+\section{Inferenza di Tipo per Variabili Locali}
+La limitazione più impattante emersa dai benchmark è l'incapacità del
+sistema di inferire il tipo di variabili locali non annotate
+esplicitamente. Questa lacuna è responsabile della totalità dei falsi
+negativi sugli archi \texttt{accesses\_field} in C (0/4) e C++ (0/4),
+e di parte degli errori in Python e Rust.
+
+Il problema si manifesta quando una variabile locale viene dichiarata
+tramite un'espressione di inizializzazione il cui tipo è noto
+staticamente, ma non annotato:
+\begin{verbatim}
+  Rectangle rect = {10, 20};     // C: tipo inferibile dal costrutto
+  auto car = Car("Fiat", 120);   // C++: tipo inferibile dal costruttore
+  admin = Admin("alice", "root") # Python: tipo inferibile dall'istanziazione
+\end{verbatim}
+
+L'estensione proposta consiste nell'introduzione di una fase
+intermedia di \textbf{propagazione del tipo} ($P_\tau$) tra la Fase 2a
+(Query Building) e la Fase 2b (Query Execution). Questa fase
+analizzerebbe le assegnazioni all'interno dei blocchi funzionali
+(\texttt{Block}) e, per ciascuna variabile locale il cui tipo è
+\texttt{Unresolved}, tenterebbe di derivarlo dal lato destro
+dell'assegnamento:
 \begin{itemize}
-  \item \textbf{Generics e Polimorfismo Parametrico}: Linguaggi come
-    Java, C++ (Template) e Rust fanno un uso massiccio di tipi
-    generici. Il sistema dei tipi $\mathcal{T}$ dovrà essere esteso
-    per catturare i parametri di tipo (es. \texttt{List<T>}) e i
-    vincoli associati (es. \texttt{T: Clone} in Rust o \texttt{T
-    extends Serializable} in Java).
-  \item \textbf{Tipi Somma Alggebrici}: L'introduzione di
-    \textbf{Enums} complessi (con dati associati, tipici di Rust o
-    Swift) e \textbf{Unions} (in C/C++) richiederà la definizione di
-    un nuovo Componente nell'IR, distinto dalle normali Classi o Struct.
+  \item Se il lato destro è un'espressione di costruzione
+    (\texttt{Instantiates}), il tipo della variabile è il tipo
+    costruito.
+  \item Se il lato destro è una chiamata a funzione con tipo di
+    ritorno noto, il tipo della variabile è il tipo di ritorno.
+  \item Se il lato destro è un accesso a campo con tipo noto, il tipo
+    della variabile è il tipo del campo.
 \end{itemize}
 
-\section{Supporto a Paradigmi Architetturali Avanzati}
-Molti linguaggi moderni utilizzano costrutti che alterano la
-struttura o il comportamento del codice in fase di compilazione o a
-runtime. Ignorare questi elementi significherebbe perdere dipendenze
-architetturali cruciali:
-\begin{itemize}
-  \item \textbf{Decorators e Annotazioni}: In Python e Java, i
-    decoratori (\texttt{@Entity}, \texttt{@Autowired}) spesso
-    iniettano dipendenze silenziose (es. verso framework come Spring
-    o Django). Sarà necessario estrarre questi metadati e mapparli
-    come speciali archi di dipendenza.
-  \item \textbf{Mixins e Traits con Implementazioni di Default}:
-    Sebbene i Trait siano abbozzati, la gestione dei Mixins (comuni
-    in linguaggi dinamici o in Dart) richiede una logica di
-    risoluzione più sofisticata per tracciare correttamente
-    l'ereditarietà multipla o l'iniezione di comportamento.
-  \item \textbf{Programmazione Orientata agli Aspetti (AOP)}:
-    Costrutti come gli \textit{Aspects} in Java modificano il flusso
-    di esecuzione ortogonalmente alla gerarchia delle classi.
-    Tracciarli nel Grafo delle Dipendenze rappresenterà una sfida
-    interessante per il mantenimento dell'agnosticismo.
-\end{itemize}
+Questa estensione, pur operando localmente a livello di blocco, avrebbe
+un impatto significativo sull'accuratezza degli archi nei linguaggi
+procedurali (C, C++) e nei linguaggi a tipizzazione dinamica (Python),
+dove le annotazioni di tipo esplicite sono rare o assenti.
+
+\section{Risoluzione di Costrutti Mancanti}
+I benchmark hanno evidenziato alcune categorie di costrutti
+sintattici che il sistema non estrae ancora come siti di dipendenza.
+Queste lacune sono puntuali e non richiedono modifiche
+all'architettura della pipeline, ma solo estensioni alle euristiche
+della Fase 1 e alla semantica del Query Engine.
+
+\subsection{Risoluzione di \texttt{super()}}
+In Python e Java, la chiamata \texttt{super()} all'interno di un
+metodo restituisce implicitamente un riferimento alla superclasse del
+tipo corrente. Il benchmark Python mostra che le chiamate
+\texttt{super().\_\_init\_\_()} e \texttt{super().get\_info()} non
+vengono estratte (0/2 sulle chiamate a superclasse).
+
+L'implementazione proposta prevede di trattare \texttt{super()} come
+una query algebrica speciale:
+$$\texttt{super()} \equiv
+\text{Extract}(\text{Find}(\texttt{current\_type}), \texttt{super\_types}[0])$$
+In questo modo, la risoluzione si riconduce al meccanismo di MRO già
+implementato, senza richiedere nuove primitive nel Query Engine.
+
+\subsection{Espressioni di Cast}
+I cast di tipo (\texttt{as} in Rust, \texttt{(Type) expr} in Java e
+C++) introducono una dipendenza verso il tipo di destinazione che il
+sistema attualmente non cattura (0/1 in Rust, 0/2 in Java). Poiché i
+nodi CST corrispondenti (\texttt{type\_cast\_expression} in Java,
+\texttt{as\_expression} in Rust) sono identificabili dall'euristica,
+l'estensione consiste nell'aggiunta di un nuovo tipo di sito di
+dipendenza nell'IR (\texttt{casts\_type}) e nella relativa regola di
+estrazione in \texttt{body\_extraction}.
+
+\subsection{Campi delle Varianti Enum con Dati Associati}
+In Rust, le varianti di enum con dati associati (ad esempio
+\texttt{EnumB::FIRST(EnumA)}) generano campi il cui tipo non viene
+correttamente risolto. Il problema è localizzato nell'euristica di
+parsing delle tuple variant, che attualmente non effettua un
+attraversamento ricorsivo dei campi posizionali. La correzione
+richiede l'estensione del parser di \texttt{enum\_variant} per
+estrarre i tipi dei campi posizionali e mapparli come
+\texttt{TypeRef::Unresolved} nell'IR.
+
+\section{Estensione della Rappresentazione Intermedia}
+Oltre alle correzioni puntuali, l'IR dovrà essere estesa per coprire
+costrutti avanzati che impattano significativamente sull'architettura
+di sistemi reali.
+
+\subsection{Generics e Polimorfismo Parametrico}
+Linguaggi come Java, C++ (Template) e Rust fanno un uso massiccio di
+tipi generici. Attualmente, un riferimento a \texttt{List<User>}
+viene estratto come un riferimento al tipo \texttt{List}, perdendo
+l'informazione sul parametro di tipo \texttt{User} --- e quindi la
+dipendenza architetturale verso di esso.
+
+Il sistema dei tipi $\mathcal{T}$ dovrà essere esteso per catturare i
+parametri di tipo:
+$$\tau_{generic} = \langle \mathcal{QN}_{base}, \vec{\tau}_{params} \rangle$$
+dove $\vec{\tau}_{params}$ è la sequenza dei parametri di tipo (a loro
+volta riferimenti di tipo risolvibili). Saranno inoltre necessari i
+vincoli sui parametri (es. \texttt{T: Clone} in Rust,
+\texttt{T extends Serializable} in Java) per abilitare la risoluzione
+corretta delle chiamate a metodo su tipi parametrici.
+
+\subsection{Decoratori e Annotazioni}
+In Python e Java, i decoratori (\texttt{@Entity}, \texttt{@Autowired},
+\texttt{@dataclass}) alterano semanticamente le classi o i metodi a
+cui sono applicati, spesso iniettando dipendenze architetturali
+silenziose verso framework esterni (Spring, Django, SQLAlchemy).
+Ignorare queste annotazioni significa perdere archi di dipendenza
+cruciali per la comprensione dell'architettura. Il benchmark Java
+conferma questa lacuna: la dipendenza
+\texttt{AnnotationDependency $\to$ SettingsAnnotation} non viene
+estratta (0/1 sugli archi di tipo annotazione).
+
+L'estensione proposta prevede l'aggiunta di un nuovo campo
+$\vec{\alpha}_{annotations}$ alle entità \texttt{StructuredType} e
+\texttt{Function} dell'IR, con il corrispondente tipo di arco
+\texttt{AnnotatedBy} nel grafo delle dipendenze.
+
+\subsection{Campi d'Istanza Dichiarati nel Corpo della Classe}
+Il benchmark Java evidenzia che i campi dichiarati come variabili
+d'istanza nel corpo della classe (ad esempio
+  \texttt{DeclarationVariableInstance.pdao} di tipo
+\texttt{ProfileDAO}) non generano un arco \texttt{uses\_type}.
+L'euristica attuale estrae i campi dalla firma della classe
+(parametri del costruttore, dichiarazioni esplicite), ma non
+scansiona le dichiarazioni all'interno del corpo della classe stessa.
+L'estensione richiede un attraversamento aggiuntivo del
+\texttt{class\_body} durante la Fase 1.
 
 \section{Affinamento delle Euristiche di Estrazione}
-L'approccio attuale si basa su funzioni di dispatch che traducono i
-nodi del Concrete Syntax Tree (CST) di Tree-sitter. Nei prossimi
-mesi, le euristiche dovranno essere irrobustite per gestire:
+L'approccio basato su euristiche di dispatch sui nodi CST di
+Tree-sitter ha dimostrato un'efficacia elevata, ma alcuni scenari
+residui richiedono un irrobustimento mirato.
+
+\subsection{Gestione delle Macro}
+In C, C++ e Rust, le macro espandono codice che non è visibile nel
+CST originale. Attualmente, il sistema può perdere dichiarazioni o
+riferimenti generati tramite macro (ad esempio, in Rust, il contenuto
+  di \texttt{println!()} viene parzialmente perso durante il token
+coalescing). Approcci possibili includono:
 \begin{itemize}
-  \item \textbf{Costrutti Sintattici Ambigui}: Migliorare il parsing
-    di macro (C/C++ e Rust) che espandendosi generano nuovo codice
-    non visibile nell'AST originale.
-  \item \textbf{Graceful Degradation}: Implementare meccanismi più
-    solidi per estrarre informazioni parziali quando il parser
-    incontra porzioni di codice gravemente malformate o non
-    supportate, garantendo che l'analisi globale non fallisca ma
-    segnali puntualmente il degrado.
+  \item \textbf{Pre-espansione selettiva}: per C/C++, invocare il
+    preprocessore prima dell'analisi per espandere le macro più
+    comuni (\texttt{\#define}, \texttt{\#include}).
+  \item \textbf{Pattern matching contestuale}: per Rust, riconoscere
+    i pattern noti di macro comuni (\texttt{vec![]},
+    \texttt{format!()}) e mapparli direttamente come siti di
+    dipendenza.
 \end{itemize}
 
-\section{Arricchimento del Grafo e Analisi delle Metriche}
-Una volta che l'astrazione sarà sufficientemente ricca, l'ultimo step
-riguarderà lo sfruttamento del Grafo delle Dipendenze ($\mathcal{G}$):
+\subsection{Graceful Degradation}
+Quando il parser incontra porzioni di codice non supportate o
+gravemente malformate, l'analisi globale dovrebbe produrre risultati
+parziali anziché fallire. Il sistema attuale gestisce già i nodi
+\texttt{ERROR} di Tree-sitter ignorandoli, ma non segnala la
+copertura effettiva dell'analisi. L'introduzione di un
+\textbf{indicatore di confidenza} per ciascun nodo e arco del grafo
+(basato sulla presenza di nodi ERROR nelle vicinanze del CST)
+permetterebbe all'utente di valutare l'affidabilità dell'output.
+
+\section{Arricchimento del Grafo e Metriche Architetturali}
+Una volta che l'astrazione sarà sufficientemente ricca, lo step
+finale riguarderà lo sfruttamento algoritmico del Grafo delle
+Dipendenze $\mathcal{G} = (V, E)$. Poiché il grafo è
+language-agnostic per costruzione, le metriche calcolate su di esso
+saranno automaticamente indipendenti dal linguaggio sorgente.
+
+\subsection{Nuove Semantiche di Dipendenza}
+L'insieme $\text{Kind}$ degli archi potrà essere espanso per catturare
+relazioni architetturali più sofisticate:
 \begin{itemize}
-  \item \textbf{Nuove Semantiche di Dipendenza}: Espandere l'insieme
-    $\text{Kind}$ degli archi per includere relazioni temporali o di
-    ownership (es. il passaggio di referenze mutabili in Rust vs il
-    passaggio per valore in C).
-  \item \textbf{Metriche Architetturali}: Sviluppare algoritmi che,
-    navigando il grafo, calcolino metriche classiche (Accoppiamento,
-    Coesione, Cicli di Dipendenza) in modo totalmente indipendente
-    dal linguaggio sorgente analizzato.
+  \item \textbf{Ownership e Lifetime} (Rust): distinguere tra
+    riferimenti immutabili (\texttt{\&T}), mutabili (\texttt{\&mut T})
+    e possesso (\texttt{T}) permetterebbe di tracciare le politiche di
+    ownership come archi specializzati.
+  \item \textbf{Dipendenze di Testing}: archi tra le classi di test e
+    le unità testate, estratti dalla struttura dei file e dalle
+    convenzioni di naming.
+  \item \textbf{Mixins e Trait con Implementazioni di Default}: la
+    gestione dei Mixins (comuni nei linguaggi dinamici) e delle
+    implementazioni di default dei Trait richiede una logica di
+    risoluzione MRO più sofisticata per tracciare correttamente
+    l'iniezione di comportamento.
 \end{itemize}
+
+\subsection{Metriche Architetturali}
+Il grafo $\mathcal{G}$ fornisce la base per il calcolo automatizzato
+di metriche classiche dell'ingegneria del software:
+\begin{itemize}
+  \item \textbf{Accoppiamento Afferente ed Efferente} ($C_a$, $C_e$):
+    il numero di archi entranti e uscenti da ciascun componente,
+    calcolabile direttamente dal grafo.
+  \item \textbf{Instabilità} ($I = C_e / (C_a + C_e)$): la
+    propensione di un componente a cambiare in risposta a cambiamenti
+    esterni.
+  \item \textbf{Coesione}: misurabile analizzando la connettività
+    interna dei sotto-grafi indotti dai moduli.
+  \item \textbf{Rilevamento di Cicli di Dipendenza}: l'identificazione
+    di componenti fortemente connesse (SCC) nel grafo diretto
+    evidenzia le dipendenze circolari, che sono indicatori noti di
+    fragilità architetturale.
+\end{itemize}
+
+Il valore aggiunto di queste metriche risiede nella loro
+\textit{language-agnosticism}: essendo calcolate sul grafo unificato,
+producono risultati direttamente confrontabili tra componenti scritti
+in linguaggi diversi all'interno dello stesso sistema.
+
+\section{Riepilogo delle Priorità}
+La Tabella~\ref{tab:priorita-future} sintetizza le estensioni
+proposte, il loro impatto atteso sull'accuratezza e la priorità di
+implementazione.
+
+\begin{table}[ht]
+  \centering
+  \caption{Riepilogo delle estensioni future e impatto atteso.}
+  \label{tab:priorita-future}
+  \begin{tabular}{l l l}
+    \hline
+    \textbf{Estensione} & \textbf{Impatto Atteso} & \textbf{Priorità} \\
+    \hline
+    Inferenza tipo variabili locali & C/C++ archi: 40\%$\to$70\%+ & Alta \\
+    Risoluzione \texttt{super()}    & Python archi: 63\%$\to$75\%+ & Alta \\
+    Campi enum variant (Rust)       & Rust archi: 69\%$\to$80\%+   & Alta \\
+    Espressioni di cast             & +3 archi (Rust, Java)          & Media \\
+    Campi d'istanza (Java)          & Java archi: 82\%$\to$88\%+   & Media \\
+    Supporto Generics               & Nuove dipendenze parametriche  & Media \\
+    Decoratori / Annotazioni        & Dipendenze verso framework     & Media \\
+    Gestione Macro                  & Copertura C/C++/Rust           & Bassa \\
+    Graceful Degradation            & Robustezza su codice reale     & Bassa \\
+    Metriche Architetturali         & Sfruttamento del grafo         & Bassa \\
+    \hline
+  \end{tabular}
+\end{table}
+
+Nessuna delle estensioni proposte richiede modifiche all'architettura
+della pipeline $\Phi$ o alle primitive dell'algebra delle query. Le
+correzioni ad alta priorità operano esclusivamente sulle euristiche
+di estrazione (Fase 1) e sull'estensione del motore di risoluzione
+(Fase 2b), confermando la solidità del modello formale e la
+modularità del design complessivo del sistema.

@@ -99,13 +99,15 @@ Esecuzione). Questa fase opera interamente sul dominio dell'IR ed è
 indipendente dal linguaggio sorgente e dal numero di file che
 compongono il Workspace.
 
-\subsection{L'Algebra delle Query e l'Indice Globale}
+\subsection{L'Algebra delle Query e lo Scope Tree}
 L'intera formalizzazione dell'architettura a due fasi (basata sul
-  \textit{Symbol Stack} per la sostituzione locale e sul
-\textit{GlobalRegistry} per la navigazione globale) è trattata in
-modo esaustivo nel Capitolo \ref{ch:name_resolution}. La fusione
+  \textit{Symbol Stack} per la sostituzione locale e sullo
+\textit{Scope Tree} per la navigazione globale) è trattata in
+modo esaustivo nel Capitolo \ref{ch:name_resolution}.
+A differenza dei modelli a registro piatto, l'adozione di un albero gerarchico allocato tramite \textit{Arena Allocator} modella esattamente lo scope lessicale sorgente. Durante l'esecuzione delle query, il motore effettua un \textit{Lexical Climbing}: partendo dallo scope corrente risale la gerarchia fino a trovare l'identificatore cercato (oppure ricade nei tipi nativi del \textit{Primitive Registry}).
+La fusione
 unificata di tutti i moduli $\vec{\mathcal{M}}$ estratti nel
-Workspace permette all'Indice Globale di tracciare dipendenze
+Workspace permette allo Scope Tree di tracciare dipendenze
 *cross-file* senza latenza computazionale.
 
 \subsection{Configurazione e Politiche di Risoluzione}
