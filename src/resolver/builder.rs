@@ -42,7 +42,7 @@ fn build_module_queries(ctx: &BuilderContext, current_lang: Option<String>, mut 
     // What about `self` and `this`? They are just local symbols pointing to the current class.
     
     module.structured_types = module.structured_types.into_iter().map(|st| build_structured_type_queries(ctx, current_lang.clone(), st)).collect();
-    module.free_functions = module.free_functions.into_iter().map(|ff| build_function_queries(ctx, ff)).collect();
+    module.free_functions = module.free_functions.into_iter().map(|ff| build_function_queries(ctx, ff, None, false)).collect();
     module.impl_blocks = module.impl_blocks.into_iter().map(|ib| build_impl_block_queries(ctx, current_lang.clone(), ib)).collect();
     module.sub_modules = module.sub_modules.into_iter().map(|sub| {
         let lang = sub.language.clone().or(current_lang.clone());
@@ -59,30 +59,38 @@ fn build_structured_type_queries(ctx: &BuilderContext, current_lang: Option<Stri
     // Inject self keyword according to language configuration
     let self_query = Query::Find(st.name.last().unwrap_or(&"".to_string()).clone());
     let lang_config = ctx.config.get_for(current_lang.as_deref().unwrap_or(""));
-    ctx.stack.borrow_mut().define_symbol(lang_config.self_keyword.clone(), self_query);
+    if let Some(kw) = &lang_config.self_keyword {
+        ctx.stack.borrow_mut().define_symbol(kw.clone(), self_query.clone());
+    }
 
     st.super_types = st.super_types.into_iter().map(|t| substitute_type(ctx, t, false)).collect();
     st.fields = st.fields.into_iter().map(|mut f| {
         f.ty = substitute_type(ctx, f.ty, false);
         f
     }).collect();
-    st.methods = st.methods.into_iter().map(|m| build_function_queries(ctx, m)).collect();
+    st.methods = st.methods.into_iter().map(|m| build_function_queries(ctx, m, Some(self_query.clone()), lang_config.implicit_first_param_as_self)).collect();
     st.nested_types = st.nested_types.into_iter().map(|n| build_structured_type_queries(ctx, current_lang.clone(), n)).collect();
 
     ctx.stack.borrow_mut().pop_scope();
     st
 }
 
-fn build_function_queries(ctx: &BuilderContext, mut ff: Function) -> Function {
+fn build_function_queries(ctx: &BuilderContext, mut ff: Function, self_query: Option<Query>, implicit_first_param_as_self: bool) -> Function {
     ctx.stack.borrow_mut().push_scope();
 
+    let mut is_first = true;
     ff.signature.parameters = ff.signature.parameters.into_iter().map(|mut p| {
         p.ty = substitute_type(ctx, p.ty, false);
         if let Some(name) = &p.name {
-            if let TypeRef::ResolutionQuery(ref q) = p.ty {
+            if is_first && implicit_first_param_as_self {
+                if let Some(sq) = &self_query {
+                    ctx.stack.borrow_mut().define_symbol(name.clone(), sq.clone());
+                }
+            } else if let TypeRef::ResolutionQuery(ref q) = p.ty {
                 ctx.stack.borrow_mut().define_symbol(name.clone(), q.clone());
             }
         }
+        is_first = false;
         p
     }).collect();
 
@@ -105,7 +113,7 @@ fn build_block_queries(ctx: &BuilderContext, mut block: Block) -> Block {
         decl
     }).collect();
 
-    block.calls = block.calls.into_iter().map(|c| substitute_type(ctx, c, true)).collect();
+    block.calls = block.calls.into_iter().map(|c| substitute_type(ctx, c, false)).collect();
     block.instantiates = block.instantiates.into_iter().map(|i| substitute_type(ctx, i, false)).collect();
     block.accesses = block.accesses.into_iter().map(|a| substitute_type(ctx, a, false)).collect();
     
@@ -119,12 +127,16 @@ fn build_impl_block_queries(ctx: &BuilderContext, current_lang: Option<String>, 
     ctx.stack.borrow_mut().push_scope();
 
     ib.impl_for = substitute_type(ctx, ib.impl_for, false);
+    let lang_config = ctx.config.get_for(current_lang.as_deref().unwrap_or(""));
+    let mut self_query = None;
     if let TypeRef::ResolutionQuery(ref q) = ib.impl_for {
-        let lang_config = ctx.config.get_for(current_lang.as_deref().unwrap_or(""));
-        ctx.stack.borrow_mut().define_symbol(lang_config.self_keyword.clone(), q.clone());
+        self_query = Some(q.clone());
+        if let Some(kw) = &lang_config.self_keyword {
+            ctx.stack.borrow_mut().define_symbol(kw.clone(), q.clone());
+        }
     }
     ib.implements_trait = ib.implements_trait.map(|t| substitute_type(ctx, t, false));
-    ib.methods = ib.methods.into_iter().map(|m| build_function_queries(ctx, m)).collect();
+    ib.methods = ib.methods.into_iter().map(|m| build_function_queries(ctx, m, self_query.clone(), lang_config.implicit_first_param_as_self)).collect();
     ib.nested_types = ib.nested_types.into_iter().map(|n| build_structured_type_queries(ctx, current_lang.clone(), n)).collect();
 
     ctx.stack.borrow_mut().pop_scope();

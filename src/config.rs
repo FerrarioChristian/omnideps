@@ -3,9 +3,11 @@ use std::collections::HashMap;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ModuleConfig {
-    pub implicit_file_modules: bool,
-    pub file_level_declarations: bool,
-    pub inline_module_blocks: bool,
+    pub file_based: bool,
+    pub directory_based: bool,
+    pub package_decl_based: bool,
+    pub namespace_based: bool,
+    pub inline_mod_based: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -13,7 +15,9 @@ pub struct LanguageConfig {
     pub modules: ModuleConfig,
     pub transitive_imports: bool,
     pub support_impl_blocks: bool,
-    pub self_keyword: String,
+    pub forward_declarations: bool,
+    pub self_keyword: Option<String>,
+    pub implicit_first_param_as_self: bool,
     pub extract_dynamic_fields: bool,
 }
 
@@ -34,79 +38,105 @@ impl AnalyzerConfig {
     pub fn default_strategies() -> Self {
         let mut languages = HashMap::new();
         
-        // Python: Directory Based, transitive imports allowed
+        // Python: Directory Based and File Based
         languages.insert("python".to_string(), LanguageConfig {
             modules: ModuleConfig {
-                implicit_file_modules: true,
-                file_level_declarations: false,
-                inline_module_blocks: false,
+                file_based: true,
+                directory_based: true,
+                package_decl_based: false,
+                namespace_based: false,
+                inline_mod_based: false,
             },
             transitive_imports: true,
             support_impl_blocks: false,
-            self_keyword: "self".to_string(),
+            forward_declarations: false,
+            self_keyword: None,
+            implicit_first_param_as_self: true,
             extract_dynamic_fields: true,
         });
 
-        // Rust: Directory Based, no transitive imports
+        // Rust: File, Directory and Inline Mod Based
         languages.insert("rust".to_string(), LanguageConfig {
             modules: ModuleConfig {
-                implicit_file_modules: true,
-                file_level_declarations: false,
-                inline_module_blocks: true,
+                file_based: true,
+                directory_based: true,
+                package_decl_based: false,
+                namespace_based: false,
+                inline_mod_based: true,
             },
             transitive_imports: false,
             support_impl_blocks: true,
-            self_keyword: "self".to_string(),
+            forward_declarations: false,
+            self_keyword: Some("self".to_string()),
+            implicit_first_param_as_self: false,
             extract_dynamic_fields: false,
         });
 
-        // Java: Package Based
+        // Java: Package Decl Based
         languages.insert("java".to_string(), LanguageConfig {
             modules: ModuleConfig {
-                implicit_file_modules: false,
-                file_level_declarations: true,
-                inline_module_blocks: false,
+                file_based: false,
+                directory_based: false,
+                package_decl_based: true,
+                namespace_based: false,
+                inline_mod_based: false,
             },
             transitive_imports: false,
             support_impl_blocks: false,
-            self_keyword: "this".to_string(),
+            forward_declarations: false,
+            self_keyword: Some("this".to_string()),
+            implicit_first_param_as_self: false,
             extract_dynamic_fields: false,
         });
 
-        // C++ / C: Package/Namespace Based
+        // C++: Namespace Based
         languages.insert("cpp".to_string(), LanguageConfig {
             modules: ModuleConfig {
-                implicit_file_modules: false,
-                file_level_declarations: false,
-                inline_module_blocks: true,
+                file_based: false,
+                directory_based: false,
+                package_decl_based: false,
+                namespace_based: true,
+                inline_mod_based: false,
             },
             transitive_imports: false,
-            support_impl_blocks: true, // C++ can implement methods outside class declaration
-            self_keyword: "this".to_string(),
+            support_impl_blocks: true,
+            forward_declarations: true,
+            self_keyword: Some("this".to_string()),
+            implicit_first_param_as_self: false,
             extract_dynamic_fields: false,
         });
+        
+        // C: None
         languages.insert("c".to_string(), LanguageConfig {
             modules: ModuleConfig {
-                implicit_file_modules: false,
-                file_level_declarations: false,
-                inline_module_blocks: false,
+                file_based: false,
+                directory_based: false,
+                package_decl_based: false,
+                namespace_based: false,
+                inline_mod_based: false,
             },
             transitive_imports: false,
             support_impl_blocks: false,
-            self_keyword: "this".to_string(),
+            forward_declarations: true,
+            self_keyword: None,
+            implicit_first_param_as_self: false,
             extract_dynamic_fields: false,
         });
 
         Self {
             default_config: LanguageConfig {
                 modules: ModuleConfig {
-                    implicit_file_modules: false,
-                    file_level_declarations: false,
-                    inline_module_blocks: false,
+                    file_based: false,
+                    directory_based: false,
+                    package_decl_based: false,
+                    namespace_based: false,
+                    inline_mod_based: false,
                 },
                 transitive_imports: false,
                 support_impl_blocks: false,
-                self_keyword: "this".to_string(),
+                forward_declarations: false,
+                self_keyword: Some("this".to_string()),
+                implicit_first_param_as_self: false,
                 extract_dynamic_fields: false,
             },
             languages,

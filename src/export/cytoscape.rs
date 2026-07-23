@@ -46,9 +46,11 @@ fn get_parent_id(qn: &QualifiedName) -> Option<String> {
 }
 
 pub fn export_graphs(graphs: &[DependencyGraph], out_path: &Path) -> anyhow::Result<()> {
-    let mut elements = Vec::new();
-    let mut added_nodes = HashSet::new();
-    let mut added_edges = HashSet::new();
+    let mut elements = vec![];
+    let mut added_nodes = std::collections::HashSet::new();
+    let mut added_edges = std::collections::HashSet::new();
+    let mut parent_types: std::collections::HashMap<String, String> = std::collections::HashMap::new();
+
     let mut global_edge_id = 0;
 
     // Helper to add a node
@@ -115,6 +117,9 @@ pub fn export_graphs(graphs: &[DependencyGraph], out_path: &Path) -> anyhow::Res
                         "StructField".to_string()
                     };
                     add_node(&mut elements, &mut added_nodes, id, label, ty_str, parent);
+                }
+                Component::Primitive(prim) => {
+                    add_node(&mut elements, &mut added_nodes, prim.clone(), prim.clone(), "Primitive".to_string(), None);
                 }
             }
         }

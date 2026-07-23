@@ -76,7 +76,7 @@ pub fn extract_fields(
             if let Some(left) = child.child_by_field_name("left") {
                 if matches!(left.kind(), "attribute" | "field_expression") {
                     if let Some(obj) = left.child_by_field_name("object") {
-                        if super::text_parsing::node_text(obj, src) == *self_kw {
+                        if Some(super::text_parsing::node_text(obj, src)) == *self_kw {
                             if let Some(attr) = left.child_by_field_name("attribute").or_else(|| left.child_by_field_name("field")) {
                                 if let Some(name) = extract_identifier(attr, src) {
                                     let ty = if let Some(right) = child.child_by_field_name("right") {

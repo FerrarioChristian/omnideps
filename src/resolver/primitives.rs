@@ -43,4 +43,9 @@ impl PrimitiveRegistry {
     pub fn is_primitive(&self, name: &str) -> bool {
         self.lang_primitives.contains(name)
     }
+
+    /// Returns all registered primitives.
+    pub fn get_all(&self) -> Vec<String> {
+        self.lang_primitives.iter().cloned().collect()
+    }
 }

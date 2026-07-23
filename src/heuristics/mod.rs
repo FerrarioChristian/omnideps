@@ -19,7 +19,8 @@ pub fn dispatch_node(node: Node, source: &str, lang_name: &str, config: &crate::
     if let Some(imports) = parsers::try_parse_imports(node, source) {
         return Some(ParsedItem::Imports(imports));
     }
-    if config.get_for(lang_name).modules.inline_module_blocks {
+    let lang_modules = &config.get_for(lang_name).modules;
+    if lang_modules.inline_mod_based || lang_modules.namespace_based {
         if let Some(m) = parsers::try_parse_module_node(node, source) {
             return Some(ParsedItem::Component(Component::Module(m)));
         }

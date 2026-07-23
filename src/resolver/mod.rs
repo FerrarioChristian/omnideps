@@ -1,7 +1,7 @@
 pub mod builder;
 pub mod executor;
 pub mod primitives;
-pub mod registry;
+pub mod scope;
 pub mod stack;
 
 use crate::model::*;

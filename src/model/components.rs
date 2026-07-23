@@ -3,15 +3,7 @@ use super::queries::TypeRef;
 pub type Identifier = String;
 pub type QualifiedName = Vec<Identifier>;
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize)]
-pub enum PrimitiveType {
-    Int,
-    Float,
-    Bool,
-    String,
-    Void,
-    Other(String),
-}
+
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize)]
 pub enum StructuredTypeKind {
@@ -122,4 +114,5 @@ pub enum Component {
     StructuredType(StructuredType),
     Function(Function),
     Field(QualifiedName, TypeRef),
+    Primitive(String),
 }

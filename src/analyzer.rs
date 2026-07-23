@@ -13,7 +13,7 @@ pub fn generic_extract(lang: Language, source: &str, lang_name: &str, file_path:
     let root = tree.root_node();
 
     let mut package_path = None;
-    if config.get_for(lang_name).modules.file_level_declarations {
+    if config.get_for(lang_name).modules.package_decl_based {
         let mut cursor = root.walk();
         for child in root.children(&mut cursor) {
             if let Some(pkg) = crate::heuristics::parsers::try_parse_package_declaration(child, source) {
@@ -75,6 +75,7 @@ fn walk_cst(node: tree_sitter::Node, source: &str, modules: &mut Vec<Module>, la
             }
             crate::heuristics::ParsedItem::ImplBlock(ib) => modules[0].impl_blocks.push(ib),
             crate::heuristics::ParsedItem::Imports(i) => modules[0].imports.extend(i),
+            crate::heuristics::ParsedItem::Component(crate::model::Component::Primitive(_)) => {}
         }
         return;
     }
@@ -100,12 +101,35 @@ pub fn parse_source(
     
     let lang_config = config.get_for(lang.name());
     
-    if lang_config.modules.implicit_file_modules {
+    if lang_config.modules.file_based && lang_config.modules.directory_based {
         apply_directory_strategy(&mut modules, path, &file_path_str, lang.name());
-    } else if lang_config.modules.file_level_declarations {
+    } else if lang_config.modules.package_decl_based {
         if let Some(pkg_path) = package_path {
             apply_package_strategy(&mut modules, pkg_path, &file_path_str, lang.name());
         }
+    } else {
+        // Fallback strategy for C/C++ or simple languages without explicit path-to-module rules
+        let mut global_root = Module {
+            name: vec!["root".to_string()],
+            language: Some(lang.name().to_string()),
+            file_path: None,
+            imports: vec![],
+            sub_modules: vec![],
+            structured_types: vec![],
+            free_functions: vec![],
+            impl_blocks: vec![],
+            free_variables: vec![],
+        };
+        if !modules.is_empty() {
+            let file_mod = modules.remove(0);
+            global_root.sub_modules.extend(file_mod.sub_modules);
+            global_root.structured_types.extend(file_mod.structured_types);
+            global_root.free_functions.extend(file_mod.free_functions);
+            global_root.free_variables.extend(file_mod.free_variables);
+            global_root.impl_blocks.extend(file_mod.impl_blocks);
+            global_root.imports.extend(file_mod.imports);
+        }
+        modules.push(global_root);
     }
 
     // Load primitives from external registry
@@ -219,7 +243,7 @@ fn apply_package_strategy(modules: &mut Vec<Module>, package_path: Vec<String>, 
 
 /// Step 2-4: Resolves references and builds the final Dependency Graph for an entire project.
 pub fn analyze_project(
-    modules: Vec<Module>,
+    mut modules: Vec<Module>,
     prim_registry: PrimitiveRegistry,
     config: &crate::config::AnalyzerConfig,
 ) -> (
@@ -227,8 +251,64 @@ pub fn analyze_project(
     crate::model::DependencyGraph,
     crate::model::AnalysisSummary,
 ) {
+    link_out_of_line_methods(&mut modules, config);
     let resolved = crate::resolver::resolve_type_refs(modules, &prim_registry, config);
-    let graph = crate::export::graph::build_dependency_graph(&resolved);
+    let graph = crate::export::graph::build_dependency_graph(&resolved, &prim_registry);
     let summary = crate::export::summary::build_analysis_summary(&resolved);
     (resolved, graph, summary)
+}
+
+fn link_out_of_line_methods(modules: &mut Vec<Module>, config: &crate::config::AnalyzerConfig) {
+    for module in modules.iter_mut() {
+        let lang = module.language.as_deref().unwrap_or("root");
+        if config.get_for(lang).forward_declarations {
+            let mut methods_to_move = vec![];
+            
+            // Extract functions that have qualified names (e.g., MyClass::my_method)
+            module.free_functions.retain(|ff| {
+                if ff.name.len() > 1 {
+                    methods_to_move.push(ff.clone());
+                    false // Remove from free_functions
+                } else {
+                    true // Keep
+                }
+            });
+
+            // Find the class and append
+            for method in methods_to_move {
+                let class_name = &method.name[..method.name.len() - 1];
+                let method_name = method.name.last().unwrap().clone();
+                
+                let mut found = false;
+                for st in &mut module.structured_types {
+                    if st.name == class_name {
+                        let mut m = method.clone();
+                        m.name = vec![method_name.clone()];
+                        st.methods.push(m);
+                        found = true;
+                        break;
+                    }
+                }
+                
+                // If not found in current module, maybe it's cross-module?
+                // For simplicity in C++, we assume the definition is in the same namespace block,
+                // or we could use the ImplBlock logic. Let's create an ImplBlock!
+                if !found {
+                    module.impl_blocks.push(crate::model::ImplBlock {
+                        name: vec![],
+                        impl_for: crate::model::TypeRef::ResolutionQuery(crate::model::Query::Find(class_name.last().unwrap().clone())),
+                        implements_trait: None,
+                        methods: vec![{
+                            let mut m = method.clone();
+                            m.name = vec![method_name];
+                            m
+                        }],
+                        nested_types: vec![],
+                    });
+                }
+            }
+        }
+        
+        link_out_of_line_methods(&mut module.sub_modules, config);
+    }
 }
