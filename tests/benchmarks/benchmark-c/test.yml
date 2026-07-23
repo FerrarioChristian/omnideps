@@ -4,6 +4,10 @@ files:
 - src/math_utils.c
 - src/shapes.h
 - src/shapes.c
+- src/pointers.h
+- src/pointers.c
+- src/nested_structs.h
+- src/nested_structs.c
 nodes:
 - name: add
   kind: function
@@ -18,6 +22,24 @@ nodes:
 - name: calculate_area
   kind: function
 - name: main
+  kind: function
+- name: Point
+  kind: struct
+- name: Point.x
+  kind: field
+- name: Point.y
+  kind: field
+- name: move_point
+  kind: function
+- name: create_point
+  kind: function
+- name: BoundingBox
+  kind: struct
+- name: BoundingBox.top_left
+  kind: field
+- name: BoundingBox.bottom_right
+  kind: field
+- name: get_width
   kind: function
 edges:
 - testid: C-CALL-1
@@ -36,6 +58,18 @@ edges:
   source: main
   sink: add
   kind: calls
+- testid: C-CALL-5
+  source: main
+  sink: create_point
+  kind: calls
+- testid: C-CALL-6
+  source: main
+  sink: move_point
+  kind: calls
+- testid: C-CALL-7
+  source: main
+  sink: get_width
+  kind: calls
 - testid: C-USE-1
   source: calculate_area
   sink: Rectangle
@@ -43,6 +77,22 @@ edges:
 - testid: C-USE-2
   source: main
   sink: Rectangle
+  kind: uses_type
+- testid: C-USE-3
+  source: move_point
+  sink: Point
+  kind: uses_type
+- testid: C-USE-4
+  source: create_point
+  sink: Point
+  kind: uses_type
+- testid: C-USE-5
+  source: BoundingBox.top_left
+  sink: Point
+  kind: uses_type
+- testid: C-USE-6
+  source: get_width
+  sink: BoundingBox
   kind: uses_type
 - testid: C-ACC-1
   source: calculate_area
@@ -59,4 +109,16 @@ edges:
 - testid: C-ACC-4
   source: main
   sink: Rectangle.height
+  kind: accesses_field
+- testid: C-ACC-5
+  source: move_point
+  sink: Point.x
+  kind: accesses_field
+- testid: C-ACC-6
+  source: get_width
+  sink: BoundingBox.bottom_right
+  kind: accesses_field
+- testid: C-ACC-7
+  source: get_width
+  sink: Point.x
   kind: accesses_field

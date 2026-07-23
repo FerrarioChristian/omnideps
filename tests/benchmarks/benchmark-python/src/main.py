@@ -1,5 +1,6 @@
 from models import User, Admin
 import utils
+import services
 
 def main():
     admin = Admin("alice", 1990, "Moderator")
@@ -12,6 +13,10 @@ def main():
     print(greeting)
     print(admin.get_info())
     print(f"Age: {age}")
+
+    super_admin = services.register_admin("bob")
+    is_valid = services.is_valid_user(super_admin)
+    print(f"Is valid: {is_valid}")
 
 if __name__ == "__main__":
     main()

@@ -2,12 +2,18 @@ files:
 - src/main.py
 - src/models.py
 - src/utils.py
+- src/advanced_models.py
+- src/services.py
 nodes:
 - name: main
   kind: module
 - name: models
   kind: module
 - name: utils
+  kind: module
+- name: advanced_models
+  kind: module
+- name: services
   kind: module
 - name: utils.greet_user
   kind: function
@@ -35,6 +41,22 @@ nodes:
   kind: field
 - name: main.main
   kind: function
+- name: advanced_models.SuperAdmin
+  kind: class
+- name: advanced_models.SuperAdmin.__init__
+  kind: method
+- name: advanced_models.SuperAdmin.grant_permission
+  kind: method
+- name: advanced_models.SuperAdmin.create_root
+  kind: method
+- name: advanced_models.SuperAdmin.get_max_level
+  kind: method
+- name: advanced_models.SuperAdmin.permissions
+  kind: field
+- name: services.register_admin
+  kind: function
+- name: services.is_valid_user
+  kind: function
 edges:
 - testid: PY-IMP-1
   source: main
@@ -48,9 +70,25 @@ edges:
   source: main
   sink: utils
   kind: imports
+- testid: PY-IMP-4
+  source: main
+  sink: services
+  kind: imports
+- testid: PY-IMP-5
+  source: services
+  sink: advanced_models.SuperAdmin
+  kind: imports
+- testid: PY-IMP-6
+  source: advanced_models
+  sink: models.Admin
+  kind: imports
 - testid: PY-INH-1
   source: models.Admin
   sink: models.User
+  kind: inherits
+- testid: PY-INH-2
+  source: advanced_models.SuperAdmin
+  sink: models.Admin
   kind: inherits
 - testid: PY-CALL-1
   source: models.Admin.__init__
@@ -80,6 +118,42 @@ edges:
   source: main.main
   sink: models.Admin.get_info
   kind: calls
+- testid: PY-CALL-8
+  source: advanced_models.SuperAdmin.__init__
+  sink: models.Admin.__init__
+  kind: calls
+- testid: PY-CALL-9
+  source: advanced_models.SuperAdmin.create_root
+  sink: advanced_models.SuperAdmin.__init__
+  kind: calls
+- testid: PY-CALL-10
+  source: services.register_admin
+  sink: advanced_models.SuperAdmin.create_root
+  kind: calls
+- testid: PY-CALL-11
+  source: services.register_admin
+  sink: advanced_models.SuperAdmin.grant_permission
+  kind: calls
+- testid: PY-CALL-12
+  source: main.main
+  sink: services.register_admin
+  kind: calls
+- testid: PY-CALL-13
+  source: main.main
+  sink: services.is_valid_user
+  kind: calls
+- testid: PY-USE-1
+  source: services.register_admin
+  sink: advanced_models.SuperAdmin
+  kind: uses_type
+- testid: PY-USE-2
+  source: services.is_valid_user
+  sink: models.User
+  kind: uses_type
+- testid: PY-USE-3
+  source: advanced_models.SuperAdmin.create_root
+  sink: advanced_models.SuperAdmin
+  kind: uses_type
 - testid: PY-ACC-1
   source: models.User.__init__
   sink: models.User.username
@@ -111,4 +185,16 @@ edges:
 - testid: PY-ACC-8
   source: main.main
   sink: models.User.birth_year
+  kind: accesses_field
+- testid: PY-ACC-9
+  source: advanced_models.SuperAdmin.__init__
+  sink: advanced_models.SuperAdmin.permissions
+  kind: accesses_field
+- testid: PY-ACC-10
+  source: advanced_models.SuperAdmin.grant_permission
+  sink: advanced_models.SuperAdmin.permissions
+  kind: accesses_field
+- testid: PY-ACC-11
+  source: services.is_valid_user
+  sink: models.User.username
   kind: accesses_field

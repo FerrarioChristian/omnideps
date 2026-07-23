@@ -4,7 +4,11 @@
     "src/math_utils.h",
     "src/math_utils.c",
     "src/shapes.h",
-    "src/shapes.c"
+    "src/shapes.c",
+    "src/pointers.h",
+    "src/pointers.c",
+    "src/nested_structs.h",
+    "src/nested_structs.c"
   ],
   "nodes": [
     {
@@ -55,6 +59,69 @@
       "exists": true,
       "same_kind": true,
       "actual_kind": "Function"
+    },
+    {
+      "name": "Point",
+      "kind": "struct",
+      "exists": true,
+      "same_kind": true,
+      "actual_kind": "Struct"
+    },
+    {
+      "name": "Point.x",
+      "kind": "field",
+      "exists": true,
+      "same_kind": true,
+      "actual_kind": "Field"
+    },
+    {
+      "name": "Point.y",
+      "kind": "field",
+      "exists": true,
+      "same_kind": true,
+      "actual_kind": "Field"
+    },
+    {
+      "name": "move_point",
+      "kind": "function",
+      "exists": true,
+      "same_kind": true,
+      "actual_kind": "Function"
+    },
+    {
+      "name": "create_point",
+      "kind": "function",
+      "exists": true,
+      "same_kind": true,
+      "actual_kind": "Function"
+    },
+    {
+      "name": "BoundingBox",
+      "kind": "struct",
+      "exists": true,
+      "same_kind": true,
+      "actual_kind": "Struct"
+    },
+    {
+      "name": "BoundingBox.top_left",
+      "kind": "field",
+      "exists": true,
+      "same_kind": true,
+      "actual_kind": "Field"
+    },
+    {
+      "name": "BoundingBox.bottom_right",
+      "kind": "field",
+      "exists": true,
+      "same_kind": true,
+      "actual_kind": "Field"
+    },
+    {
+      "name": "get_width",
+      "kind": "function",
+      "exists": true,
+      "same_kind": true,
+      "actual_kind": "Function"
     }
   ],
   "edges": [
@@ -99,6 +166,36 @@
       "same_kind": true
     },
     {
+      "testid": "C-CALL-5",
+      "source": "main",
+      "sink": "create_point",
+      "kind": "calls",
+      "source_exists": true,
+      "sink_exists": true,
+      "edge_exists": true,
+      "same_kind": true
+    },
+    {
+      "testid": "C-CALL-6",
+      "source": "main",
+      "sink": "move_point",
+      "kind": "calls",
+      "source_exists": true,
+      "sink_exists": true,
+      "edge_exists": true,
+      "same_kind": true
+    },
+    {
+      "testid": "C-CALL-7",
+      "source": "main",
+      "sink": "get_width",
+      "kind": "calls",
+      "source_exists": true,
+      "sink_exists": true,
+      "edge_exists": true,
+      "same_kind": true
+    },
+    {
       "testid": "C-USE-1",
       "source": "calculate_area",
       "sink": "Rectangle",
@@ -117,6 +214,46 @@
       "sink_exists": true,
       "edge_exists": false,
       "same_kind": false
+    },
+    {
+      "testid": "C-USE-3",
+      "source": "move_point",
+      "sink": "Point",
+      "kind": "uses_type",
+      "source_exists": true,
+      "sink_exists": true,
+      "edge_exists": true,
+      "same_kind": true
+    },
+    {
+      "testid": "C-USE-4",
+      "source": "create_point",
+      "sink": "Point",
+      "kind": "uses_type",
+      "source_exists": true,
+      "sink_exists": true,
+      "edge_exists": false,
+      "same_kind": false
+    },
+    {
+      "testid": "C-USE-5",
+      "source": "BoundingBox.top_left",
+      "sink": "Point",
+      "kind": "uses_type",
+      "source_exists": true,
+      "sink_exists": true,
+      "edge_exists": false,
+      "same_kind": false
+    },
+    {
+      "testid": "C-USE-6",
+      "source": "get_width",
+      "sink": "BoundingBox",
+      "kind": "uses_type",
+      "source_exists": true,
+      "sink_exists": true,
+      "edge_exists": true,
+      "same_kind": true
     },
     {
       "testid": "C-ACC-1",
@@ -157,8 +294,38 @@
       "sink_exists": true,
       "edge_exists": false,
       "same_kind": false
+    },
+    {
+      "testid": "C-ACC-5",
+      "source": "move_point",
+      "sink": "Point.x",
+      "kind": "accesses_field",
+      "source_exists": true,
+      "sink_exists": true,
+      "edge_exists": false,
+      "same_kind": false
+    },
+    {
+      "testid": "C-ACC-6",
+      "source": "get_width",
+      "sink": "BoundingBox.bottom_right",
+      "kind": "accesses_field",
+      "source_exists": true,
+      "sink_exists": true,
+      "edge_exists": false,
+      "same_kind": false
+    },
+    {
+      "testid": "C-ACC-7",
+      "source": "get_width",
+      "sink": "Point.x",
+      "kind": "accesses_field",
+      "source_exists": true,
+      "sink_exists": true,
+      "edge_exists": false,
+      "same_kind": false
     }
   ],
   "node_not_found_count": 0,
-  "edge_not_found_count": 6
+  "edge_not_found_count": 11
 }
