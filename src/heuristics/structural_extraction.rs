@@ -20,7 +20,7 @@ use super::type_extraction::extract_type_ref;
 /// * `node` - The root AST node to begin the search from.
 /// * `source` - The complete source code string.
 /// * `parser` - A closure or function pointer that attempts to extract `T` from a Node.
-pub fn extract_list_of<T, F>(node: Node, source: &str, parser: F) -> Vec<T>
+pub fn extract_list_of<T, F>(node: Node, source: &str, enter_functions: bool, parser: F) -> Vec<T>
 where
     F: Fn(Node, &str) -> Option<T> + Copy,
 {
@@ -29,23 +29,33 @@ where
     for child in node.children(&mut cursor) {
         if let Some(item) = parser(child, source) {
             items.push(item);
-        } else if !crate::heuristics::classifiers::is_function(child)
-            && !crate::heuristics::classifiers::is_structured_type(child)
-            && (child.kind().contains("body")
-                || child.kind().contains("list")
-                || child.kind().contains("block")
-                || child.kind().contains("declaration")
-                || child.kind().contains("variant"))
+        } else if !crate::heuristics::classifiers::is_structured_type(child)
+            && (enter_functions
+                || (!crate::heuristics::classifiers::is_function(child)
+                    && (child.kind().contains("body")
+                        || child.kind().contains("list")
+                        || child.kind().contains("block")
+                        || child.kind().contains("declaration")
+                        || child.kind().contains("variant"))))
         {
-            items.extend(extract_list_of(child, source, parser));
+            items.extend(extract_list_of(child, source, enter_functions, parser));
         }
     }
     items
 }
 
 /// Extracts all field (property) declarations from a given node.
-pub fn extract_fields(node: Node, source: &str) -> Vec<Field> {
-    let mut fields = extract_list_of(node, source, |child, src| {
+pub fn extract_fields(
+    node: Node,
+    source: &str,
+    lang_name: &str,
+    config: &crate::config::AnalyzerConfig,
+) -> Vec<Field> {
+    let lang_config = config.get_for(lang_name);
+    let enter_functions = lang_config.extract_dynamic_fields;
+    let self_kw = &lang_config.self_keyword;
+
+    let mut fields = extract_list_of(node, source, enter_functions, |child, src| {
         if matches!(
             child.kind(),
             "field_declaration"
@@ -60,6 +70,29 @@ pub fn extract_fields(node: Node, source: &str) -> Vec<Field> {
                 return Some(Field { name, ty });
             }
         }
+
+        // Dynamic fields inside methods (e.g. self.username = username)
+        if enter_functions && child.kind() == "assignment" {
+            if let Some(left) = child.child_by_field_name("left") {
+                if matches!(left.kind(), "attribute" | "field_expression") {
+                    if let Some(obj) = left.child_by_field_name("object") {
+                        if super::text_parsing::node_text(obj, src) == *self_kw {
+                            if let Some(attr) = left.child_by_field_name("attribute").or_else(|| left.child_by_field_name("field")) {
+                                if let Some(name) = extract_identifier(attr, src) {
+                                    let ty = if let Some(right) = child.child_by_field_name("right") {
+                                        crate::heuristics::body_extraction::infer_variable_type(right, src)
+                                    } else {
+                                        crate::model::TypeRef::Failed(vec![])
+                                    };
+                                    return Some(Field { name, ty });
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         None
     });
 
@@ -97,20 +130,41 @@ pub fn extract_fields(node: Node, source: &str) -> Vec<Field> {
     }
     extract_tuple_fields(node, source, &mut fields);
 
-    fields
+    // Deduplicate fields by name, preferring ones with a resolved type
+    let mut deduped = std::collections::HashMap::new();
+    for f in fields {
+        let entry = deduped.entry(f.name.clone()).or_insert_with(|| f.clone());
+        if matches!(entry.ty, crate::model::TypeRef::Failed(_) | crate::model::TypeRef::Unresolved(_)) 
+            && !matches!(f.ty, crate::model::TypeRef::Failed(_) | crate::model::TypeRef::Unresolved(_)) {
+            *entry = f;
+        }
+    }
+
+    deduped.into_values().collect()
 }
 
 /// Extracts all method declarations from a given node.
 pub fn extract_methods(node: Node, source: &str) -> Vec<Function> {
-    extract_list_of(node, source, crate::heuristics::parsers::try_parse_function)
-}
-
-/// Extracts all nested structured types (classes, structs) declared within a given node.
-pub fn extract_nested_types(node: Node, source: &str) -> Vec<StructuredType> {
     extract_list_of(
         node,
         source,
-        crate::heuristics::parsers::try_parse_structured_type,
+        false,
+        crate::heuristics::parsers::try_parse_function,
+    )
+}
+
+/// Extracts all nested structured types (classes, structs) declared within a given node.
+pub fn extract_nested_types(
+    node: Node,
+    source: &str,
+    lang_name: &str,
+    config: &crate::config::AnalyzerConfig,
+) -> Vec<StructuredType> {
+    extract_list_of(
+        node,
+        source,
+        false,
+        |child, src| crate::heuristics::parsers::try_parse_structured_type(child, src, lang_name, config),
     )
 }
 

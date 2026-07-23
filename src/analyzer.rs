@@ -74,7 +74,7 @@ fn walk_cst(node: tree_sitter::Node, source: &str, modules: &mut Vec<Module>, la
                 }
             }
             crate::heuristics::ParsedItem::ImplBlock(ib) => modules[0].impl_blocks.push(ib),
-            crate::heuristics::ParsedItem::Import(i) => modules[0].imports.push(i),
+            crate::heuristics::ParsedItem::Imports(i) => modules[0].imports.extend(i),
         }
         return;
     }

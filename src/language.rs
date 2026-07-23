@@ -20,8 +20,8 @@ impl SupportedLanguage {
             "rs" => Some(Self::Rust),
             "java" => Some(Self::Java),
             "py" => Some(Self::Python),
-            "c" | "h" => Some(Self::C),
-            "cpp" | "cxx" | "cc" | "hxx" | "hpp" => Some(Self::Cpp),
+            "c" => Some(Self::C),
+            "cpp" | "cxx" | "cc" | "hxx" | "hpp" | "h" => Some(Self::Cpp),
             _ => None,
         }
     }

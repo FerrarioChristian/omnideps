@@ -45,7 +45,12 @@ pub fn try_parse_package_declaration(node: Node, source: &str) -> Option<Vec<Str
     None
 }
 
-pub fn try_parse_structured_type(node: Node, source: &str) -> Option<StructuredType> {
+pub fn try_parse_structured_type(
+    node: Node,
+    source: &str,
+    lang_name: &str,
+    config: &crate::config::AnalyzerConfig,
+) -> Option<StructuredType> {
     if !is_structured_type(node) {
         return None;
     }
@@ -54,10 +59,21 @@ pub fn try_parse_structured_type(node: Node, source: &str) -> Option<StructuredT
     let text = node_text(node, source);
     let name =
         extract_qualified_name(node, source).unwrap_or_else(|| vec!["unnamed_type".to_string()]);
-    let fields = extract_fields(node, source);
+    let mut fields = extract_fields(node, source, lang_name, config);
+    
+    // Handle C/C++ typedef struct/enum by extracting fields from the inner specifier
+    if node.kind() == "type_definition" {
+        let mut cursor = node.walk();
+        for child in node.children(&mut cursor) {
+            if child.kind() == "struct_specifier" || child.kind() == "enum_specifier" || child.kind() == "union_specifier" {
+                fields.extend(extract_fields(child, source, lang_name, config));
+            }
+        }
+    }
+    
     let methods = extract_methods(node, source);
     let super_types = extract_super_types(node, source);
-    let nested_types = extract_nested_types(node, source);
+    let nested_types = extract_nested_types(node, source, lang_name, config);
 
     Some(StructuredType {
         name,
@@ -110,7 +126,12 @@ pub fn try_parse_function(node: Node, source: &str) -> Option<Function> {
     })
 }
 
-pub fn try_parse_impl_block(node: Node, source: &str) -> Option<ImplBlock> {
+pub fn try_parse_impl_block(
+    node: Node,
+    source: &str,
+    lang_name: &str,
+    config: &crate::config::AnalyzerConfig,
+) -> Option<ImplBlock> {
     if !is_impl_block(node) {
         return None;
     }
@@ -120,7 +141,7 @@ pub fn try_parse_impl_block(node: Node, source: &str) -> Option<ImplBlock> {
     let methods = extract_methods(node, source);
     let impl_for = extract_impl_for(node, source);
     let implements_trait = extract_implements_trait(node, source);
-    let nested_types = extract_nested_types(node, source);
+    let nested_types = extract_nested_types(node, source, lang_name, config);
 
     Some(ImplBlock {
         name,
@@ -131,7 +152,7 @@ pub fn try_parse_impl_block(node: Node, source: &str) -> Option<ImplBlock> {
     })
 }
 
-pub fn try_parse_import(node: Node, source: &str) -> Option<Import> {
+pub fn try_parse_imports(node: Node, source: &str) -> Option<Vec<Import>> {
     if !is_import(node) {
         return None;
     }
@@ -152,52 +173,79 @@ pub fn try_parse_import(node: Node, source: &str) -> Option<Import> {
         }
     }
 
-    // Try to extract path using tree-sitter fields, fallback to regex-like
-    let path = if let Some(p_node) = node
-        .child_by_field_name("argument")
-        .or_else(|| node.child_by_field_name("name"))
-        .or_else(|| node.child_by_field_name("path"))
-        .or_else(|| node.child_by_field_name("module_name"))
-    {
-        let mut p_text = node_text(p_node, source);
-        if p_text.starts_with("crate::") {
-            p_text = p_text.replace("crate::", "");
-        }
-        split_qualified_name(&p_text)
-    } else {
-        // Fallback for preproc_include or generic imports
-        let mut p = vec![];
+    let mut imports = vec![];
+
+    if let Some(p_node) = node.child_by_field_name("module_name") {
+        let base_path = split_qualified_name(&node_text(p_node, source));
         let mut cursor = node.walk();
         for child in node.children(&mut cursor) {
-            let c_kind = child.kind();
-            if matches!(
-                c_kind,
-                "scoped_identifier"
-                    | "identifier"
-                    | "dotted_name"
-                    | "system_lib_string"
-                    | "string_literal"
-            ) {
-                let txt = node_text(child, source)
-                    .replace("\"", "")
-                    .replace("<", "")
-                    .replace(">", "");
-                p = split_qualified_name(&txt);
-                break;
+            let kind = child.kind();
+            if matches!(kind, "aliased_import" | "dotted_name" | "name" | "identifier") {
+                if child.id() != p_node.id() {
+                    let txt = node_text(child, source);
+                    let mut full_path = base_path.clone();
+                    full_path.extend(split_qualified_name(&txt));
+                    imports.push(Import {
+                        path: full_path,
+                        alias: alias.clone(),
+                        is_wildcard,
+                    });
+                }
             }
         }
-        p
-    };
+        if imports.is_empty() {
+            imports.push(Import { path: base_path, alias, is_wildcard });
+        }
+    } else {
+        let path = if let Some(p_node) = node
+            .child_by_field_name("argument")
+            .or_else(|| node.child_by_field_name("name"))
+            .or_else(|| node.child_by_field_name("path"))
+        {
+            let mut p_text = node_text(p_node, source);
+            if p_text.starts_with("crate::") {
+                p_text = p_text.replace("crate::", "");
+            }
+            split_qualified_name(&p_text)
+        } else {
+            // Fallback for preproc_include or generic imports
+            let mut p = vec![];
+            let mut cursor = node.walk();
+            for child in node.children(&mut cursor) {
+                let c_kind = child.kind();
+                if matches!(
+                    c_kind,
+                    "scoped_identifier"
+                        | "identifier"
+                        | "dotted_name"
+                        | "system_lib_string"
+                        | "string_literal"
+                ) {
+                    let txt = node_text(child, source)
+                        .replace("\"", "")
+                        .replace("<", "")
+                        .replace(">", "");
+                    p = split_qualified_name(&txt);
+                    break;
+                }
+            }
+            p
+        };
 
-    if path.is_empty() {
-        return None;
+        if !path.is_empty() {
+            imports.push(Import {
+                path,
+                alias,
+                is_wildcard,
+            });
+        }
     }
 
-    Some(Import {
-        path,
-        alias,
-        is_wildcard,
-    })
+    if imports.is_empty() {
+        None
+    } else {
+        Some(imports)
+    }
 }
 
 pub fn try_parse_free_variable(node: Node, source: &str) -> Option<crate::model::Field> {

@@ -24,7 +24,8 @@ pub fn is_structured_type(node: Node) -> bool {
         return false;
     }
     let kind = node.kind();
-    (kind.contains("struct")
+    (kind == "type_definition"
+        || kind.contains("struct")
         || kind.contains("class")
         || kind.contains("interface")
         || kind.contains("trait")

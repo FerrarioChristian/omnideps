@@ -14,6 +14,7 @@ pub struct LanguageConfig {
     pub transitive_imports: bool,
     pub support_impl_blocks: bool,
     pub self_keyword: String,
+    pub extract_dynamic_fields: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -43,6 +44,7 @@ impl AnalyzerConfig {
             transitive_imports: true,
             support_impl_blocks: false,
             self_keyword: "self".to_string(),
+            extract_dynamic_fields: true,
         });
 
         // Rust: Directory Based, no transitive imports
@@ -55,6 +57,7 @@ impl AnalyzerConfig {
             transitive_imports: false,
             support_impl_blocks: true,
             self_keyword: "self".to_string(),
+            extract_dynamic_fields: false,
         });
 
         // Java: Package Based
@@ -67,6 +70,7 @@ impl AnalyzerConfig {
             transitive_imports: false,
             support_impl_blocks: false,
             self_keyword: "this".to_string(),
+            extract_dynamic_fields: false,
         });
 
         // C++ / C: Package/Namespace Based
@@ -79,6 +83,7 @@ impl AnalyzerConfig {
             transitive_imports: false,
             support_impl_blocks: true, // C++ can implement methods outside class declaration
             self_keyword: "this".to_string(),
+            extract_dynamic_fields: false,
         });
         languages.insert("c".to_string(), LanguageConfig {
             modules: ModuleConfig {
@@ -89,6 +94,7 @@ impl AnalyzerConfig {
             transitive_imports: false,
             support_impl_blocks: false,
             self_keyword: "this".to_string(),
+            extract_dynamic_fields: false,
         });
 
         Self {
@@ -101,6 +107,7 @@ impl AnalyzerConfig {
                 transitive_imports: false,
                 support_impl_blocks: false,
                 self_keyword: "this".to_string(),
+                extract_dynamic_fields: false,
             },
             languages,
         }
