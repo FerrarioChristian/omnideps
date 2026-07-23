@@ -4,6 +4,10 @@ files:
 - src/Vehicle.cpp
 - src/Car.h
 - src/Car.cpp
+- src/Engine.h
+- src/Engine.cpp
+- src/Fleet.h
+- src/Fleet.cpp
 nodes:
 - name: Transport
   kind: namespace
@@ -29,10 +33,38 @@ nodes:
   kind: method
 - name: main
   kind: function
+- name: automotive
+  kind: namespace
+- name: automotive.IEngine
+  kind: class
+- name: automotive.IEngine.start
+  kind: method
+- name: automotive.V8Engine
+  kind: class
+- name: automotive.V8Engine.horsepower
+  kind: field
+- name: automotive.V8Engine.start
+  kind: method
+- name: automotive.V8Engine.getHorsepower
+  kind: method
+- name: Fleet
+  kind: class
+- name: Fleet.cars
+  kind: field
+- name: Fleet.addCar
+  kind: method
+- name: Fleet.getMaxFleetSize
+  kind: method
+- name: Fleet.startAll
+  kind: method
 edges:
 - testid: CPP-INH-1
   source: Transport.Car
   sink: Transport.Vehicle
+  kind: inherits
+- testid: CPP-INH-2
+  source: automotive.V8Engine
+  sink: automotive.IEngine
   kind: inherits
 - testid: CPP-CALL-1
   source: Transport.Car.displayInfo
@@ -46,6 +78,26 @@ edges:
   source: main
   sink: Transport.Car.displayInfo
   kind: calls
+- testid: CPP-CALL-4
+  source: main
+  sink: automotive.V8Engine.start
+  kind: calls
+- testid: CPP-CALL-5
+  source: main
+  sink: Fleet.addCar
+  kind: calls
+- testid: CPP-CALL-6
+  source: main
+  sink: Fleet.startAll
+  kind: calls
+- testid: CPP-CALL-7
+  source: main
+  sink: Fleet.getMaxFleetSize
+  kind: calls
+- testid: CPP-CALL-8
+  source: Fleet.startAll
+  sink: Transport.Car.displayInfo
+  kind: calls
 - testid: CPP-USE-1
   source: Transport.Car
   sink: Transport.Vehicle
@@ -56,6 +108,26 @@ edges:
   kind: uses_type
 - testid: CPP-USE-3
   source: main
+  sink: Transport.Car
+  kind: uses_type
+- testid: CPP-USE-4
+  source: automotive.V8Engine
+  sink: automotive.IEngine
+  kind: uses_type
+- testid: CPP-USE-5
+  source: main
+  sink: automotive.V8Engine
+  kind: uses_type
+- testid: CPP-USE-6
+  source: main
+  sink: Fleet
+  kind: uses_type
+- testid: CPP-USE-7
+  source: Fleet.cars
+  sink: Transport.Car
+  kind: uses_type
+- testid: CPP-USE-8
+  source: Fleet.addCar
   sink: Transport.Car
   kind: uses_type
 - testid: CPP-ACC-1
@@ -73,4 +145,20 @@ edges:
 - testid: CPP-ACC-4
   source: Transport.Car.displayInfo
   sink: Transport.Car.numDoors
+  kind: accesses_field
+- testid: CPP-ACC-5
+  source: automotive.V8Engine.start
+  sink: automotive.V8Engine.horsepower
+  kind: accesses_field
+- testid: CPP-ACC-6
+  source: automotive.V8Engine.getHorsepower
+  sink: automotive.V8Engine.horsepower
+  kind: accesses_field
+- testid: CPP-ACC-7
+  source: Fleet.addCar
+  sink: Fleet.cars
+  kind: accesses_field
+- testid: CPP-ACC-8
+  source: Fleet.startAll
+  sink: Fleet.cars
   kind: accesses_field

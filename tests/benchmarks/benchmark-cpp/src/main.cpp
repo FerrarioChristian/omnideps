@@ -1,12 +1,24 @@
-#include <iostream>
-#include <memory>
 #include "Car.h"
+#include "Engine.h"
+#include "Fleet.h"
+#include <iostream>
+
+using namespace Transport;
+using namespace automotive;
 
 int main() {
-    std::unique_ptr<Transport::Vehicle> myCar = std::make_unique<Transport::Car>("Toyota", 100, 4);
+    Car myCar("Toyota", 120, 4);
+    myCar.accelerate();
+    myCar.displayInfo();
     
-    myCar->accelerate();
-    myCar->displayInfo();
+    V8Engine engine(450);
+    engine.start();
     
+    Fleet myFleet;
+    myFleet.addCar(myCar);
+    myFleet.startAll();
+    
+    std::cout << "Max fleet size: " << Fleet::getMaxFleetSize() << std::endl;
+
     return 0;
 }
