@@ -571,8 +571,8 @@
 ctx.stack.borrow_mut().define_symbol("self".to_string(), self_query.clone());
 ctx.stack.borrow_mut().define_symbol("this".to_string(), self_query);</code></pre>
     <p><strong>Perché <code>st.name.last()</code>?</strong> Perché il nome del tipo strutturato nell'IR prima della Fase 2b è un nome <em>relativo</em> (es. <code>["Veicolo"]</code>), non assoluto (che diventerà <code>["root","core","Veicolo"]</code> solo nell'Executor). <code>.last()</code> estrae <code>"Veicolo"</code>.</p>
-    <p><strong>Perché sia <code>self</code> che <code>this</code>?</strong> Per essere language-agnostic: Rust usa <code>self</code>, Java/C# usano <code>this</code>, Python usa <code>self</code>. Registrandoli entrambi, il sistema funziona per tutti i linguaggi.</p>
-    <p><strong>Cosa succede per gli ImplBlock?</strong> Stessa logica, ma il <code>self</code>/<code>this</code> punta alla query del <code>impl_for</code> (cioè il tipo per cui l'impl è definito), non al nome dell'impl block stesso.</p>
+    <p><strong>Perché si inietta <code>self_keyword</code>?</strong> Per supportare l'accesso ai membri d'istanza. A seconda della configurazione del linguaggio (<code>self_keyword</code>), il Builder inietta dinamicamente la keyword corretta (es. <code>self</code> per Rust, <code>this</code> per Java/C#). Python, invece, non utilizza una keyword hardcoded a livello di classe, ma si affida all'euristica <code>implicit_first_param_as_self</code> che mappa dinamicamente il primo parametro dei metodi all'istanza della classe.</p>
+    <p><strong>Cosa succede per gli ImplBlock?</strong> Stessa logica, ma la keyword punta alla query del <code>impl_for</code> (cioè il tipo per cui l'impl è definito), non al nome dell'impl block stesso.</p>
 
     <h3>5.3 Registrazione dei Parametri — Perché Solo <code>ResolutionQuery</code></h3>
     <pre><code>ff.signature.parameters = ff.signature.parameters.into_iter().map(|mut p| {
@@ -1009,6 +1009,40 @@ m.impl_blocks = unfused_impls;</code></pre>
         <li>Il tipo target deve esistere nel campo <code>m.structured_types</code> dello <strong>stesso modulo</strong></li>
     </ol>
     <p><strong>Perché preservare gli unfused?</strong> Un impl block per un tipo <code>External</code> (es. <code>impl ExternalTrait for LocalType</code>) non può essere fuso perché il tipo target non è nell'IR locale. I suoi metodi devono essere preservati per la Fase 3.</p>
+
+    <!-- ============================================================ -->
+    <!-- SEZIONE 10.5 -->
+    <!-- ============================================================ -->
+    <h2 id="forward-declarations">10.5 Forward Declarations e Out-Of-Line Methods</h2>
+    <p class="ref">Riferimento: <code>src/analyzer.rs:link_out_of_line_methods</code></p>
+
+    <p><strong>Cos'è?</strong> In linguaggi come C++, è comune dichiarare un metodo all'interno di una classe (in un file header) e definirne il corpo esternamente usando il resolution operator (es. <code>void MyClass::my_method() { ... }</code>). Il parser Tree-sitter estrae la definizione out-of-line come una <code>Function</code> globale, disconnettendola dalla sua classe di appartenenza.</p>
+
+    <p>Per ricongiungere questi metodi, l'analizzatore esegue un passo di pre-processing (attivato dal flag <code>forward_declarations</code> nel <code>LanguageConfig</code>) prima che inizi la Name Resolution:</p>
+    <pre><code>if config.get_for(lang).forward_declarations {
+    let mut methods_to_move = vec![];
+    
+    // 1. Estrae le funzioni con nome qualificato (es. MyClass::my_method)
+    module.free_functions.retain(|ff| {
+        if ff.name.len() > 1 {
+            methods_to_move.push(ff.clone());
+            false // Rimuove dalle funzioni libere
+        } else {
+            true // Mantiene
+        }
+    });
+
+    // 2. Ricolloca i metodi all'interno della rispettiva classe
+    for method in methods_to_move {
+        let class_name = &method.name[..method.name.len() - 1]; // "MyClass"
+        let method_name = method.name.last().unwrap().clone();  // "my_method"
+        
+        // Cerca la classe nel modulo e inietta il metodo (aggiornando o sostituendo la dichiarazione)
+        // ...
+    }
+}</code></pre>
+
+    <p><strong>Perché è importante?</strong> Senza questa fusione, il Query Engine non potrebbe iniettare la keyword <code>this</code> all'interno del corpo del metodo out-of-line (poiché verrebbe trattato come una funzione libera). Questo farebbe fallire la risoluzione di tutti gli accessi ai membri della classe (es. <code>this->field</code>) scritti all'interno del metodo.</p>
 
     <!-- ============================================================ -->
     <!-- SEZIONE 11 -->

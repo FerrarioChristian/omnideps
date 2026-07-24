@@ -460,10 +460,10 @@ class A : public B // C++</pre></td>
             <td><pre>mod core { } // Rust
         namespace math { } // C++
         package com.api; // Java</pre>
-                <div class="notes">Annidamento ricorsivo supportato. Funziona in Rust (<code>mod</code>), C++ (<code>namespace</code>) e Java, dove l'estrattore rileva il costrutto <code>package_declaration</code> per mappare i file nei moduli corretti senza fare affidamento sul File System. In Python i file vengono attualmente appiattiti nel modulo <code>root</code>.</div>
+                <div class="notes">Annidamento ricorsivo e diversificazione strategica supportata tramite `ModuleStrategy`. Funziona in Rust (`mod` e file-based), C++ (`namespace`), Java (`package_declaration`) e Python (dove i file e le directory `__init__.py` vengono automaticamente mappati in gerarchie di moduli senza appiattimenti nel root).</div>
             </td>
             <td>Annidamento ricorsivo di <code>Module</code>.<br>Arco: Mappato come gerarchia <code>parent</code> in Cytoscape.</td>
-            <td><span class="function-ref">try_parse_module_node</span>, <span class="function-ref">try_parse_package_declaration</span></td>
+            <td><span class="function-ref">try_parse_module_node</span>, <span class="function-ref">try_parse_package_declaration</span>, Logica in <code>analyzer.rs</code></td>
         </tr>
         <tr>
             <td>Dynamic Imports</td>
@@ -488,6 +488,14 @@ class A : public B // C++</pre></td>
             <td>Supportato tramite la configurazione linguistica <code>transitive_imports</code> che permette all'ExecutorContext di ri-esportare la visibilità degli import nei moduli dipendenti.</td>
             <td><span class="function-ref">get_all_module_imports</span></td>
         </tr>
+        <tr>
+            <td>Forward Declarations</td>
+            <td><span class="status-yes">Sì</span></td>
+            <td><pre>class Car; // C++
+void run();</pre> <div class="notes">Permette la dichiarazione disaccoppiata dall'implementazione (header/source) tipica di C/C++.</div></td>
+            <td>Supportato tramite un passo di pre-processing (<code>link_out_of_line_methods</code>) governato dal flag <code>forward_declarations</code>, che fonde i corpi delle funzioni fuori-linea nelle dichiarazioni originali all'interno delle classi o interfacce.</td>
+            <td><span class="function-ref">link_out_of_line_methods</span></td>
+        </tr>
     </table>
 
     <h2>9. Casi Limite e Costrutti Complessi (Risolti)</h2>
@@ -497,12 +505,6 @@ class A : public B // C++</pre></td>
         <li><strong>Appiattimento ImplBlock e Tipi Locali:</strong> I blocchi di implementazione Rust e i metodi fuori-dichiarazione C++ vengono appiattiti nel tipo bersaglio finale (grazie a un fix nell'esplorazione del <code>declarator</code>). I tipi locali dichiarati nei metodi sono correttamente mappati nel Global Registry.</li>
         <li><strong>Funzioni Anonime e Interazioni Comportamentali:</strong> Scansione best-effort del corpo per estrarre <code>Calls</code> e <code>Instantiates</code>. Le chiamate non risolvibili (variabili locali dinamiche) falliscono elegantemente senza impedire l'estrazione degli altri archi.</li>
         <li><strong>Fallback dei Tipi di Ritorno:</strong> I costruttori (Python/C++) senza un <code>return_type</code> esplicito vengono assegnati correttamente a <code>Void</code>, prevenendo che l'analizzatore utilizzi erroneamente il nome della funzione stessa. L'ereditarietà in Java/Python (nodi specifici <code>superclass</code>, <code>interfaces</code>) ora mappa correttamente ad archi <code>IsA</code>.</li>
-    </ul>
-
-    <h2>10. Roadmap Architetturale e Ottimizzazioni</h2>
-    <ul>
-        <li><strong>Ottimizzazione del Global Registry:</strong> Attualmente strutturato come <code>HashMap&lt;QualifiedName, RegistryEntry&gt;</code>, porta a frequenti manipolazioni di array di stringhe. Valutare la migrazione ad un <strong>Trie</strong> o all'implementazione dello <em>String Interning</em> (confronto fra interi) per ridurre drasticamente i tempi di lookup.</li>
-        <li><strong>Moduli Python / Directory Hierarchy:</strong> Python posiziona file non pacchettizzati nel modulo radice. Valutare logiche basate sulle path delle directory per rispecchiare l'effettivo annidamento architetturale, configurabili globalmente tramite il config file language-specific.</li>
     </ul>
 </body>
 </html>
