@@ -1,6 +1,6 @@
-use crate::model::*;
-use super::scope::{ScopeTree, ScopeId, Symbol};
 use super::primitives::PrimitiveRegistry;
+use super::scope::{ScopeId, ScopeTree, Symbol};
+use crate::model::*;
 
 pub struct ExecutorContext<'a> {
     pub tree: &'a ScopeTree,
@@ -8,19 +8,35 @@ pub struct ExecutorContext<'a> {
     pub config: &'a crate::config::AnalyzerConfig,
 }
 
-pub fn execute_queries(modules: Vec<Module>, primitives: &PrimitiveRegistry, config: &crate::config::AnalyzerConfig) -> Vec<Module> {
+/// Entry point for Phase 2b (Name Resolution).
+/// Takes the extracted modules, builds the `ScopeTree`, and resolves all `TypeRef` queries.
+pub fn execute_queries(
+    modules: Vec<Module>,
+    primitives: &PrimitiveRegistry,
+    config: &crate::config::AnalyzerConfig,
+) -> Vec<Module> {
     let tree = ScopeTree::build(&modules, config);
-    
+
     let ctx = ExecutorContext {
         tree: &tree,
         primitives,
         config,
     };
 
-    modules.into_iter().map(|m| execute_module(&ctx, m, tree.root)).collect()
+    modules
+        .into_iter()
+        .map(|m| execute_module(&ctx, m, tree.root))
+        .collect()
 }
 
-fn find_child_scope(tree: &ScopeTree, parent: ScopeId, name: &str, is_module: bool) -> Option<ScopeId> {
+/// Helper function to find a direct child scope by name.
+/// `is_module` differentiates between searching for a module or a structured type (class/struct).
+fn find_child_scope(
+    tree: &ScopeTree,
+    parent: ScopeId,
+    name: &str,
+    is_module: bool,
+) -> Option<ScopeId> {
     if let Some(sym) = tree.arena[parent].symbols.get(name) {
         match sym {
             Symbol::Module(id) if is_module => return Some(*id),
@@ -31,9 +47,14 @@ fn find_child_scope(tree: &ScopeTree, parent: ScopeId, name: &str, is_module: bo
     None
 }
 
+/// Recursively resolves all declarations and queries inside a `Module`.
 pub fn execute_module(ctx: &ExecutorContext, mut m: Module, parent_scope: ScopeId) -> Module {
-    let module_name = m.name.last().cloned().unwrap_or_else(|| "unknown".to_string());
-    
+    let module_name = m
+        .name
+        .last()
+        .cloned()
+        .unwrap_or_else(|| "unknown".to_string());
+
     let scope_id = if module_name == "root" {
         parent_scope
     } else {
@@ -44,28 +65,75 @@ pub fn execute_module(ctx: &ExecutorContext, mut m: Module, parent_scope: ScopeI
         fv.ty = evaluate_typeref(ctx, fv.ty.clone(), scope_id, true);
     }
 
-    m.free_functions = m.free_functions.into_iter().map(|ff| execute_function(ctx, ff, scope_id)).collect();
-    m.structured_types = m.structured_types.into_iter().map(|st| execute_structured_type(ctx, st, scope_id)).collect();
-    m.impl_blocks = m.impl_blocks.into_iter().map(|ib| execute_impl_block(ctx, ib, scope_id)).collect();
-    m.sub_modules = m.sub_modules.into_iter().map(|sub| execute_module(ctx, sub, scope_id)).collect();
+    m.free_functions = m
+        .free_functions
+        .into_iter()
+        .map(|ff| execute_function(ctx, ff, scope_id))
+        .collect();
+    m.structured_types = m
+        .structured_types
+        .into_iter()
+        .map(|st| execute_structured_type(ctx, st, scope_id))
+        .collect();
+    m.impl_blocks = m
+        .impl_blocks
+        .into_iter()
+        .map(|ib| execute_impl_block(ctx, ib, scope_id))
+        .collect();
+    m.sub_modules = m
+        .sub_modules
+        .into_iter()
+        .map(|sub| execute_module(ctx, sub, scope_id))
+        .collect();
 
     m
 }
 
-fn execute_structured_type(ctx: &ExecutorContext, mut st: StructuredType, parent_scope: ScopeId) -> StructuredType {
+/// Recursively resolves all declarations and queries inside a `StructuredType` (Class, Struct, ecc.).
+fn execute_structured_type(
+    ctx: &ExecutorContext,
+    mut st: StructuredType,
+    parent_scope: ScopeId,
+) -> StructuredType {
     let name = st.name.last().cloned().unwrap_or_default();
     let scope_id = find_child_scope(ctx.tree, parent_scope, &name, false).unwrap_or(parent_scope);
 
-    st.super_types = st.super_types.into_iter().map(|t| evaluate_typeref(ctx, t, scope_id, true)).collect();
-    st.fields = st.fields.into_iter().map(|mut f| { f.ty = evaluate_typeref(ctx, f.ty, scope_id, true); f }).collect();
-    st.methods = st.methods.into_iter().map(|m| execute_function(ctx, m, scope_id)).collect();
-    st.nested_types = st.nested_types.into_iter().map(|n| execute_structured_type(ctx, n, scope_id)).collect();
+    st.super_types = st
+        .super_types
+        .into_iter()
+        .map(|t| evaluate_typeref(ctx, t, scope_id, true))
+        .collect();
+    st.fields = st
+        .fields
+        .into_iter()
+        .map(|mut f| {
+            f.ty = evaluate_typeref(ctx, f.ty, scope_id, true);
+            f
+        })
+        .collect();
+    st.methods = st
+        .methods
+        .into_iter()
+        .map(|m| execute_function(ctx, m, scope_id))
+        .collect();
+    st.nested_types = st
+        .nested_types
+        .into_iter()
+        .map(|n| execute_structured_type(ctx, n, scope_id))
+        .collect();
     st
 }
 
-fn execute_impl_block(ctx: &ExecutorContext, mut ib: ImplBlock, parent_scope: ScopeId) -> ImplBlock {
+/// Recursively resolves all declarations and queries inside an `ImplBlock`.
+fn execute_impl_block(
+    ctx: &ExecutorContext,
+    mut ib: ImplBlock,
+    parent_scope: ScopeId,
+) -> ImplBlock {
     ib.impl_for = evaluate_typeref(ctx, ib.impl_for, parent_scope, true);
-    ib.implements_trait = ib.implements_trait.map(|t| evaluate_typeref(ctx, t, parent_scope, true));
+    ib.implements_trait = ib
+        .implements_trait
+        .map(|t| evaluate_typeref(ctx, t, parent_scope, true));
 
     let target_name = match &ib.impl_for {
         TypeRef::Resolved(qn) | TypeRef::External(qn) => qn.last().cloned().unwrap_or_default(),
@@ -73,16 +141,26 @@ fn execute_impl_block(ctx: &ExecutorContext, mut ib: ImplBlock, parent_scope: Sc
         _ => "".to_string(),
     };
 
-    let scope_id = find_child_scope(ctx.tree, parent_scope, &target_name, false).unwrap_or(parent_scope);
+    let scope_id =
+        find_child_scope(ctx.tree, parent_scope, &target_name, false).unwrap_or(parent_scope);
 
-    ib.methods = ib.methods.into_iter().map(|m| execute_function(ctx, m, scope_id)).collect();
-    ib.nested_types = ib.nested_types.into_iter().map(|n| execute_structured_type(ctx, n, scope_id)).collect();
+    ib.methods = ib
+        .methods
+        .into_iter()
+        .map(|m| execute_function(ctx, m, scope_id))
+        .collect();
+    ib.nested_types = ib
+        .nested_types
+        .into_iter()
+        .map(|n| execute_structured_type(ctx, n, scope_id))
+        .collect();
     ib
 }
 
+/// Resolves parameter types, return type, and body block of a `Function`.
 fn execute_function(ctx: &ExecutorContext, mut f: Function, parent_scope: ScopeId) -> Function {
     let name = f.name.last().cloned().unwrap_or_default();
-    
+
     let mut func_scope_id = parent_scope;
     for child in &ctx.tree.arena {
         if child.parent == Some(parent_scope) && child.name == name {
@@ -91,14 +169,28 @@ fn execute_function(ctx: &ExecutorContext, mut f: Function, parent_scope: ScopeI
         }
     }
 
-    f.signature.parameters = f.signature.parameters.into_iter().map(|mut p| { p.ty = evaluate_typeref(ctx, p.ty, func_scope_id, true); p }).collect();
+    f.signature.parameters = f
+        .signature
+        .parameters
+        .into_iter()
+        .map(|mut p| {
+            p.ty = evaluate_typeref(ctx, p.ty, func_scope_id, true);
+            p
+        })
+        .collect();
     f.signature.return_type = evaluate_typeref(ctx, f.signature.return_type, func_scope_id, true);
     f.body = f.body.map(|b| execute_block(ctx, b, func_scope_id, 0));
-    
+
     f
 }
 
-fn execute_block(ctx: &ExecutorContext, mut b: Block, parent_scope: ScopeId, index: usize) -> Block {
+/// Resolves variable declarations, instantiations, function calls, and field accesses within a `Block`.
+fn execute_block(
+    ctx: &ExecutorContext,
+    mut b: Block,
+    parent_scope: ScopeId,
+    index: usize,
+) -> Block {
     let block_name = format!("block_{}", index);
     let mut block_scope_id = parent_scope;
     for child in &ctx.tree.arena {
@@ -108,21 +200,54 @@ fn execute_block(ctx: &ExecutorContext, mut b: Block, parent_scope: ScopeId, ind
         }
     }
 
-    b.declarations = b.declarations.into_iter().map(|mut d| { d.ty = evaluate_typeref(ctx, d.ty, block_scope_id, true); d }).collect();
-    b.calls = b.calls.into_iter().map(|c| evaluate_typeref(ctx, c, block_scope_id, false)).collect();
-    b.instantiates = b.instantiates.into_iter().map(|i| evaluate_typeref(ctx, i, block_scope_id, false)).collect();
-    b.accesses = b.accesses.into_iter().map(|a| evaluate_typeref(ctx, a, block_scope_id, false)).collect();
-    
-    let sub_blocks: Vec<Block> = b.sub_blocks.into_iter().enumerate().map(|(i, sub)| execute_block(ctx, sub, block_scope_id, i)).collect();
+    b.declarations = b
+        .declarations
+        .into_iter()
+        .map(|mut d| {
+            d.ty = evaluate_typeref(ctx, d.ty, block_scope_id, true);
+            d
+        })
+        .collect();
+    b.calls = b
+        .calls
+        .into_iter()
+        .map(|c| evaluate_typeref(ctx, c, block_scope_id, false))
+        .collect();
+    b.instantiates = b
+        .instantiates
+        .into_iter()
+        .map(|i| evaluate_typeref(ctx, i, block_scope_id, false))
+        .collect();
+    b.accesses = b
+        .accesses
+        .into_iter()
+        .map(|a| evaluate_typeref(ctx, a, block_scope_id, false))
+        .collect();
+
+    let sub_blocks: Vec<Block> = b
+        .sub_blocks
+        .into_iter()
+        .enumerate()
+        .map(|(i, sub)| execute_block(ctx, sub, block_scope_id, i))
+        .collect();
     b.sub_blocks = sub_blocks;
     b
 }
 
-pub fn evaluate_typeref(ctx: &ExecutorContext, tr: TypeRef, scope_id: ScopeId, resolve_type: bool) -> TypeRef {
+/// Core function to resolve a `TypeRef`.
+/// If the `TypeRef` is a `ResolutionQuery` or `Unresolved`, it tries to evaluate it dynamically against the ScopeTree.
+pub fn evaluate_typeref(
+    ctx: &ExecutorContext,
+    tr: TypeRef,
+    scope_id: ScopeId,
+    resolve_type: bool,
+) -> TypeRef {
     match tr {
         TypeRef::ResolutionQuery(query) => {
             let mut visited = std::collections::HashSet::new();
-            if let Some(resolved) = evaluate_query(ctx, &query, scope_id, resolve_type, &mut visited) {
+            if let Some(resolved) =
+                evaluate_query(ctx, &query, scope_id, resolve_type, &mut visited)
+            {
                 resolved
             } else {
                 TypeRef::Failed(vec![extract_base_name(&query)])
@@ -136,9 +261,11 @@ pub fn evaluate_typeref(ctx: &ExecutorContext, tr: TypeRef, scope_id: ScopeId, r
             for part in &qn[1..] {
                 query = Query::Extract(Box::new(query), part.clone());
             }
-            
+
             let mut visited = std::collections::HashSet::new();
-            let res = if let Some(resolved) = evaluate_query(ctx, &query, scope_id, resolve_type, &mut visited) {
+            let res = if let Some(resolved) =
+                evaluate_query(ctx, &query, scope_id, resolve_type, &mut visited)
+            {
                 resolved
             } else {
                 TypeRef::Unresolved(qn.clone())
@@ -150,6 +277,7 @@ pub fn evaluate_typeref(ctx: &ExecutorContext, tr: TypeRef, scope_id: ScopeId, r
     }
 }
 
+/// Extracts the human-readable string representation of a `Query`.
 pub fn extract_base_name(query: &Query) -> String {
     match query {
         Query::Find(name) => name.clone(),
@@ -158,6 +286,7 @@ pub fn extract_base_name(query: &Query) -> String {
     }
 }
 
+/// Reconstructs the fully qualified path from the root down to a specific `ScopeId`.
 fn build_path_from_scope(tree: &ScopeTree, scope_id: ScopeId) -> QualifiedName {
     let mut path = vec![];
     let mut curr = Some(scope_id);
@@ -171,6 +300,8 @@ fn build_path_from_scope(tree: &ScopeTree, scope_id: ScopeId) -> QualifiedName {
     path
 }
 
+/// Attempts to find a symbol strictly within the given scope or its inherited super types.
+/// Does not perform lexical climbing.
 pub fn find_symbol_in_scope_and_supers(
     ctx: &ExecutorContext,
     scope_id: ScopeId,
@@ -179,9 +310,16 @@ pub fn find_symbol_in_scope_and_supers(
     visited: &mut std::collections::HashSet<String>,
 ) -> Option<TypeRef> {
     if let Some(sym) = ctx.tree.arena[scope_id].symbols.get(name) {
-        return Some(symbol_to_typeref(ctx, scope_id, sym, name, resolve_type, visited));
+        return Some(symbol_to_typeref(
+            ctx,
+            scope_id,
+            sym,
+            name,
+            resolve_type,
+            visited,
+        ));
     }
-    
+
     for st in &ctx.tree.arena[scope_id].super_types {
         // Resolve super type first
         let resolved_st = match st {
@@ -192,86 +330,117 @@ pub fn find_symbol_in_scope_and_supers(
                 let query = Query::Find(qn.last().cloned().unwrap_or_default());
                 evaluate_query(ctx, &query, scope_id, true, visited).unwrap_or_else(|| st.clone())
             }
-            _ => st.clone()
+            _ => st.clone(),
         };
 
         if let Some(super_scope) = find_scope_for_type(ctx.tree, &resolved_st) {
             // Prevent infinite loops if circular inheritance
-            if scope_id != super_scope {
-                if let Some(res) = find_symbol_in_scope_and_supers(ctx, super_scope, name, resolve_type, visited) {
-                    return Some(res);
-                }
+            if scope_id != super_scope
+                && let Some(res) =
+                    find_symbol_in_scope_and_supers(ctx, super_scope, name, resolve_type, visited)
+            {
+                return Some(res);
             }
         }
     }
-    
+
     None
 }
 
-fn evaluate_query(ctx: &ExecutorContext, query: &Query, scope_id: ScopeId, resolve_type: bool, visited: &mut std::collections::HashSet<String>) -> Option<TypeRef> {
+/// Evaluates a `Query` (Find, Extract, or Call) dynamically against the ScopeTree.
+/// Employs lexical climbing for `Find`, and hierarchical resolution for `Extract`.
+fn evaluate_query(
+    ctx: &ExecutorContext,
+    query: &Query,
+    scope_id: ScopeId,
+    resolve_type: bool,
+    visited: &mut std::collections::HashSet<String>,
+) -> Option<TypeRef> {
     let q_str = extract_base_name(query);
     if !visited.insert(q_str.clone()) {
         return None;
     }
-    println!("evaluate_query: {:?}", query);
 
     let result = match query {
-        Query::Find(name) => {
-            let mut curr = Some(scope_id);
-            while let Some(id) = curr {
-                if let Some(res) = find_symbol_in_scope_and_supers(ctx, id, name, resolve_type, visited) {
-                    return Some(res);
-                }
-                
-                if name == "BadgesDAO" {
-                    println!("Checking imports for scope {:?} ({:?})", id, ctx.tree.arena[id].name);
-                }
-                for imp in &ctx.tree.arena[id].imports {
-                    if name == "BadgesDAO" {
-                        println!("  Import: {:?}", imp.path);
-                    }
-                    if let Some(last) = imp.path.last() {
-                        if last == name || last == "*" {
-                            if let Some(resolved) = find_global(ctx, &imp.path) {
-                                return Some(resolved);
-                            } else {
-                                // If not found in the tree, it might be an external library
-                                return Some(TypeRef::External(imp.path.clone()));
-                            }
-                        }
-                    }
-                }
-                
-                curr = ctx.tree.arena[id].parent;
-            }
-            
-            find_global(ctx, &[name.clone()])
-        }
+        Query::Find(name) => evaluate_query_find(ctx, name, scope_id, resolve_type, visited),
         Query::Extract(parent_q, member) => {
-            let parent_ty = evaluate_query(ctx, parent_q, scope_id, true, visited);
-            println!("  parent_ty: {:?}", parent_ty);
-            let parent_ty = parent_ty?;
-            
-            if let Some(target_scope) = find_scope_for_type(ctx.tree, &parent_ty) {
-                println!("  target_scope: {:?}", target_scope);
-                if let Some(res) = find_symbol_in_scope_and_supers(ctx, target_scope, member, resolve_type, visited) {
-                    println!("  res: {:?}", res);
-                    return Some(res);
-                }
-                println!("  find_symbol failed for {:?}", member);
-            }
-            None
+            evaluate_query_extract(ctx, parent_q, member, scope_id, resolve_type, visited)
         }
-        Query::Call(target_q) => {
-             evaluate_query(ctx, target_q, scope_id, true, visited)
-        }
+        Query::Call(target_q) => evaluate_query(ctx, target_q, scope_id, true, visited),
     };
 
     visited.remove(&q_str);
     result
 }
 
-fn symbol_to_typeref(ctx: &ExecutorContext, scope_id: ScopeId, sym: &Symbol, name: &str, resolve_type: bool, visited: &mut std::collections::HashSet<String>) -> TypeRef {
+/// Helper function to evaluate `Query::Find`. Performs lexical climbing up the scope tree.
+fn evaluate_query_find(
+    ctx: &ExecutorContext,
+    name: &str,
+    scope_id: ScopeId,
+    resolve_type: bool,
+    visited: &mut std::collections::HashSet<String>,
+) -> Option<TypeRef> {
+    let mut curr = Some(scope_id);
+    while let Some(id) = curr {
+        if let Some(res) = find_symbol_in_scope_and_supers(ctx, id, name, resolve_type, visited) {
+            return Some(res);
+        }
+
+        for imp in &ctx.tree.arena[id].imports {
+            if let Some(last) = imp.path.last() {
+                if last == name || last == "*" {
+                    if let Some(resolved) = find_global(ctx, &imp.path) {
+                        return Some(resolved);
+                    } else {
+                        // If not found in the tree, it might be an external library
+                        return Some(TypeRef::External(imp.path.clone()));
+                    }
+                }
+            }
+        }
+
+        curr = ctx.tree.arena[id].parent;
+    }
+
+    find_global(ctx, &[name.to_string()])
+}
+
+/// Helper function to evaluate `Query::Extract`. Resolves the parent and extracts the member.
+fn evaluate_query_extract(
+    ctx: &ExecutorContext,
+    parent_q: &Query,
+    member: &str,
+    scope_id: ScopeId,
+    resolve_type: bool,
+    visited: &mut std::collections::HashSet<String>,
+) -> Option<TypeRef> {
+    let parent_ty = evaluate_query(ctx, parent_q, scope_id, true, visited)?;
+
+    if let Some(target_scope) = find_scope_for_type(ctx.tree, &parent_ty) {
+        if let Some(res) =
+            find_symbol_in_scope_and_supers(ctx, target_scope, member, resolve_type, visited)
+        {
+            return Some(res);
+        }
+
+        // Transitive imports check
+        if let Some(res) = resolve_via_transitive_imports(ctx, target_scope, member) {
+            return Some(res);
+        }
+    }
+    None
+}
+
+/// Converts a raw `Symbol` found in the tree into a properly formatted `TypeRef`.
+fn symbol_to_typeref(
+    ctx: &ExecutorContext,
+    scope_id: ScopeId,
+    sym: &Symbol,
+    name: &str,
+    resolve_type: bool,
+    visited: &mut std::collections::HashSet<String>,
+) -> TypeRef {
     match sym {
         Symbol::Module(id) | Symbol::Type(id) => {
             let path = build_path_from_scope(ctx.tree, *id);
@@ -280,9 +449,8 @@ fn symbol_to_typeref(ctx: &ExecutorContext, scope_id: ScopeId, sym: &Symbol, nam
         Symbol::Value(ty) => {
             if resolve_type {
                 match ty {
-                    TypeRef::ResolutionQuery(q) => {
-                        evaluate_query(ctx, q, scope_id, true, visited).unwrap_or_else(|| ty.clone())
-                    }
+                    TypeRef::ResolutionQuery(q) => evaluate_query(ctx, q, scope_id, true, visited)
+                        .unwrap_or_else(|| ty.clone()),
                     _ => ty.clone(),
                 }
             } else {
@@ -294,6 +462,7 @@ fn symbol_to_typeref(ctx: &ExecutorContext, scope_id: ScopeId, sym: &Symbol, nam
     }
 }
 
+/// Given a resolved `TypeRef`, attempts to locate its corresponding `ScopeId` in the ScopeTree.
 pub fn find_scope_for_type(tree: &ScopeTree, ty: &TypeRef) -> Option<ScopeId> {
     match ty {
         TypeRef::Resolved(qn) | TypeRef::External(qn) => {
@@ -302,13 +471,10 @@ pub fn find_scope_for_type(tree: &ScopeTree, ty: &TypeRef) -> Option<ScopeId> {
                 if part == "root" && i == 0 {
                     continue;
                 }
-                if let Some(sym) = tree.arena[curr].symbols.get(part) {
-                    match sym {
-                        Symbol::Module(id) | Symbol::Type(id) => curr = *id,
-                        _ => return None,
-                    }
-                } else {
-                    return None;
+                let sym = tree.arena[curr].symbols.get(part)?;
+                match sym {
+                    Symbol::Module(id) | Symbol::Type(id) => curr = *id,
+                    _ => return None,
                 }
             }
             Some(curr)
@@ -317,9 +483,11 @@ pub fn find_scope_for_type(tree: &ScopeTree, ty: &TypeRef) -> Option<ScopeId> {
     }
 }
 
+/// Resolves a fully qualified path starting from the global root.
+/// Also handles transitive imports resolution natively.
 pub fn find_global(ctx: &ExecutorContext, path: &[String]) -> Option<TypeRef> {
     let mut curr = ctx.tree.root;
-    
+
     if path.len() == 1 && ctx.primitives.is_primitive(&path[0]) {
         return Some(TypeRef::Primitive(path[0].clone()));
     }
@@ -340,10 +508,50 @@ pub fn find_global(ctx: &ExecutorContext, path: &[String]) -> Option<TypeRef> {
                 }
             }
         } else {
+            // Check transitive imports
+            if let Some(resolved) = resolve_via_transitive_imports(ctx, curr, part) {
+                if i == path.len() - 1 {
+                    return Some(resolved);
+                } else {
+                    if let Some(next_scope) = find_scope_for_type(ctx.tree, &resolved) {
+                        curr = next_scope;
+                        continue;
+                    }
+                }
+            }
+
             return None;
         }
     }
-    
+
     let final_path = build_path_from_scope(ctx.tree, curr);
     Some(TypeRef::Resolved(final_path))
 }
+
+/// Checks if the target scope is a module with `transitive_imports` enabled,
+/// and attempts to resolve the member through its exported imports.
+fn resolve_via_transitive_imports(
+    ctx: &ExecutorContext,
+    scope_id: ScopeId,
+    member: &str,
+) -> Option<TypeRef> {
+    let node = &ctx.tree.arena[scope_id];
+    if node.is_module {
+        let lang = node.language.as_deref().unwrap_or("root");
+        if ctx.config.get_for(lang).transitive_imports {
+            for imp in &node.imports {
+                if let Some(last) = imp.path.last() {
+                    if last == member || last == "*" {
+                        if let Some(resolved) = find_global(ctx, &imp.path) {
+                            return Some(resolved);
+                        } else {
+                            return Some(TypeRef::External(imp.path.clone()));
+                        }
+                    }
+                }
+            }
+        }
+    }
+    None
+}
+

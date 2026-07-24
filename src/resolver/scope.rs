@@ -26,6 +26,8 @@ pub struct Scope {
     pub symbols: HashMap<String, Symbol>,
     pub imports: Vec<crate::model::Import>,
     pub super_types: Vec<TypeRef>,
+    pub is_module: bool,
+    pub language: Option<String>,
 }
 
 /// L'albero gerarchico degli Scope Lexicali, implementato tramite Arena Pattern.
@@ -46,6 +48,8 @@ impl ScopeTree {
                 symbols: HashMap::new(),
                 imports: vec![],
                 super_types: vec![],
+                is_module: true,
+                language: None,
             }],
             root: 0,
         };
@@ -67,6 +71,8 @@ impl ScopeTree {
             symbols: HashMap::new(),
             imports: vec![],
             super_types: vec![],
+            is_module: false,
+            language: None,
         });
         id
     }
@@ -96,12 +102,19 @@ impl ScopeTree {
                 existing_id
             } else {
                 let id = self.new_scope(parent_id, part.clone());
+                self.arena[id].is_module = true;
+                self.arena[id].language = m.language.clone();
                 self.define_symbol(parent_id, part.clone(), Symbol::Module(id));
                 id
             };
         }
         
         let scope_id = parent_id;
+        
+        // Update language if not set
+        if self.arena[scope_id].language.is_none() {
+            self.arena[scope_id].language = m.language.clone();
+        }
 
         // Aggiungi import
         for imp in &m.imports {

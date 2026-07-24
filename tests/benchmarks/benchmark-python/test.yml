@@ -4,6 +4,9 @@ files:
 - src/utils.py
 - src/advanced_models.py
 - src/services.py
+- src/lib_a.py
+- src/lib_b.py
+- src/transitive_main.py
 nodes:
 - name: main
   kind: module
@@ -15,6 +18,20 @@ nodes:
   kind: module
 - name: services
   kind: module
+- name: lib_a
+  kind: module
+- name: lib_b
+  kind: module
+- name: transitive_main
+  kind: module
+- name: lib_a.TransitiveClass
+  kind: class
+- name: lib_a.TransitiveClass.__init__
+  kind: method
+- name: transitive_main.do_transitive
+  kind: function
+- name: transitive_main.do_transitive_specific
+  kind: function
 - name: utils.greet_user
   kind: function
 - name: utils.calculate_age
@@ -198,3 +215,27 @@ edges:
   source: services.is_valid_user
   sink: models.User.username
   kind: accesses_field
+- testid: PY-TRANS-IMP-1
+  source: lib_b
+  sink: lib_a.TransitiveClass
+  kind: imports
+- testid: PY-TRANS-IMP-2
+  source: transitive_main
+  sink: lib_b
+  kind: imports
+- testid: PY-TRANS-CALL-1
+  source: transitive_main.do_transitive
+  sink: lib_a.TransitiveClass.__init__
+  kind: calls
+- testid: PY-TRANS-INST-1
+  source: transitive_main.do_transitive
+  sink: lib_a.TransitiveClass
+  kind: instantiates
+- testid: PY-TRANS-IMP-3
+  source: transitive_main
+  sink: lib_b.TransitiveClass
+  kind: imports
+- testid: PY-TRANS-INST-2
+  source: transitive_main.do_transitive_specific
+  sink: lib_a.TransitiveClass
+  kind: instantiates
