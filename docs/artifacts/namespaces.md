@@ -30,39 +30,43 @@ Ecco una lista delle modalità di definizione dei moduli/package nei vari ecosis
    - **Nota:** Rust permette sia di montare file come moduli (`mod x;` caricherà `x.rs`), facendo corrispondere file system e FQN, sia di dichiarare sottomoduli inline (`mod x { ... }`).
    - **Comportamento atteso:** Il file determina il modulo base, ma all'interno del file si possono creare ulteriori sottomoduli tramite blocchi AST.
 
-## Proposta di Refactoring della `ModuleStrategy`
+## Refactoring Implementato: `ModuleConfig`
 
-Attualmente abbiamo un Enum monolitico `ModuleStrategy`. Propongo di sostituirlo con una struct di flag booleani (es. `ModuleConfig`), in cui ogni campo attiva o disattiva un meccanismo specifico. Questo rende la formalizzazione LaTeX e l'architettura estremamente più precise.
+Come concordato, l'Enum monolitico `ModuleStrategy` è stato definitivamente sostituito con una struct di flag booleani (`ModuleConfig`), in cui ogni campo attiva o disattiva un meccanismo specifico in modo ortogonale. Questo rende l'architettura estremamente più flessibile e formalmente corretta.
+
+L'implementazione attuale in `src/config.rs` definisce i seguenti 5 assi ortogonali:
 
 ```rust
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ModuleConfig {
-    /// Se true, il path del file e le directory contribuiscono al nome del modulo (es. Python, Rust)
-    pub implicit_file_modules: bool,
+    /// Se true, ogni file crea implicitamente un modulo con il suo nome (es. Python, Rust)
+    pub file_based: bool,
+    
+    /// Se true, l'albero delle directory modella la gerarchia dei moduli (es. Python, Rust)
+    pub directory_based: bool,
     
     /// Se true, il linguaggio usa intestazioni a livello di file come `package x.y;` (es. Java)
-    pub file_level_declarations: bool,
+    pub package_decl_based: bool,
     
-    /// Se true, il linguaggio usa blocchi AST interni al file come `namespace x {}` o `mod x {}` (es. C++, Rust)
-    pub inline_module_blocks: bool,
+    /// Se true, il linguaggio usa blocchi AST interni al file del tipo `namespace x { ... }` (es. C++)
+    pub namespace_based: bool,
+    
+    /// Se true, il linguaggio usa blocchi AST interni al file del tipo `mod x { ... }` (es. Rust)
+    pub inline_mod_based: bool,
 }
 ```
 
-### Come mapperebbero i linguaggi in questa nuova struttura?
+### Come mappano i linguaggi in questa nuova struttura
 
-| Linguaggio | `implicit_file_modules` | `file_level_declarations` | `inline_module_blocks` |
-|------------|-------------------------|---------------------------|------------------------|
-| **C**      | False                   | False                     | False                  |
-| **C++**    | False                   | False                     | True                   |
-| **Java**   | False                   | True                      | False                  |
-| **Python** | True                    | False                     | False                  |
-| **Rust**   | True                    | False                     | True                   |
+| Linguaggio | `file` | `directory` | `package_decl` | `namespace` | `inline_mod` |
+|------------|--------|-------------|----------------|-------------|--------------|
+| **C**      | False  | False       | False          | False       | False        |
+| **C++**    | False  | False       | False          | True        | False        |
+| **Java**   | False  | False       | True           | False       | False        |
+| **Python** | True   | True        | False          | False       | False        |
+| **Rust**   | True   | True        | False          | False       | True         |
 
-### Vantaggi dell'approccio
-1. **Semantica Corretta per il C:** Avendo tutti i flag a `false`, il C inserirà semplicemente tutto in `root`, che è esattamente ciò che ci si aspetta. Non dovremo usare un valore "None" speciale, sarà lo stato di default disattivo.
-2. **Supporto Ibrido (Rust):** Supportare Rust diventerà naturale, attivando sia i file impliciti che i blocchi inline, senza che uno escluda l'altro come accadeva con l'Enum.
-3. **Formalizzazione Matematica:** Anche nel documento LaTeX, questo set di booleani è molto più rigoroso da esprimere rispetto a un enum arbitrario.
-
-### Open Questions per l'utente
-Sei d'accordo con la scomposizione della `ModuleStrategy` in questi 3 flag ortogonali? 
-Se sì, procederò a sostituire l'Enum nella codebase, ad aggiornare la tabella in LaTeX, e ad adattare il parser (`src/analyzer.rs`) affinché processi le regole dei package e delle directory in base a questi tre flag, piuttosto che affidarsi al match su `ModuleStrategy`.
+### Vantaggi Ottenuti
+1. **Semantica Corretta per il C:** Avendo tutti i flag a `false`, il C inserisce semplicemente tutte le dichiarazioni in `root`, il global scope atteso. Non è stato necessario introdurre alcun valore "None" speciale.
+2. **Supporto Ibrido (Rust):** Supportare Rust è diventato naturale, potendo attivare sia l'estrazione implicita dai file/directory (`file_based`, `directory_based`) sia l'intercettazione dei blocchi inline (`inline_mod_based`), senza che un paradigma escluda l'altro come accadeva con il vecchio Enum.
+3. **Formalizzazione Matematica (Tesi):** Nel documento LaTeX, questo set di assi di funzionalità booleane è molto più elegante e rigoroso da esprimere e schematizzare rispetto a un enumeratore arbitrario ed esclusivo. L'estrattore CST ora può semplicemente applicare le regole attivate componendole in sequenza.

@@ -295,7 +295,7 @@ fn link_out_of_line_methods(modules: &mut Vec<Module>, config: &crate::config::A
                 // or we could use the ImplBlock logic. Let's create an ImplBlock!
                 if !found {
                     module.impl_blocks.push(crate::model::ImplBlock {
-                        name: vec![],
+                        name: class_name.to_vec(),
                         impl_for: crate::model::TypeRef::ResolutionQuery(crate::model::Query::Find(class_name.last().unwrap().clone())),
                         implements_trait: None,
                         methods: vec![{

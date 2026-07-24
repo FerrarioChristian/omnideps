@@ -1,38 +1,33 @@
-# Risoluzione dello Scope ed Ereditarietà (Punto 2)
+# Risoluzione dello Scope ed Ereditarietà: Implementazione
 
-Questo documento approfondisce le logiche avanzate di cui abbiamo discusso, attualmente accantonate ma fondamentali per mappare accuratamente il codice in linguaggi complessi come Java e Rust.
+Questo documento approfondisce le logiche avanzate introdotte per mappare accuratamente il codice in linguaggi complessi come Java e Rust, superando i limiti delle prime versioni dell'analizzatore.
 
-## 1. Risoluzione delle Variabili Locali e dello Scope
+## 1. Risoluzione delle Variabili Locali e dello Scope (IMPLEMENTATO)
 Quando analizziamo il corpo di una funzione o di un metodo (in un costrutto `Block`), l'estrattore individua chiamate a metodi (`method_invocation`) o accessi a campi (`field_access`). Per sapere a *quale* tipo strutturato appartiene quel metodo o campo, dobbiamo capire di che tipo è la variabile su cui viene invocato.
 
-### Problema Attuale
-Attualmente, se troviamo un'espressione come `myVar.doSomething()`, l'analizzatore potrebbe non riuscire a dedurre che `myVar` è di tipo `StructA`, e quindi fallisce nel creare un arco `Calls` verso `StructA.doSomething`.
-
-### Soluzione: Tabella dei Simboli (Scope Tree)
-Bisogna implementare una gerarchia di **Scope**:
+### Soluzione Implementata: `ScopeTree`
+Il problema è stato risolto con l'introduzione della nuova architettura V4 **Scope Tree**. È stata implementata una gerarchia lessicale rigorosa allocata su una `Arena`:
 1. **Scope Globale/Modulo**: dove vivono classi, struct, funzioni libere.
-2. **Scope della Classe/Struct**: dove vivono i campi (proprietà) dell'oggetto.
+2. **Scope della Classe/Struct**: dove vivono i campi (proprietà) e i metodi dell'oggetto.
 3. **Scope della Funzione (Locale)**: dove vivono i parametri e le variabili dichiarate localmente.
-Quando l'analizzatore incontra `myVar.doSomething()`, cercherà `myVar` partendo dallo scope più interno (le variabili locali), poi tra i campi della classe (se in un metodo), fino a trovare il suo tipo. Trovato il tipo (`StructA`), mapperà correttamente la dipendenza.
 
-## 2. Ereditarietà e Trait Methods
+Quando l'analizzatore incontra un'espressione come `myVar.doSomething()`, il Query Engine risolve `myVar` sfruttando il *Lexical Climbing*: parte dallo scope più interno (il blocco di codice corrente), risale alla funzione, poi alla classe, e infine al modulo. Trovato il tipo originario (`StructA`), mappa correttamente la dipendenza architetturale `Calls` verso `StructA.doSomething`.
+
+## 2. Ereditarietà e Trait Methods (IMPLEMENTATO)
 L'ereditarietà in Java (`extends`, `implements`) e in Rust (`impl Trait for Struct`) permette a un oggetto di chiamare metodi che non sono stati definiti direttamente all'interno della classe o struct, ma ereditati.
 
-### Problema Attuale
-Se `StructA` implementa `TraitA` (che definisce il metodo `trait_method()`), una chiamata a `struct_a_instance.trait_method()` potrebbe fallire la risoluzione se l'analizzatore cerca il metodo solo all'interno del blocco principale di `StructA`.
+### Soluzione Implementata: Risoluzione Polimorfica
+La risoluzione dei metodi ereditati è ora pienamente supportata dal Query Engine:
+1. Durante la scansione dello `ScopeTree`, se il metodo non si trova direttamente nel nodo (es. `StructA`)...
+2. ...l'algoritmo ispeziona ricorsivamente la lista dei `super_types` (la lista di astrazioni parenti generate dagli archi `IsA`).
+3. Risalendo l'albero di ereditarietà, giunge al `TraitA` (o alla SuperClasse), trova lì il `trait_method()` e risolve l'arco con successo, collegando il chiamante all'implementazione generica corretta.
 
-### Soluzione: Risoluzione Polimorfica
-Durante la risoluzione del grafo:
-1. Se il metodo non si trova direttamente nel nodo `StructA`...
-2. ...l'algoritmo ispeziona gli archi in uscita di tipo `Implements` o `Extends`.
-3. Arriva a `TraitA` (o `SuperClass`), trova lì il `trait_method()` e risolve l'arco con successo puntando al metodo del tratto/superclasse.
-
-## 3. Pattern `Deref` in Rust
+## 3. Pattern `Deref` in Rust (LAVORO FUTURO)
 In Rust esiste un tratto speciale chiamato `Deref`. Viene usato massicciamente per gli "smart pointer" (es. `Box<T>`, `Arc<T>`, o wrapper custom). Quando un tipo `MyWrapper` implementa `Deref<Target=StructC>`, tutte le chiamate a metodi non trovati su `MyWrapper` vengono instradate automaticamente da Rust verso `StructC`.
 
-### Implementazione
-Per simulare questo comportamento dell'AST di Rust, l'analizzatore dovrà:
+### Implementazione Futura
+Per simulare questo comportamento dell'AST di Rust, l'analizzatore dovrà in futuro:
 1. Riconoscere l'arco di ereditarietà speciale verso il target del `Deref` (spesso espresso con un alias o trait assocciato `Target`).
-2. Adottare la stessa logica polimorfica usata per l'ereditarietà normale, "scivolando" in modo trasparente sul target del Deref per risolvere il metodo chiamato.
+2. Adottare la stessa logica polimorfica usata per l'ereditarietà normale e attualmente operativa, "scivolando" in modo trasparente sul target del Deref per risolvere il metodo chiamato.
 
-Questi miglioramenti ridurranno a zero i falsi negativi derivati da chiamate "sepolte" in variabili complesse o classi ereditate.
+Questi miglioramenti riducono a zero i falsi negativi derivati da chiamate "sepolte" in variabili complesse o classi ereditate.

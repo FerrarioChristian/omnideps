@@ -373,6 +373,31 @@ fn evaluate_query(
     result
 }
 
+/// Helper function to resolve the "super" or "super()" keyword dynamically.
+/// It climbs the scope tree to find the nearest enclosing class/struct and returns its first base type.
+fn resolve_super_keyword(
+    ctx: &ExecutorContext,
+    scope_id: ScopeId,
+    resolve_type: bool,
+    visited: &mut std::collections::HashSet<String>,
+) -> Option<TypeRef> {
+    let mut curr = Some(scope_id);
+    while let Some(id) = curr {
+        let scope = &ctx.tree.arena[id];
+        if !scope.super_types.is_empty() {
+            let st = &scope.super_types[0];
+            return match st {
+                TypeRef::ResolutionQuery(q) => {
+                    evaluate_query(ctx, q, id, resolve_type, visited).or(Some(st.clone()))
+                }
+                _ => Some(st.clone()),
+            };
+        }
+        curr = scope.parent;
+    }
+    None
+}
+
 /// Helper function to evaluate `Query::Find`. Performs lexical climbing up the scope tree.
 fn evaluate_query_find(
     ctx: &ExecutorContext,
@@ -381,6 +406,10 @@ fn evaluate_query_find(
     resolve_type: bool,
     visited: &mut std::collections::HashSet<String>,
 ) -> Option<TypeRef> {
+    if name == "super()" || name == "super" {
+        return resolve_super_keyword(ctx, scope_id, resolve_type, visited);
+    }
+
     let mut curr = Some(scope_id);
     while let Some(id) = curr {
         if let Some(res) = find_symbol_in_scope_and_supers(ctx, id, name, resolve_type, visited) {
@@ -389,12 +418,27 @@ fn evaluate_query_find(
 
         for imp in &ctx.tree.arena[id].imports {
             if let Some(last) = imp.path.last() {
-                if last == name || last == "*" {
+                if last == name {
                     if let Some(resolved) = find_global(ctx, &imp.path) {
                         return Some(resolved);
                     } else {
                         // If not found in the tree, it might be an external library
                         return Some(TypeRef::External(imp.path.clone()));
+                    }
+                } else if last == "*" {
+                    let mut specific_path = imp.path.clone();
+                    specific_path.pop();
+                    specific_path.push(name.to_string());
+
+                    if let Some(resolved) = find_global(ctx, &specific_path) {
+                        return Some(resolved);
+                    }
+
+                    // Check if the base module exists. If not, we assume the symbol comes from it.
+                    let mut base_path = imp.path.clone();
+                    base_path.pop();
+                    if find_global(ctx, &base_path).is_none() {
+                        return Some(TypeRef::External(specific_path));
                     }
                 }
             }

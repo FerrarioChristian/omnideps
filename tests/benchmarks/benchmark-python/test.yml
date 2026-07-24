@@ -7,6 +7,7 @@ files:
 - src/lib_a.py
 - src/lib_b.py
 - src/transitive_main.py
+- src/test_constructors.py
 nodes:
 - name: main
   kind: module
@@ -74,6 +75,23 @@ nodes:
   kind: function
 - name: services.is_valid_user
   kind: function
+- name: test_constructors
+  kind: module
+- name: test_constructors.Animal
+  kind: class
+- name: test_constructors.Dog
+  kind: class
+- name: test_constructors.test_inference
+  kind: function
+- name: test_constructors.Animal.__init__
+  kind: method
+- name: test_constructors.Animal.speak
+  kind: method
+- name: test_constructors.Dog.__init__
+  kind: method
+- name: test_constructors.Dog.speak
+  kind: method
+
 edges:
 - testid: PY-IMP-1
   source: main
@@ -239,3 +257,15 @@ edges:
   source: transitive_main.do_transitive_specific
   sink: lib_a.TransitiveClass
   kind: instantiates
+- testid: PY-CONSTR-1
+  source: test_constructors.test_inference
+  sink: test_constructors.Dog.__init__
+  kind: calls
+- testid: PY-CONSTR-2
+  source: test_constructors.test_inference
+  sink: test_constructors.Dog.speak
+  kind: calls
+- testid: PY-CONSTR-3
+  source: test_constructors.Dog.__init__
+  sink: test_constructors.Animal.__init__
+  kind: calls

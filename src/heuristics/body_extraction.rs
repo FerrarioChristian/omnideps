@@ -27,8 +27,15 @@ pub fn extract_block(node: Node, source: &str) -> crate::model::Block {
     let mut sub_blocks = vec![];
 
     let mut cursor = node.walk();
-    for child in node.children(&mut cursor) {
-        let kind = child.kind();
+    for mut child in node.children(&mut cursor) {
+        let mut kind = child.kind();
+        
+        if kind == "expression_statement" {
+            if let Some(inner) = child.child(0) {
+                child = inner;
+                kind = child.kind();
+            }
+        }
 
         // 1. Variable Declarations
         if matches!(
@@ -43,6 +50,7 @@ pub fn extract_block(node: Node, source: &str) -> crate::model::Block {
                 | "lexical_declaration"
                 | "variable_declaration"
                 | "let_declaration"
+                | "assignment" // <--- Added for Python and Ruby
         ) {
             let name_opt;
             if let Some(decl_node) = child.child_by_field_name("declarator") {
@@ -53,6 +61,8 @@ pub fn extract_block(node: Node, source: &str) -> crate::model::Block {
                 }
             } else if let Some(name_node) = child.child_by_field_name("name") {
                 name_opt = extract_identifier(name_node, source);
+            } else if let Some(left_node) = child.child_by_field_name("left") {
+                name_opt = extract_identifier(left_node, source);
             } else {
                 name_opt = extract_identifier(child, source);
             }
@@ -192,8 +202,8 @@ fn find_behavioral_deps(
 /// assignment stems from an explicit instantiation (e.g. `new_expression`), it extracts the target 
 /// class and deduces the variable's type.
 pub fn infer_variable_type(node: Node, source: &str) -> TypeRef {
-    // 1. If it has a explicit "value" field (like Rust let_declaration)
-    if let Some(val) = node.child_by_field_name("value") {
+    // 1. If it has a explicit "value" or "right" field (like Rust let_declaration or Python assignment)
+    if let Some(val) = node.child_by_field_name("value").or_else(|| node.child_by_field_name("right")) {
         if matches!(val.kind(), "object_creation_expression" | "new_expression") {
             if let Some(t_node) = val.child_by_field_name("type") {
                 return extract_type_ref(t_node, source);
@@ -201,6 +211,13 @@ pub fn infer_variable_type(node: Node, source: &str) -> TypeRef {
         } else if val.kind() == "struct_expression" {
             if let Some(name_node) = val.child_by_field_name("name") {
                 return extract_type_ref(name_node, source);
+            }
+        } else if val.kind() == "call" {
+            // In languages like Python, object creation is just a call node (e.g. `Admin(...)`)
+            if let Some(f_node) = val.child_by_field_name("function") {
+                let extracted = extract_type_ref(f_node, source);
+                // println!("INFERRED CALL TYPE (value branch): {:?}", extracted);
+                return extracted;
             }
         }
         // It could just be an identifier (e.g. let x = Factory;)
@@ -221,6 +238,13 @@ pub fn infer_variable_type(node: Node, source: &str) -> TypeRef {
         } else if kind == "struct_expression" {
             if let Some(name_node) = child.child_by_field_name("name") {
                 return extract_type_ref(name_node, source);
+            }
+        } else if kind == "call" {
+            // In languages like Python, object creation is just a call node (e.g. `Admin(...)`)
+            if let Some(f_node) = child.child_by_field_name("function") {
+                let extracted = extract_type_ref(f_node, source);
+                println!("INFERRED CALL TYPE: {:?}", extracted);
+                return extracted;
             }
         }
     }
