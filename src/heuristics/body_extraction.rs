@@ -51,6 +51,7 @@ pub fn extract_block(node: Node, source: &str) -> crate::model::Block {
                 | "variable_declaration"
                 | "let_declaration"
                 | "assignment"
+                | "declaration"
         ) {
             let name_opt;
             if let Some(decl_node) = child.child_by_field_name("declarator") {
