@@ -81,6 +81,11 @@ fn tally_ref(tr: &TypeRef, resolved: &mut usize, failed: &mut usize) {
     match tr {
         TypeRef::Resolved(_) | TypeRef::External(_) => *resolved += 1,
         TypeRef::Failed(_) | TypeRef::Unresolved(_) => *failed += 1,
+        TypeRef::Union(variants) => {
+            for v in variants {
+                tally_ref(v, resolved, failed);
+            }
+        }
         _ => {}
     }
 }

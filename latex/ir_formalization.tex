@@ -42,6 +42,7 @@ grafo, definiamo $\tau$ come un tipo somma a cinque stati:
   &\mid \text{Unresolved}(\mathcal{QN}_{raw}) \\
   &\mid \text{Resolved}(\mathcal{QN}_{abs}) \\
   &\mid \text{External}(\mathcal{QN}_{ext}) \\
+  &\mid \text{Union}(\vec{\tau}) \\
   &\mid \text{Failed}
 \end{align*}
 Dove:
@@ -58,14 +59,21 @@ Dove:
     e \texttt{Call}. È il prodotto della Fase di Substituzione
     (Lexical Scoping).
   \item \textbf{Resolved}: Rappresenta un tipo definito dall'utente
-    per cui l'Esecutore di Query ha trovato una corrispondenza
-    univoca navigando l'IR. Contiene il nome qualificato
-    assoluto (es. \texttt{java::util::List}).
-  \item \textbf{External}: Rappresenta un tipo per cui la fase di Risoluzione ha
-    trovato una corrispondenza in una clausola di importazione esplicita
-    ma che non appartiene al codice analizzato.
-  \item \textbf{Failed}: Indica che la fase di risoluzione ha tentato
-    di associare l'identificatore ma non ha trovato corrispondenze.
+    (interno al progetto) la cui dichiarazione o definizione è stata
+    localizzata e associata con successo nello spazio dei nomi
+    assoluto del progetto. Il percorso $\mathcal{QN}_{abs}$ è
+    relativo alla radice dell'albero dei moduli.
+  \item \textbf{Union($\vec{\tau}$)}: Cattura una disgiunzione di tipi
+    (es. in Python \texttt{Union[A, B]} o in TypeScript \texttt{A | B}). 
+    Mantiene un vettore di riferimenti che dovranno essere singolarmente processati.
+  \item \textbf{External}: Rappresenta un tipo riconosciuto e
+    localizzato spazialmente, ma appartenente ad un modulo o
+    ecosistema al di fuori del codice sorgente fornito in input (es.
+    librerie standard, \texttt{java.util.*}, crates esterne).
+  \item \textbf{Failed}: Indica che la fase di risoluzione statica ha
+    fallito. Questo stato è cruciale per permettere calcoli
+    statistici sul \textit{Recall} (copertura e confidenza
+    dell'analizzatore).
 \end{itemize}
 Questa rigorosa separazione permette al type system di imporre che la
 generazione del grafo avvenga esclusivamente a partire da riferimenti

@@ -57,7 +57,19 @@ nodes:
   kind: method
 - name: Fleet.startAll
   kind: method
+- name: Transport.EngineSpec
+  kind: class
+- name: Transport.EngineSpec.horsepower
+  kind: field
+- name: Transport.EngineSpec.kw_power
+  kind: field
+- name: Transport.Vehicle.spec
+  kind: field
 edges:
+- testid: UNION-DECL
+  source: Transport.Vehicle.spec
+  sink: Transport.EngineSpec
+  kind: uses_type
 - testid: CPP-INH-1
   source: Transport.Car
   sink: Transport.Vehicle

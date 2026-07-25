@@ -1239,7 +1239,7 @@ struct User { name: String }</code></pre>
     <!-- ============================================================ -->
     <!-- SEZIONE 6 -->
     <!-- ============================================================ -->
-    <h2 id="extensions">6. Estensioni Architetturali (Aliases e Casts)</h2>
+    <h2 id="extensions">6. Estensioni Architetturali (Aliases, Casts, e Unions)</h2>
     <p>L'architettura del resolver è progettata per gestire in modo trasparente pattern complessi tipici della programmazione moderna:</p>
 
     <h3>6.1 Type Aliases</h3>
@@ -1251,6 +1251,13 @@ struct User { name: String }</code></pre>
 
     <h3>6.2 Type Casts</h3>
     <p>I <strong>Type Casts</strong> (es. <code>(int) x</code> oppure <code>x as i32</code>) vengono intercettati a livello di <code>Block</code> dall'estrattore euristico e memorizzati in un vettore <code>type_casts</code>. La fase 2b li attraversa e risolve ogni cast generato come farebbe con un parametro o un valore di ritorno locale. Nel grafo finale, ogni cast si traduce in una dipendenza semantica di tipo <code>CastsTo</code>.</p>
+
+    <h3>6.3 Union Types</h3>
+    <p>I <strong>Tipi Unione</strong> (es. <code>Union[str, int]</code> o <code>str | int</code>) sono catturati dalla rappresentazione <code>TypeRef::Union(Vec&lt;TypeRef&gt;)</code>. Poiché un'entità può assumere tipi multipli contemporaneamente:</p>
+    <ul>
+        <li>Il resolver esplora e risolve indipendentemente ogni <code>TypeRef</code> interno al costrutto Union.</li>
+        <li>Durante la generazione del grafo architetturale, le dipendenze per nodi e riferimenti associati a costrutti Union (ad esempio un metodo invocato su una variabile dal tipo Unione) vengono moltiplicate o distinte per mappare ogni possibile target senza perdere precisione.</li>
+    </ul>
 
 </body>
 </html>

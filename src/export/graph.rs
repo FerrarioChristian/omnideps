@@ -57,7 +57,7 @@ fn traverse_module_for_edges(
     for ta in &m.type_aliases {
         let mut ta_name = m_name.clone();
         ta_name.extend(ta.name.clone());
-        if let Some(to) = type_ref_target(&ta.target) {
+        for to in type_ref_targets(&ta.target) {
             edges.push(Dependency {
                 from: ta_name.clone(),
                 to,
@@ -96,9 +96,9 @@ fn traverse_module_for_edges(
             to: fv_name.clone(),
             kind: DependencyEdgeKind::ModuleContainment,
         });
-        if let Some(to) = type_ref_target(&fv.ty) {
+        for to in type_ref_targets(&fv.ty) {
             edges.push(Dependency {
-                from: fv_name,
+                from: fv_name.clone(),
                 to: to.clone(),
                 kind: DependencyEdgeKind::UsesFieldType,
             });
@@ -106,7 +106,7 @@ fn traverse_module_for_edges(
     }
 
     for ib in &m.impl_blocks {
-        if let Some(to) = type_ref_target(&ib.impl_for) {
+        for to in type_ref_targets(&ib.impl_for) {
             for mut meth in ib.methods.clone() {
                 let mut m_name = to.clone();
                 m_name.extend(meth.name.clone());
@@ -176,17 +176,18 @@ fn traverse_structured_type_edges(st: &StructuredType, prefix: &QualifiedName, e
     }
 }
 
-fn type_ref_target(tr: &TypeRef) -> Option<QualifiedName> {
+fn type_ref_targets(tr: &TypeRef) -> Vec<QualifiedName> {
     match tr {
-        TypeRef::Resolved(to) | TypeRef::External(to) => Some(to.clone()),
-        TypeRef::Primitive(s) => Some(vec![s.clone()]),
-        _ => None,
+        TypeRef::Resolved(to) | TypeRef::External(to) => vec![to.clone()],
+        TypeRef::Primitive(s) => vec![vec![s.clone()]],
+        TypeRef::Union(types) => types.iter().flat_map(type_ref_targets).collect(),
+        _ => vec![],
     }
 }
 
 fn add_super_edges(st: &StructuredType, st_name: &QualifiedName, edges: &mut Vec<Dependency>) {
     for sup in &st.super_types {
-        if let Some(to) = type_ref_target(sup) {
+        for to in type_ref_targets(sup) {
             edges.push(Dependency {
                 from: st_name.clone(),
                 to: to.clone(),
@@ -198,7 +199,7 @@ fn add_super_edges(st: &StructuredType, st_name: &QualifiedName, edges: &mut Vec
 
 fn add_field_edges(st: &StructuredType, st_name: &QualifiedName, edges: &mut Vec<Dependency>) {
     for f in &st.fields {
-        if let Some(to) = type_ref_target(&f.ty) {
+        for to in type_ref_targets(&f.ty) {
             let mut f_name = st_name.clone();
             f_name.push(f.name.clone());
             edges.push(Dependency {
@@ -212,7 +213,7 @@ fn add_field_edges(st: &StructuredType, st_name: &QualifiedName, edges: &mut Vec
 
 fn add_function_edges(ff: &Function, ff_name: &QualifiedName, edges: &mut Vec<Dependency>) {
     for p in &ff.signature.parameters {
-        if let Some(to) = type_ref_target(&p.ty) {
+        for to in type_ref_targets(&p.ty) {
             edges.push(Dependency {
                 from: ff_name.clone(),
                 to: to.clone(),
@@ -220,7 +221,7 @@ fn add_function_edges(ff: &Function, ff_name: &QualifiedName, edges: &mut Vec<De
             });
         }
     }
-    if let Some(to) = type_ref_target(&ff.signature.return_type) {
+    for to in type_ref_targets(&ff.signature.return_type) {
         edges.push(Dependency {
             from: ff_name.clone(),
             to: to.clone(),
@@ -236,7 +237,7 @@ fn add_function_edges(ff: &Function, ff_name: &QualifiedName, edges: &mut Vec<De
 fn add_block_edges(ff: &Function, ff_name: &QualifiedName, block: &Block, edges: &mut Vec<Dependency>) {
     // 1. Declarations (Local variables)
     for decl in &block.declarations {
-        if let Some(to) = type_ref_target(&decl.ty) {
+        for to in type_ref_targets(&decl.ty) {
             edges.push(Dependency {
                 from: ff_name.clone(),
                 to: to.clone(),
@@ -247,7 +248,7 @@ fn add_block_edges(ff: &Function, ff_name: &QualifiedName, block: &Block, edges:
 
     // 2. Behavioral dependencies
     for call in &block.calls {
-        if let Some(to) = type_ref_target(call) {
+        for to in type_ref_targets(call) {
             edges.push(Dependency {
                 from: ff_name.clone(),
                 to: to.clone(),
@@ -256,7 +257,7 @@ fn add_block_edges(ff: &Function, ff_name: &QualifiedName, block: &Block, edges:
         }
     }
     for inst in &block.instantiates {
-        if let Some(to) = type_ref_target(inst) {
+        for to in type_ref_targets(inst) {
             edges.push(Dependency {
                 from: ff_name.clone(),
                 to: to.clone(),
@@ -265,7 +266,7 @@ fn add_block_edges(ff: &Function, ff_name: &QualifiedName, block: &Block, edges:
         }
     }
     for acc in &block.accesses {
-        if let Some(to) = type_ref_target(acc) {
+        for to in type_ref_targets(acc) {
             edges.push(Dependency {
                 from: ff_name.clone(),
                 to: to.clone(),
@@ -274,7 +275,7 @@ fn add_block_edges(ff: &Function, ff_name: &QualifiedName, block: &Block, edges:
         }
     }
     for cast in &block.type_casts {
-        if let Some(to) = type_ref_target(cast) {
+        for to in type_ref_targets(cast) {
             edges.push(Dependency {
                 from: ff_name.clone(),
                 to: to.clone(),
@@ -327,7 +328,7 @@ fn flatten_modules(modules: &[Module], prefix: QualifiedName) -> Vec<Component> 
         }
         
         for ib in &m.impl_blocks {
-            if let Some(to) = type_ref_target(&ib.impl_for) {
+            for to in type_ref_targets(&ib.impl_for) {
                 for mut m in ib.methods.clone() {
                     let mut m_name = to.clone();
                     m_name.extend(m.name.clone());

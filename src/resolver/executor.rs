@@ -253,13 +253,15 @@ pub fn evaluate_typeref(
     resolve_type: bool,
 ) -> TypeRef {
     match tr {
-        TypeRef::ResolutionQuery(query) => {
+                        TypeRef::ResolutionQuery(query) => {
             let mut visited = std::collections::HashSet::new();
             if let Some(resolved) =
                 evaluate_query(ctx, &query, scope_id, resolve_type, &mut visited)
             {
+                println!("RESOLUTION QUERY {:?} EVALUATED TO: {:?}", query, resolved);
                 resolved
             } else {
+                println!("RESOLUTION QUERY {:?} FAILED", query);
                 TypeRef::Failed(vec![extract_base_name(&query)])
             }
         }
@@ -272,14 +274,23 @@ pub fn evaluate_typeref(
                 query = Query::Extract(Box::new(query), part.clone());
             }
 
-            let mut visited = std::collections::HashSet::new();
+                        let mut visited = std::collections::HashSet::new();
             if let Some(resolved) =
                 evaluate_query(ctx, &query, scope_id, resolve_type, &mut visited)
             {
+                if qn[0] == "StructA" { println!("EVALUATED Unresolved StructA to: {:?}", resolved); }
                 resolved
             } else {
+                if qn[0] == "StructA" { println!("EVALUATED Unresolved StructA to NONE"); }
                 TypeRef::Unresolved(qn.clone())
             }
+        }
+        TypeRef::Union(variants) => {
+            let evaluated = variants.into_iter()
+                .map(|v| evaluate_typeref(ctx, v, scope_id, resolve_type))
+                .collect::<Vec<_>>();
+            println!("UNION EVALUATED TO: {:?}", evaluated);
+            TypeRef::Union(evaluated)
         }
         _ => tr,
     }
@@ -503,6 +514,7 @@ fn symbol_to_typeref(
                 match ty {
                     TypeRef::ResolutionQuery(q) => evaluate_query(ctx, q, scope_id, true, visited)
                         .unwrap_or_else(|| ty.clone()),
+                    TypeRef::Unresolved(_) => evaluate_typeref(ctx, ty.clone(), scope_id, true),
                     _ => ty.clone(),
                 }
             } else {
@@ -545,7 +557,7 @@ pub fn find_global(ctx: &ExecutorContext, path: &[String]) -> Option<TypeRef> {
     }
 
     for (i, part) in path.iter().enumerate() {
-        if part == "root" && i == 0 {
+        if (part == "root" || part == "crate") && i == 0 {
             continue;
         }
         if let Some(sym) = ctx.tree.arena[curr].symbols.get(part) {

@@ -41,7 +41,19 @@ nodes:
   kind: field
 - name: get_width
   kind: function
+- name: ShapeData
+  kind: struct
+- name: ShapeData.size
+  kind: field
+- name: ShapeData.area
+  kind: field
+- name: Rectangle.data
+  kind: field
 edges:
+- testid: UNION-DECL
+  source: Rectangle.data
+  sink: ShapeData
+  kind: uses_type
 - testid: C-CALL-1
   source: multiply
   sink: add

@@ -80,10 +80,24 @@ nodes:
   kind: method
 - name: functions.function_with_trait_methods
   kind: method
+- name: functions.function_with_alias
+  kind: method
+- name: functions.MyAlias
+  kind: class
 - name: functions.function_with_inherited_trait_methods
   kind: method
 - name: functions.STATIC_SA
   kind: field
+- name: unions
+  kind: module
+- name: unions.MyUnion
+  kind: class
+- name: unions.MyUnion.f1
+  kind: field
+- name: unions.MyUnion.f2
+  kind: field
+- name: unions.handle_union
+  kind: function
 edges:
 - testid: IMPO-1
   source: enums
@@ -359,5 +373,13 @@ edges:
   kind: aliases
 - testid: DECL-99
   source: functions.function_with_alias
-  sink: functions.MyAlias
+  sink: structs.StructA
   kind: uses_type
+- testid: UNION-DECL
+  source: unions.handle_union
+  sink: unions.MyUnion
+  kind: uses_type
+- testid: UNION-ACC
+  source: unions.handle_union
+  sink: unions.MyUnion.f1
+  kind: accesses_field

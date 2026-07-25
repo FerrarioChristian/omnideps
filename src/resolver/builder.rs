@@ -166,6 +166,13 @@ fn substitute_type(ctx: &BuilderContext, tr: TypeRef, is_call: bool) -> TypeRef 
 
             TypeRef::ResolutionQuery(base_query)
         }
+        TypeRef::Union(variants) => {
+            TypeRef::Union(
+                variants.into_iter()
+                    .map(|v| substitute_type(ctx, v, is_call))
+                    .collect()
+            )
+        }
         _ => tr,
     }
 }

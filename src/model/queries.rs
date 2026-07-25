@@ -28,4 +28,6 @@ pub enum TypeRef {
     External(QualifiedName),
     /// Exhausted all resolution mechanisms without success.
     Failed(QualifiedName),
+    /// A composite type representing a union of multiple possible types.
+    Union(Vec<TypeRef>),
 }

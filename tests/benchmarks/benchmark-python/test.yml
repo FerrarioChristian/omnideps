@@ -273,3 +273,19 @@ edges:
   source: utils.MyAlias
   sink: str
   kind: aliases
+- testid: UNION-1
+  source: unions_test.handle_animal
+  sink: unions_test.Dog
+  kind: UsesParamType
+- testid: UNION-2
+  source: unions_test.handle_animal
+  sink: unions_test.Cat
+  kind: UsesParamType
+- testid: UNION-3
+  source: unions_test.process_legacy
+  sink: unions_test.Dog
+  kind: UsesParamType
+- testid: UNION-4
+  source: unions_test.process_legacy
+  sink: unions_test.Cat
+  kind: UsesParamType

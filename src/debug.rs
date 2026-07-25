@@ -89,6 +89,7 @@ fn print_ref(kind: &str, context: &str, tr: &TypeRef) {
         TypeRef::Resolved(q) => ("✅ RESOLVED", q.join("::")),
         TypeRef::External(q) => ("🌐 EXTERNAL", q.join("::")),
         TypeRef::Failed(q) => ("❌ FAILED", q.join("::")),
+        TypeRef::Union(types) => ("🔀 UNION", format!("{} variants", types.len())),
     };
     println!("[{:^12}] {:<30} | {} ({})", state, kind, text, context);
 }

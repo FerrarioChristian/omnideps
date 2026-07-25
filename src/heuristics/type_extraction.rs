@@ -45,6 +45,19 @@ pub fn determine_structured_kind(kind: &str, text: &str) -> StructuredTypeKind {
 /// * `source` - The complete source code string.
 pub fn extract_type_ref(node: Node, source: &str) -> TypeRef {
     let kind = node.kind();
+    
+    // 0.2. Unwrap Python wrapper `type` nodes
+    if kind == "type" && node.child_count() == 1 {
+        if let Some(child) = node.child(0) {
+            return extract_type_ref(child, source);
+        }
+    }
+
+    // 0.5. Try union types
+    if let Some(union_ref) = try_extract_union(node, source) {
+        return union_ref;
+    }
+
     // 0. Handle direct access and identifiers
     if matches!(
         kind,
@@ -111,4 +124,63 @@ fn try_extract_from_type_field(node: Node, source: &str) -> Option<TypeRef> {
     } else {
         None
     }
+}
+
+/// Tries to extract a Union type from typical constructs like `union_type`, `binary_operator` (|), or `Union[...]`
+fn try_extract_union(node: Node, source: &str) -> Option<TypeRef> {
+    let kind = node.kind();
+    if kind == "union_type" {
+        let mut types = vec![];
+        let mut cursor = node.walk();
+        for child in node.children(&mut cursor) {
+            if child.kind() != "|" {
+                let ty = extract_type_ref(child, source);
+                if !matches!(ty, TypeRef::Failed(_)) {
+                    types.push(ty);
+                }
+            }
+        }
+        if !types.is_empty() {
+            return Some(TypeRef::Union(types));
+        }
+    }
+
+    if kind == "binary_operator" {
+        if node_text(node, source).contains('|') {
+            let mut types = vec![];
+            if let Some(left) = node.child_by_field_name("left") {
+                types.push(extract_type_ref(left, source));
+            }
+            if let Some(right) = node.child_by_field_name("right") {
+                types.push(extract_type_ref(right, source));
+            }
+            if !types.is_empty() {
+                return Some(TypeRef::Union(types));
+            }
+        }
+    }
+
+    if kind == "generic_type" {
+        if let Some(name_node) = node.child(0) {
+            if node_text(name_node, source).trim() == "Union" {
+                if let Some(params) = node.child(1) {
+                    let mut types = vec![];
+                    let mut cursor = params.walk();
+                    for child in params.children(&mut cursor) {
+                        let ckind = child.kind();
+                        if ckind != "[" && ckind != "]" && ckind != "," {
+                            let ty = extract_type_ref(child, source);
+                            if !matches!(ty, TypeRef::Failed(_)) {
+                                types.push(ty);
+                            }
+                        }
+                    }
+                    if !types.is_empty() {
+                        return Some(TypeRef::Union(types));
+                    }
+                }
+            }
+        }
+    }
+    None
 }
