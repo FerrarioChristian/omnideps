@@ -53,41 +53,67 @@ pub fn extract_fields(
 ) -> Vec<Field> {
     let lang_config = config.get_for(lang_name);
     let enter_functions = lang_config.extract_dynamic_fields;
-    let self_kw = &lang_config.self_keyword;
+    let initial_self_kw = lang_config.self_keyword.clone();
+    let implicit_first_param = lang_config.implicit_first_param_as_self;
 
-    let mut fields = extract_list_of(node, source, enter_functions, |child, src| {
-        if matches!(
-            child.kind(),
-            "field_declaration"
-                | "property_declaration"
-                | "field"
-                | "member_declaration"
-                | "variable_declarator"
-        )
-            && let Some(name) = extract_identifier(child, src) {
-                let ty = extract_type_ref(child, src);
-                let annotations = super::annotation_extraction::extract_annotations(child, src);
-                return Some(Field { name, ty, annotations });
+    fn traverse_for_fields(
+        n: Node,
+        src: &str,
+        enter_functions: bool,
+        active_self_kw: Option<String>,
+        implicit_first_param: bool,
+    ) -> Vec<Field> {
+        let mut fields = Vec::new();
+        let mut cursor = n.walk();
+        for child in n.children(&mut cursor) {
+            let mut child_active_self_kw = active_self_kw.clone();
+            let is_func = crate::heuristics::classifiers::is_function(child);
+
+            if is_func && implicit_first_param {
+                if let Some(func) = super::parsers::try_parse_function(child, src) {
+                    if let Some(first_param) = func.signature.parameters.first() {
+                        child_active_self_kw = first_param.name.clone();
+                    }
+                }
             }
 
-        // Dynamic fields inside methods (e.g. self.username = username)
-        if enter_functions && child.kind() == "assignment"
-            && let Some(left) = child.child_by_field_name("left")
-                && matches!(left.kind(), "attribute" | "field_expression")
-                    && let Some(obj) = left.child_by_field_name("object")
-                        && Some(super::text_parsing::node_text(obj, src)) == *self_kw
-                            && let Some(attr) = left.child_by_field_name("attribute").or_else(|| left.child_by_field_name("field"))
-                                && let Some(name) = extract_identifier(attr, src) {
-                                    let ty = if let Some(right) = child.child_by_field_name("right") {
-                                        crate::heuristics::body_extraction::infer_variable_type(right, src)
-                                    } else {
-                                        crate::model::TypeRef::Failed(vec![])
-                                    };
-                                    return Some(Field { name, ty, annotations: vec![] });
-                                }
+            if matches!(
+                child.kind(),
+                "field_declaration"
+                    | "property_declaration"
+                    | "field"
+                    | "member_declaration"
+                    | "variable_declarator"
+            ) && let Some(name) = super::text_parsing::extract_identifier(child, src) {
+                let ty = super::type_extraction::extract_type_ref(child, src);
+                let annotations = super::annotation_extraction::extract_annotations(child, src);
+                fields.push(Field { name, ty, annotations });
+            }
 
-        None
-    });
+            // Dynamic fields inside methods (e.g. self.username = username)
+            if enter_functions && child.kind() == "assignment"
+                && let Some(left) = child.child_by_field_name("left")
+                && matches!(left.kind(), "attribute" | "field_expression")
+                && let Some(obj) = left.child_by_field_name("object")
+                && Some(super::text_parsing::node_text(obj, src)) == child_active_self_kw
+                && let Some(attr) = left.child_by_field_name("attribute").or_else(|| left.child_by_field_name("field"))
+                && let Some(name) = super::text_parsing::extract_identifier(attr, src) {
+                    let ty = if let Some(right) = child.child_by_field_name("right") {
+                        crate::heuristics::body_extraction::infer_variable_type(right, src)
+                    } else {
+                        crate::model::TypeRef::Failed(vec![])
+                    };
+                    fields.push(Field { name, ty, annotations: vec![] });
+                }
+
+            if child.child_count() > 0 && (enter_functions || !is_func) {
+                fields.extend(traverse_for_fields(child, src, enter_functions, child_active_self_kw, implicit_first_param));
+            }
+        }
+        fields
+    }
+
+    let mut fields = traverse_for_fields(node, source, enter_functions, initial_self_kw, implicit_first_param);
 
     // Handle Rust's Tuple Structs / Enum Tuple Variants
     fn extract_tuple_fields(n: Node, src: &str, fds: &mut Vec<Field>) {
@@ -168,10 +194,11 @@ pub fn extract_parameters(node: Node, source: &str) -> Vec<Parameter> {
     if let Some(params_node) = node.child_by_field_name("parameters") {
         let mut cursor = params_node.walk();
         for p in params_node.children(&mut cursor) {
-            if p.kind().contains("parameter") {
-                let name = extract_identifier(p, source);
-                let ty = extract_type_ref(p, source);
-                let text = node_text(p, source);
+            let p_kind = p.kind();
+            if p_kind.contains("parameter") || p_kind == "identifier" {
+                let name = super::text_parsing::extract_identifier(p, source);
+                let ty = super::type_extraction::extract_type_ref(p, source);
+                let text = super::text_parsing::node_text(p, source);
                 let is_variadic = text.contains("...") || text.contains("*args");
                 params.push(Parameter {
                     name,

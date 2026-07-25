@@ -184,7 +184,7 @@ fn find_behavioral_deps(
     }
 
     // --- Accesses ---
-    if matches!(kind, "field_access" | "member_expression" | "property_identifier" | "member_access" | "identifier" | "field_expression") {
+    if matches!(kind, "field_access" | "member_expression" | "property_identifier" | "member_access" | "identifier" | "field_expression" | "attribute") {
         accesses.push(extract_type_ref(node, source));
     }
     
