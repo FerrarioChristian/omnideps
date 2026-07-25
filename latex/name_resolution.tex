@@ -230,3 +230,10 @@ coincide con una parola chiave del linguaggio (es. \texttt{int},
 \texttt{Prim}, evitando di contrassegnarlo come dipendenza
 \texttt{Failed} o \texttt{External} e garantendo la pulizia semantica
 del grafo architetturale finale.
+
+\subsection{Estensioni: Tipi Unione e Metadati}
+L'architettura del resolver supporta nativamente pattern linguistici complessi come Tipi Unione, Annotazioni e Decoratori:
+\begin{itemize}
+    \item \textbf{Tipi Unione}: costrutti come \texttt{Union[A, B]} sono analizzati esplorando ricorsivamente ogni riferimento interno al dominio $\vec{\tau}$ dell'unione. Il resolver genera query algebriche separate, e il generatore di grafo (Fase 3) emette archi indipendenti per ogni target possibile, preservando la natura probabilistica del tipo senza perdite di informazione.
+    \item \textbf{Annotazioni e Decoratori}: trattati come metadati applicati a classi, campi e funzioni, vengono estratti dal modulo euristico (superando barriere sintattiche come i tag \texttt{\#[]} in Rust o le direttive \texttt{[[ ]]} in C++). Il resolver ne valuta lo stato \texttt{TypeRef} impiegando lo scope contestuale del nodo annotato. Le annotazioni, anche se irrisolte, vengono aggregate in output producendo archi specializzati (\texttt{AnnotatedWith}), permettendo un'analisi profonda delle iniezioni di dipendenza e della programmazione orientata agli aspetti.
+\end{itemize}

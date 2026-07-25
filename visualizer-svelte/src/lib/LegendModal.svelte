@@ -242,6 +242,9 @@
     .edge-aliases .edge-line { height: 2px; border-top: 2px dotted #ff00ff; background: transparent; }
     .edge-aliases .edge-arrow { border-left: 8px solid #ff00ff; }
     
+    .edge-annotated .edge-line { height: 2px; border-top: 2px dotted #ff00ff; background: transparent; }
+    .edge-annotated .edge-arrow { border-left: 8px solid #ff00ff; }
+    
     .interaction-box {
         background: rgba(20, 20, 20, 0.5);
         border: 1px solid #444;
@@ -434,6 +437,16 @@
                     <div class="description">
                         <h3>Aliases (Alias di Tipo)</h3>
                         <p>Linea magenta puntigliata. Generata da un TypeAlias verso il suo tipo bersaglio originale.</p>
+                    </div>
+                </div>
+                <div class="legend-card">
+                    <div class="visual-element edge-container edge-annotated">
+                        <div class="edge-line"></div>
+                        <div class="edge-arrow"></div>
+                    </div>
+                    <div class="description">
+                        <h3>AnnotatedWith (Annotazioni/Decoratori)</h3>
+                        <p>Linea magenta puntigliata, usata per indicare che un'entità è stata decorata o annotata con il componente bersaglio (es. <code>@Autowired</code> o <code>#[derive]</code>).</p>
                     </div>
                 </div>
                 <div class="legend-card">

@@ -9,15 +9,34 @@ pub fn build_dependency_graph(modules: &[Module], primitives: &crate::resolver::
         traverse_module_for_edges(m, None, vec![], &mut edges);
     }
     
-    // Create primitive nodes only on demand (if they are actually targeted by an edge)
     let mut used_primitives = std::collections::HashSet::new();
+    let mut used_unresolved = std::collections::HashSet::new();
+    
+    let mut existing_node_names = std::collections::HashSet::new();
+    for n in &nodes {
+        match n {
+            Component::Module(m) => { existing_node_names.insert(m.name.clone()); },
+            Component::StructuredType(s) => { existing_node_names.insert(s.name.clone()); },
+            Component::TypeAlias(t) => { existing_node_names.insert(t.name.clone()); },
+            Component::Function(f) => { existing_node_names.insert(f.name.clone()); },
+            Component::Field(name, _) => { existing_node_names.insert(name.clone()); },
+            Component::Primitive(_) | Component::External(_) => {},
+        }
+    }
+
     for edge in &edges {
         if edge.to.len() == 1 && primitives.is_primitive(&edge.to[0]) {
             used_primitives.insert(edge.to[0].clone());
+        } else if !existing_node_names.contains(&edge.to) {
+            used_unresolved.insert(edge.to.clone());
         }
     }
+    
     for prim in used_primitives {
         nodes.push(Component::Primitive(prim));
+    }
+    for unres in used_unresolved {
+        nodes.push(Component::External(unres));
     }
     
     // Deduplicate edges to prevent inflated coupling metrics
@@ -86,6 +105,7 @@ fn traverse_module_for_edges(
             kind: DependencyEdgeKind::ModuleContainment,
         });
         add_function_edges(ff, &ff_name, edges);
+        add_annotation_edges(&ff.annotations, &ff_name, edges);
     }
 
     for fv in &m.free_variables {
@@ -103,6 +123,7 @@ fn traverse_module_for_edges(
                 kind: DependencyEdgeKind::UsesFieldType,
             });
         }
+        add_annotation_edges(&fv.annotations, &fv_name, edges);
     }
 
     for ib in &m.impl_blocks {
@@ -117,6 +138,7 @@ fn traverse_module_for_edges(
                     kind: DependencyEdgeKind::NestedIn,
                 });
                 add_function_edges(&meth, &m_name, edges);
+                add_annotation_edges(&meth.annotations, &m_name, edges);
             }
             for nested in &ib.nested_types {
                 let mut nested_name = to.clone();
@@ -142,6 +164,7 @@ fn traverse_structured_type_edges(st: &StructuredType, prefix: &QualifiedName, e
 
     add_super_edges(st, &st_name, edges);
     add_field_edges(st, &st_name, edges);
+    add_annotation_edges(&st.annotations, &st_name, edges);
 
     for f in &st.fields {
         let mut f_name = st_name.clone();
@@ -162,6 +185,7 @@ fn traverse_structured_type_edges(st: &StructuredType, prefix: &QualifiedName, e
             kind: DependencyEdgeKind::NestedIn,
         });
         add_function_edges(m, &m_name, edges);
+        add_annotation_edges(&m.annotations, &m_name, edges);
     }
 
     for nested in &st.nested_types {
@@ -178,7 +202,7 @@ fn traverse_structured_type_edges(st: &StructuredType, prefix: &QualifiedName, e
 
 fn type_ref_targets(tr: &TypeRef) -> Vec<QualifiedName> {
     match tr {
-        TypeRef::Resolved(to) | TypeRef::External(to) => vec![to.clone()],
+        TypeRef::Resolved(to) | TypeRef::External(to) | TypeRef::Unresolved(to) | TypeRef::Failed(to) => vec![to.clone()],
         TypeRef::Primitive(s) => vec![vec![s.clone()]],
         TypeRef::Union(types) => types.iter().flat_map(type_ref_targets).collect(),
         _ => vec![],
@@ -199,15 +223,16 @@ fn add_super_edges(st: &StructuredType, st_name: &QualifiedName, edges: &mut Vec
 
 fn add_field_edges(st: &StructuredType, st_name: &QualifiedName, edges: &mut Vec<Dependency>) {
     for f in &st.fields {
+        let mut f_name = st_name.clone();
+        f_name.push(f.name.clone());
         for to in type_ref_targets(&f.ty) {
-            let mut f_name = st_name.clone();
-            f_name.push(f.name.clone());
             edges.push(Dependency {
-                from: f_name,
+                from: f_name.clone(),
                 to: to.clone(),
                 kind: DependencyEdgeKind::UsesFieldType,
             });
         }
+        add_annotation_edges(&f.annotations, &f_name, edges);
     }
 }
 
@@ -287,6 +312,18 @@ fn add_block_edges(ff: &Function, ff_name: &QualifiedName, block: &Block, edges:
     // 3. Recurse into sub-blocks
     for sub in &block.sub_blocks {
         add_block_edges(ff, ff_name, sub, edges);
+    }
+}
+
+fn add_annotation_edges(annotations: &[TypeRef], source_name: &QualifiedName, edges: &mut Vec<Dependency>) {
+    for anno in annotations {
+        for to in type_ref_targets(anno) {
+            edges.push(Dependency {
+                from: source_name.clone(),
+                to: to.clone(),
+                kind: DependencyEdgeKind::AnnotatedWith,
+            });
+        }
     }
 }
 

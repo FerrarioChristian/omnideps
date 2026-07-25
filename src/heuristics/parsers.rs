@@ -76,6 +76,9 @@ pub fn try_parse_structured_type(
     let super_types = extract_super_types(node, source);
     let nested_types = extract_nested_types(node, source, lang_name, config);
 
+    let annotations = super::annotation_extraction::extract_annotations(node, source);
+    println!("Type {:?} annotations: {:?}", name, annotations);
+
     Some(StructuredType {
         name,
         kind: determine_structured_kind(kind_text, &text),
@@ -83,6 +86,7 @@ pub fn try_parse_structured_type(
         methods,
         super_types,
         nested_types,
+        annotations,
     })
 }
 
@@ -116,6 +120,8 @@ pub fn try_parse_function(node: Node, source: &str) -> Option<Function> {
         found_body
     };
 
+    let annotations = super::annotation_extraction::extract_annotations(node, source);
+
     Some(Function {
         name: vec![name],
         signature: crate::model::Signature {
@@ -124,6 +130,7 @@ pub fn try_parse_function(node: Node, source: &str) -> Option<Function> {
         },
         body,
         is_constructor,
+        annotations,
     })
 }
 
@@ -181,8 +188,8 @@ pub fn try_parse_imports(node: Node, source: &str) -> Option<Vec<Import>> {
         let mut cursor = node.walk();
         for child in node.children(&mut cursor) {
             let kind = child.kind();
-            if matches!(kind, "aliased_import" | "dotted_name" | "name" | "identifier") {
-                if child.id() != p_node.id() {
+            if matches!(kind, "aliased_import" | "dotted_name" | "name" | "identifier")
+                && child.id() != p_node.id() {
                     let txt = node_text(child, source);
                     let mut full_path = base_path.clone();
                     full_path.extend(split_qualified_name(&txt));
@@ -192,7 +199,6 @@ pub fn try_parse_imports(node: Node, source: &str) -> Option<Vec<Import>> {
                         is_wildcard,
                     });
                 }
-            }
         }
         if imports.is_empty() {
             imports.push(Import { path: base_path, alias, is_wildcard });
@@ -256,7 +262,8 @@ pub fn try_parse_free_variable(node: Node, source: &str) -> Option<crate::model:
 
     if let Some(name) = extract_identifier(node, source) {
         let ty = extract_type_ref(node, source);
-        return Some(crate::model::Field { name, ty });
+        let annotations = super::annotation_extraction::extract_annotations(node, source);
+        return Some(crate::model::Field { name, ty, annotations });
     }
 
     None

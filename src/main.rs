@@ -103,15 +103,13 @@ fn analyze_directory(
     for entry in WalkDir::new(dir).into_iter().filter_map(|e| e.ok()) {
         if entry.file_type().is_file()
             && let Some(lang) = SupportedLanguage::from_path(entry.path())
-        {
-            if let Ok(source) = fs::read_to_string(entry.path()) {
+            && let Ok(source) = fs::read_to_string(entry.path()) {
                 let rel_path = entry.path().strip_prefix(dir).unwrap_or(entry.path());
                 if let Ok((mut file_modules, file_primitives)) = parse_source(lang, &source, rel_path, config) {
                     all_modules.append(&mut file_modules);
                     combined_primitives.merge(file_primitives);
                 }
             }
-        }
     }
 
     // Phase 2-4: Unified Resolution and Graph Building

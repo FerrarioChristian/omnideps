@@ -383,3 +383,20 @@ edges:
   source: unions.handle_union
   sink: unions.MyUnion.f1
   kind: accesses_field
+
+- testid: "RS-ANNO-1"
+  source: "annotations.MyStruct"
+  sink: "derive"
+  kind: "annotated_with"
+- testid: "RS-ANNO-2"
+  source: "annotations.MyStruct"
+  sink: "Debug"
+  kind: "annotated_with"
+- testid: "RS-ANNO-3"
+  source: "annotations.MyStruct.field"
+  sink: "serde"
+  kind: "annotated_with"
+- testid: "RS-ANNO-4"
+  source: "annotations.my_func"
+  sink: "inline"
+  kind: "annotated_with"

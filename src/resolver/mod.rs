@@ -15,7 +15,7 @@ pub fn resolve_type_refs(modules: Vec<Module>, primitives: &PrimitiveRegistry, c
     let modules_with_queries = builder::build_queries(modules, config);
     
     // Phase 2: Navigation
-    let resolved_modules = executor::execute_queries(modules_with_queries, primitives, config);
     
-    resolved_modules
+    
+    executor::execute_queries(modules_with_queries, primitives, config)
 }

@@ -155,10 +155,10 @@ int b = (int) c;</pre>
 Union[str, int] // Python</pre>
             </td>
             <td>
-                Fallisce o prende solo il primo termine.
-                <div class="implementation-idea"><strong>Idea di implementazione:</strong> Introdurre <code>TypeRef::Union(Vec&lt;TypeRef&gt;)</code>. Nell'estrattore di tipi, se il nodo è <code>union_type</code>, parsare tutti i child. Il creatore del grafo genererà archi multipli per la singola referenza.</div>
+                L'implementazione estrae tutti i termini dell'unione in un costrutto <code>TypeRef::Union(Vec&lt;TypeRef&gt;)</code>.
+                Il grafo genera automaticamente un arco <code>UsesType</code> / <code>UsesReturnType</code> per ciascun tipo che fa parte dell'unione.
             </td>
-            <td>-</td>
+            <td><span class="function-ref">try_parse_structured_type</span>, <span class="function-ref">type_ref_targets</span></td>
         </tr>
         <tr>
             <td>Type Constraints</td>
@@ -306,15 +306,18 @@ User() // Python</pre>
         </tr>
         <tr>
             <td>Annotazioni e Decorator</td>
-            <td><span class="status-no">No</span></td>
+            <td><span class="status-yes">Sì</span></td>
             <td>
                 <pre>@Autowired
-@Inject</pre>
+@Inject
+#[derive(Debug)]</pre>
             </td>
             <td>
-                <div class="implementation-idea"><strong>Idea di implementazione:</strong> Aggiungere <code>pub annotations: Vec&lt;TypeRef&gt;</code> a <code>StructuredType</code> e <code>Function</code>. In `heuristics.rs`, parser per <code>annotation</code> (Java) o <code>decorator</code> (Python). Il risolutore mapperebbe queste reference creando archi di tipo <code>AnnotatedWith</code>.</div>
+                I meta-dati vengono estratti e aggiunti come <code>annotations: Vec&lt;TypeRef&gt;</code> in <code>StructuredType</code>, <code>Function</code> e <code>Field</code>.
+                Il generatore di grafo esporta queste relazioni usando archi di tipo <code>AnnotatedWith</code>. 
+                Funziona agnosticamente anche con gli attributi Rust e le direttive C++.
             </td>
-            <td>-</td>
+            <td><span class="function-ref">extract_annotations</span></td>
         </tr>
         <tr>
             <td>Constructor Injection</td>

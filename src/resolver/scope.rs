@@ -1,4 +1,4 @@
-use crate::model::{Module, QualifiedName, StructuredType, TypeRef, Function, ImplBlock, Block};
+use crate::model::{Module, StructuredType, TypeRef, Function, ImplBlock, Block};
 use std::collections::HashMap;
 use crate::config::AnalyzerConfig;
 
@@ -227,14 +227,12 @@ impl ScopeTree {
 
         let mut params = func.signature.parameters.iter();
         
-        if lang_config.implicit_first_param_as_self {
-            if let Some(class_type) = &parent_class_type {
-                if let Some(first_param) = params.next() {
+        if lang_config.implicit_first_param_as_self
+            && let Some(class_type) = &parent_class_type
+                && let Some(first_param) = params.next() {
                     let p_name = first_param.name.clone().unwrap_or_else(|| "self".to_string());
                     self.define_symbol(func_scope, p_name, Symbol::Value(class_type.clone()));
                 }
-            }
-        }
 
         for param in params {
             if let Some(p_name) = &param.name {
@@ -242,11 +240,10 @@ impl ScopeTree {
             }
         }
 
-        if let Some(ref class_type) = parent_class_type {
-            if let Some(ref kw) = lang_config.self_keyword {
+        if let Some(ref class_type) = parent_class_type
+            && let Some(ref kw) = lang_config.self_keyword {
                 self.define_symbol(func_scope, kw.clone(), Symbol::Value(class_type.clone()));
             }
-        }
 
         if let Some(block) = &func.body {
             self.register_block(block, func_scope, 0);

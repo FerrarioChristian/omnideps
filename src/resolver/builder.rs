@@ -64,8 +64,10 @@ fn build_structured_type_queries(ctx: &BuilderContext, current_lang: Option<Stri
     }
 
     st.super_types = st.super_types.into_iter().map(|t| substitute_type(ctx, t, false)).collect();
+    st.annotations = st.annotations.into_iter().map(|a| substitute_type(ctx, a, false)).collect();
     st.fields = st.fields.into_iter().map(|mut f| {
         f.ty = substitute_type(ctx, f.ty, false);
+        f.annotations = f.annotations.into_iter().map(|a| substitute_type(ctx, a, false)).collect();
         f
     }).collect();
     st.methods = st.methods.into_iter().map(|m| build_function_queries(ctx, m, Some(self_query.clone()), lang_config.implicit_first_param_as_self)).collect();
@@ -95,6 +97,7 @@ fn build_function_queries(ctx: &BuilderContext, mut ff: Function, self_query: Op
     }).collect();
 
     ff.signature.return_type = substitute_type(ctx, ff.signature.return_type, false);
+    ff.annotations = ff.annotations.into_iter().map(|a| substitute_type(ctx, a, false)).collect();
 
     ff.body = ff.body.map(|b| build_block_queries(ctx, b));
 
@@ -107,6 +110,7 @@ fn build_block_queries(ctx: &BuilderContext, mut block: Block) -> Block {
 
     block.declarations = block.declarations.into_iter().map(|mut decl| {
         decl.ty = substitute_type(ctx, decl.ty, false);
+        decl.annotations = decl.annotations.into_iter().map(|a| substitute_type(ctx, a, false)).collect();
         if let TypeRef::ResolutionQuery(ref q) = decl.ty {
             ctx.stack.borrow_mut().define_symbol(decl.name.clone(), q.clone());
         }

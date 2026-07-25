@@ -82,6 +82,10 @@ pub fn extract_identifier(node: Node, source: &str) -> Option<String> {
 
 /// Extracts a qualified name (e.g. A::B::C) by traversing identifiers.
 pub fn extract_qualified_name(node: Node, source: &str) -> Option<QualifiedName> {
+    if matches!(node.kind(), "identifier" | "type_identifier" | "name" | "scoped_identifier") {
+        return Some(split_qualified_name(&node_text(node, source)));
+    }
+
     // Try with Tree-sitter fields first (more precise)
     if let Some(n) = node
         .child_by_field_name("name")

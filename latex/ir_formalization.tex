@@ -86,9 +86,9 @@ componenti definiscono lo stato e il comportamento dell'entità.
 
 \subsection{Membri e Firme}
 Definiamo il tipo \textbf{Field} ($F$), che rappresenta un attributo
-o campo dati, definito come il prodotto tra un identificatore e un
-riferimento a un tipo:
-$$F = \mathcal{I} \times \tau$$
+o campo dati, definito come il prodotto tra un identificatore, un
+riferimento a un tipo e un insieme di eventuali annotazioni/decoratori associate:
+$$F = \mathcal{I} \times \tau \times \mathcal{P}(\tau)$$
 Definiamo il tipo \textbf{Parameter} ($P$) per gestire i parametri
 passati alle funzioni:
 $$P = \mathcal{I}^? \times \tau \times \mathbb{B}$$ dove
@@ -122,9 +122,9 @@ componente (es. accesso a variabili di istanza o campi statici).
 
 Definiamo infine il tipo universale \textbf{Function}
 ($\mathcal{F}$) come contenitore che lega un nome qualificato a una
-specifica firma e a un opzionale blocco radice che ne modella il corpo:
+specifica firma, a un opzionale blocco radice che ne modella il corpo, e a un set di annotazioni (es. \texttt{@staticmethod} in Python o direttive in C++):
 $$\mathcal{F} = \langle \text{id} \in \mathcal{QN}, \sigma,
-\mathcal{B}^? \rangle$$
+\mathcal{B}^?, \mathcal{P}(\tau) \rangle$$
 
 Il ruolo architetturale di una $\mathcal{F}$ (se funge da Metodo o da
 Free Function) non è codificato nel suo tipo, ma è determinato
@@ -142,7 +142,7 @@ dominio delle tipologie di tipi struttrati. Un tipo strutturato è
 definito dalla tupla:
 $$\mathcal{S} = \langle \text{id} \in \mathcal{QN}, k \in
 \mathcal{K}, \vec{F}, \vec{\mathcal{F}}, \vec{\tau}_{sup},
-\vec{\mathcal{S}}_{nest} \rangle$$
+\vec{\mathcal{S}}_{nest}, \mathcal{P}(\tau) \rangle$$
 dove:
 \begin{itemize}
   \item \textbf{id}: il nome qualificato univoco che identifica
@@ -159,6 +159,7 @@ dove:
   \item $\vec{\mathcal{S}}_{nest}$: l'insieme dei tipi definiti
     internamente all'entità, permettendo una modellazione ricorsiva
     dei tipi annidati (\textit{nested types}).
+  \item $\mathcal{P}(\tau)$: l'insieme delle annotazioni, attributi (es. \texttt{\#[derive(Debug)]} in Rust) o decoratori applicati all'entità.
 \end{itemize}
 
 \subsection{Type Alias ($\mathcal{TA}$)}

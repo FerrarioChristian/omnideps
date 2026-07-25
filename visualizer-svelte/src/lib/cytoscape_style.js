@@ -250,6 +250,16 @@ const style = [
 		}
 	},
 	{
+		selector: 'edge[label = "AnnotatedWith"]',
+		style: {
+			'line-color': '#ff00ff',
+			'target-arrow-color': '#ff00ff',
+			'line-style': 'dotted',
+			'width': 2,
+			'target-arrow-shape': 'triangle'
+		}
+	},
+	{
 		selector: 'edge[label = "CastsTo"]',
 		style: {
 			'line-color': '#00a8ff',

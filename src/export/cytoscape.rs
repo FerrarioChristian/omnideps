@@ -49,7 +49,7 @@ pub fn export_graphs(graphs: &[DependencyGraph], out_path: &Path) -> anyhow::Res
     let mut elements = vec![];
     let mut added_nodes = std::collections::HashSet::new();
     let mut added_edges = std::collections::HashSet::new();
-    let mut parent_types: std::collections::HashMap<String, String> = std::collections::HashMap::new();
+    let _parent_types: std::collections::HashMap<String, String> = std::collections::HashMap::new();
 
     let mut global_edge_id = 0;
 
@@ -124,6 +124,11 @@ pub fn export_graphs(graphs: &[DependencyGraph], out_path: &Path) -> anyhow::Res
                 }
                 Component::Primitive(prim) => {
                     add_node(&mut elements, &mut added_nodes, prim.clone(), prim.clone(), "Primitive".to_string(), None);
+                }
+                Component::External(u) => {
+                    let qn = u.join("::");
+                    let name = u.last().cloned().unwrap_or_default();
+                    add_node(&mut elements, &mut added_nodes, qn, name, "External".to_string(), None);
                 }
             }
         }

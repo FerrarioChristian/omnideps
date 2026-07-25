@@ -37,9 +37,9 @@ fn analyze_directory(dir: &std::path::Path, config: &AnalyzerConfig) -> Result<D
     }
 
     for entry in WalkDir::new(&src_dir).into_iter().filter_map(|e| e.ok()) {
-        if entry.file_type().is_file() {
-            if let Some(lang) = SupportedLanguage::from_path(entry.path()) {
-                if let Ok(source) = fs::read_to_string(entry.path()) {
+        if entry.file_type().is_file()
+            && let Some(lang) = SupportedLanguage::from_path(entry.path())
+                && let Ok(source) = fs::read_to_string(entry.path()) {
                     let rel_path = entry.path().strip_prefix(&src_dir).unwrap_or(entry.path());
                     if let Ok((mut file_modules, file_primitives)) =
                         parse_source(lang, &source, rel_path, config)
@@ -48,8 +48,6 @@ fn analyze_directory(dir: &std::path::Path, config: &AnalyzerConfig) -> Result<D
                         combined_primitives.merge(file_primitives);
                     }
                 }
-            }
-        }
     }
 
     let (_, graph, _) = analyze_project(all_modules, combined_primitives, config);
@@ -75,6 +73,7 @@ fn verify_graph_adherence(graph: &DependencyGraph, manifest: &TestManifest) -> T
             Component::Field(name, _) => flatten_name(name),
             Component::TypeAlias(t) => flatten_name(&t.name),
             Component::Primitive(p) => p.clone(),
+            Component::External(u) => flatten_name(u),
         };
         // Some nodes like roots might be prefixed or not depending on config, but let's try direct matches
         nodes_map.insert(name, node);
@@ -106,6 +105,7 @@ fn verify_graph_adherence(graph: &DependencyGraph, manifest: &TestManifest) -> T
                 Component::Field(_, _) => "Field".to_string(),
                 Component::TypeAlias(_) => "TypeAlias".to_string(),
                 Component::Primitive(_) => "Primitive".to_string(),
+                Component::External(_) => "External".to_string(),
             }
         } else {
             "-".to_string()
@@ -124,13 +124,11 @@ fn verify_graph_adherence(graph: &DependencyGraph, manifest: &TestManifest) -> T
         let sink_exists = nodes_map.contains_key(&edge.sink);
         
         let mut edge_exists = false;
-        if source_exists {
-            if let Some(sinks) = edges_map.get(&edge.source) {
-                if sinks.contains(&edge.sink) {
+        if source_exists
+            && let Some(sinks) = edges_map.get(&edge.source)
+                && sinks.contains(&edge.sink) {
                     edge_exists = true;
                 }
-            }
-        }
 
         if !edge_exists {
             report.edge_not_found_count += 1;

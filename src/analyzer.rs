@@ -24,14 +24,15 @@ pub fn generic_extract(lang: Language, source: &str, lang_name: &str, file_path:
     }
 
     let mut modules = vec![];
-    walk_cst(root, source, &mut modules, lang_name, file_path, config);
+    let mut pending_attributes = vec![];
+    walk_cst(root, source, &mut modules, &mut pending_attributes, lang_name, file_path, config);
     Ok((modules, package_path))
 }
 
 /// Recursively traverses the Concrete Syntax Tree (CST).
 /// When a recognized component is found, it's added to the IR and the recursion stops for that branch
 /// to prevent duplicating internal methods/functions as top-level components.
-fn walk_cst(node: tree_sitter::Node, source: &str, modules: &mut Vec<Module>, lang_name: &str, file_path: Option<String>, config: &crate::config::AnalyzerConfig) {
+fn walk_cst(node: tree_sitter::Node, source: &str, modules: &mut Vec<Module>, pending_attributes: &mut Vec<crate::model::TypeRef>, lang_name: &str, file_path: Option<String>, config: &crate::config::AnalyzerConfig) {
     if let Some(comp) = crate::heuristics::dispatch_node(node, source, lang_name, config) {
         if modules.is_empty() {
             modules.push(Module {
@@ -54,39 +55,49 @@ fn walk_cst(node: tree_sitter::Node, source: &str, modules: &mut Vec<Module>, la
                 let mut cursor = node.walk();
                 let mut new_modules = vec![m];
                 for child in node.children(&mut cursor) {
-                    walk_cst(child, source, &mut new_modules, lang_name, file_path.clone(), config);
+                    walk_cst(child, source, &mut new_modules, pending_attributes, lang_name, file_path.clone(), config);
                 }
                 // The new module is now populated (it is located at new_modules[0])
                 modules[0].sub_modules.push(new_modules.remove(0));
             }
-            crate::heuristics::ParsedItem::Component(crate::model::Component::StructuredType(st)) => modules[0].structured_types.push(st),
-            crate::heuristics::ParsedItem::Component(crate::model::Component::Function(ff)) => {
+            crate::heuristics::ParsedItem::Component(crate::model::Component::StructuredType(mut st)) => {
+                st.annotations.append(pending_attributes);
+                modules[0].structured_types.push(st);
+            }
+            crate::heuristics::ParsedItem::Component(crate::model::Component::Function(mut ff)) => {
+                ff.annotations.append(pending_attributes);
                 modules[0].free_functions.push(ff);
                 let mut cursor = node.walk();
                 for child in node.children(&mut cursor) {
                     if child.kind().contains("body") || child.kind().contains("block") {
-                        walk_cst(child, source, modules, lang_name, file_path.clone(), config);
+                        walk_cst(child, source, modules, pending_attributes, lang_name, file_path.clone(), config);
                     }
                 }
             }
             crate::heuristics::ParsedItem::Component(crate::model::Component::Field(name, ty)) => {
                 if let Some(n) = name.last() {
-                    modules[0].free_variables.push(crate::model::Field { name: n.clone(), ty });
+                    let annotations = std::mem::take(pending_attributes);
+                    modules[0].free_variables.push(crate::model::Field { name: n.clone(), ty, annotations });
                 }
             }
             crate::heuristics::ParsedItem::ImplBlock(ib) => modules[0].impl_blocks.push(ib),
             crate::heuristics::ParsedItem::Imports(i) => modules[0].imports.extend(i),
             crate::heuristics::ParsedItem::Component(crate::model::Component::TypeAlias(t)) => {
                 modules[0].type_aliases.push(t);
+                pending_attributes.clear();
             }
             crate::heuristics::ParsedItem::Component(crate::model::Component::Primitive(_)) => {}
+            crate::heuristics::ParsedItem::Component(crate::model::Component::External(_)) => {}
+            crate::heuristics::ParsedItem::Attribute(attrs) => {
+                pending_attributes.extend(attrs);
+            }
         }
         return;
     }
 
     let mut cursor = node.walk();
     for child in node.children(&mut cursor) {
-        walk_cst(child, source, modules, lang_name, file_path.clone(), config);
+        walk_cst(child, source, modules, pending_attributes, lang_name, file_path.clone(), config);
     }
 }
 
@@ -155,11 +166,10 @@ fn apply_directory_strategy(modules: &mut Vec<Module>, path: &std::path::Path, f
         })
         .collect();
         
-    if let Some(last) = path_components.last_mut() {
-        if let Some(stem) = std::path::Path::new(last).file_stem() {
+    if let Some(last) = path_components.last_mut()
+        && let Some(stem) = std::path::Path::new(last).file_stem() {
             *last = stem.to_string_lossy().to_string();
         }
-    }
 
     if !path_components.is_empty() {
         let mut current = modules.remove(0);

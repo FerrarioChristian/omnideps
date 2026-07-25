@@ -31,12 +31,11 @@ pub fn extract_block(node: Node, source: &str) -> crate::model::Block {
     for mut child in node.children(&mut cursor) {
         let mut kind = child.kind();
         
-        if kind == "expression_statement" {
-            if let Some(inner) = child.child(0) {
+        if kind == "expression_statement"
+            && let Some(inner) = child.child(0) {
                 child = inner;
                 kind = child.kind();
             }
-        }
 
         // 1. Variable Declarations
         if matches!(
@@ -51,7 +50,7 @@ pub fn extract_block(node: Node, source: &str) -> crate::model::Block {
                 | "lexical_declaration"
                 | "variable_declaration"
                 | "let_declaration"
-                | "assignment" // <--- Added for Python and Ruby
+                | "assignment"
         ) {
             let name_opt;
             if let Some(decl_node) = child.child_by_field_name("declarator") {
@@ -88,7 +87,8 @@ pub fn extract_block(node: Node, source: &str) -> crate::model::Block {
                         }
                     }
                 }
-                declarations.push(Field { name, ty });
+                let annotations = super::annotation_extraction::extract_annotations(child, source);
+                declarations.push(Field { name, ty, annotations });
             }
             
             // WE MUST ALSO check the right-hand side (initializer/value) for behavioral deps!
@@ -159,11 +159,10 @@ fn find_behavioral_deps(
         if let Some(t_node) = node.child_by_field_name("type") {
             instantiates.push(extract_type_ref(t_node, source));
         }
-    } else if kind == "struct_expression" {
-        if let Some(name_node) = node.child_by_field_name("name") {
+    } else if kind == "struct_expression"
+        && let Some(name_node) = node.child_by_field_name("name") {
             instantiates.push(extract_type_ref(name_node, source));
         }
-    }
 
     // --- Calls ---
     if matches!(kind, "call_expression" | "call") {
@@ -171,16 +170,14 @@ fn find_behavioral_deps(
     } else if kind == "method_invocation" {
         // Java
         let mut parts = vec![];
-        if let Some(obj) = node.child_by_field_name("object") {
-            if let TypeRef::Unresolved(qn) = extract_type_ref(obj, source) {
+        if let Some(obj) = node.child_by_field_name("object")
+            && let TypeRef::Unresolved(qn) = extract_type_ref(obj, source) {
                 parts.extend(qn);
             }
-        }
-        if let Some(name) = node.child_by_field_name("name") {
-            if let TypeRef::Unresolved(qn) = extract_type_ref(name, source) {
+        if let Some(name) = node.child_by_field_name("name")
+            && let TypeRef::Unresolved(qn) = extract_type_ref(name, source) {
                 parts.extend(qn);
             }
-        }
         if !parts.is_empty() {
             calls.push(TypeRef::Unresolved(parts));
         }
@@ -192,12 +189,11 @@ fn find_behavioral_deps(
     }
     
     // --- Type Casts ---
-    if matches!(kind, "cast_expression" | "type_cast_expression") {
-        if let Some(type_node) = node.child_by_field_name("type") {
+    if matches!(kind, "cast_expression" | "type_cast_expression")
+        && let Some(type_node) = node.child_by_field_name("type") {
             let ty = extract_type_ref(type_node, source);
             type_casts.push(ty);
         }
-    }
 
     // --- Token Tree Coalescing (e.g. for Rust macros or generic unparsed blocks) ---
     if kind == "token_tree" {

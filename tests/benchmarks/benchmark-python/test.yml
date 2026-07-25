@@ -8,7 +8,18 @@ files:
 - src/lib_b.py
 - src/transitive_main.py
 - src/test_constructors.py
+- annotations.py
 nodes:
+- name: annotations
+  kind: module
+- name: annotations.my_decorator
+  kind: function
+- name: annotations.decorated_function
+  kind: function
+- name: annotations.DataClassMeta
+  kind: class
+- name: annotations.MyDataClass
+  kind: class
 - name: main
   kind: module
 - name: models
@@ -93,6 +104,15 @@ nodes:
   kind: method
 
 edges:
+- testid: PY-ANNO-1
+  source: annotations.decorated_function
+  sink: annotations.my_decorator
+  kind: annotated_with
+- testid: PY-ANNO-2
+  source: annotations.MyDataClass
+  sink: annotations.DataClassMeta
+  kind: annotated_with
+
 - testid: PY-IMP-1
   source: main
   sink: models.User

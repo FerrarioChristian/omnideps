@@ -8,6 +8,12 @@ pub struct StackFrame {
     pub symbols: HashMap<String, Query>,
 }
 
+impl Default for StackFrame {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl StackFrame {
     pub fn new() -> Self {
         Self {
@@ -20,6 +26,12 @@ impl StackFrame {
 #[derive(Debug, Clone)]
 pub struct SymbolStack {
     pub frames: Vec<StackFrame>,
+}
+
+impl Default for SymbolStack {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl SymbolStack {

@@ -1259,5 +1259,13 @@ struct User { name: String }</code></pre>
         <li>Durante la generazione del grafo architetturale, le dipendenze per nodi e riferimenti associati a costrutti Union (ad esempio un metodo invocato su una variabile dal tipo Unione) vengono moltiplicate o distinte per mappare ogni possibile target senza perdere precisione.</li>
     </ul>
 
+    <h3>6.4 Annotazioni e Decoratori</h3>
+    <p>I <strong>Metadati del codice</strong> come annotazioni (es. <code>@Autowired</code> in Java), decoratori (es. <code>@staticmethod</code> in Python) e attributi (es. <code>#[derive(Debug)]</code> in Rust, <code>[[nodiscard]]</code> in C++) vengono estratti per arricchire l'analisi del grafo:</p>
+    <ul>
+        <li>Durante la fase 1, il modulo <code>heuristics/annotation_extraction.rs</code> cattura i metadati applicati a <code>StructuredType</code>, <code>Function</code> e <code>Field</code> ignorando le barriere lessicali o le differenze sintattiche, e li salva nel campo <code>annotations: Vec&lt;TypeRef&gt;</code>.</li>
+        <li>Durante la fase 2b, il risolutore (in <code>executor.rs</code>) valuta questi <code>TypeRef</code>, utilizzando lo scope contestuale del nodo annotato. Qualsiasi annotazione irrisolta passa allo stato <code>TypeRef::Failed</code> (o <code>Unresolved</code> in caso non venga elaborata direttamente, ma il graph exporter la estrarrà comunque).</li>
+        <li>Il generatore di grafo (Fase 3, <code>graph.rs</code>) scorre le annotazioni di tutti i nodi e, tramite la funzione <code>type_ref_targets</code>, emette archi di tipo <code>AnnotatedWith</code> per catturare queste dipendenze.</li>
+    </ul>
+
 </body>
 </html>

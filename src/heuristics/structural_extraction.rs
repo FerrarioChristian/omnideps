@@ -63,35 +63,28 @@ pub fn extract_fields(
                 | "field"
                 | "member_declaration"
                 | "variable_declarator"
-                | "attribute"
-        ) {
-            if let Some(name) = extract_identifier(child, src) {
+        )
+            && let Some(name) = extract_identifier(child, src) {
                 let ty = extract_type_ref(child, src);
-                return Some(Field { name, ty });
+                let annotations = super::annotation_extraction::extract_annotations(child, src);
+                return Some(Field { name, ty, annotations });
             }
-        }
 
         // Dynamic fields inside methods (e.g. self.username = username)
-        if enter_functions && child.kind() == "assignment" {
-            if let Some(left) = child.child_by_field_name("left") {
-                if matches!(left.kind(), "attribute" | "field_expression") {
-                    if let Some(obj) = left.child_by_field_name("object") {
-                        if Some(super::text_parsing::node_text(obj, src)) == *self_kw {
-                            if let Some(attr) = left.child_by_field_name("attribute").or_else(|| left.child_by_field_name("field")) {
-                                if let Some(name) = extract_identifier(attr, src) {
+        if enter_functions && child.kind() == "assignment"
+            && let Some(left) = child.child_by_field_name("left")
+                && matches!(left.kind(), "attribute" | "field_expression")
+                    && let Some(obj) = left.child_by_field_name("object")
+                        && Some(super::text_parsing::node_text(obj, src)) == *self_kw
+                            && let Some(attr) = left.child_by_field_name("attribute").or_else(|| left.child_by_field_name("field"))
+                                && let Some(name) = extract_identifier(attr, src) {
                                     let ty = if let Some(right) = child.child_by_field_name("right") {
                                         crate::heuristics::body_extraction::infer_variable_type(right, src)
                                     } else {
                                         crate::model::TypeRef::Failed(vec![])
                                     };
-                                    return Some(Field { name, ty });
+                                    return Some(Field { name, ty, annotations: vec![] });
                                 }
-                            }
-                        }
-                    }
-                }
-            }
-        }
 
         None
     });
@@ -114,6 +107,7 @@ pub fn extract_fields(
                 fds.push(Field {
                     name: index.to_string(),
                     ty: extract_type_ref(child, src),
+                    annotations: vec![],
                 });
                 index += 1;
             }

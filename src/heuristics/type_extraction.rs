@@ -47,11 +47,10 @@ pub fn extract_type_ref(node: Node, source: &str) -> TypeRef {
     let kind = node.kind();
     
     // 0.2. Unwrap Python wrapper `type` nodes
-    if kind == "type" && node.child_count() == 1 {
-        if let Some(child) = node.child(0) {
+    if kind == "type" && node.child_count() == 1
+        && let Some(child) = node.child(0) {
             return extract_type_ref(child, source);
         }
-    }
 
     // 0.5. Try union types
     if let Some(union_ref) = try_extract_union(node, source) {
@@ -113,17 +112,12 @@ pub fn extract_type_ref(node: Node, source: &str) -> TypeRef {
 /// the actual type node. This function recursively calls `extract_type_ref` on 
 /// these fields to properly resolve nested types (e.g., unwrapping references like `&StructA`).
 fn try_extract_from_type_field(node: Node, source: &str) -> Option<TypeRef> {
-    if let Some(type_node) = node
+    node
         .child_by_field_name("type")
         .or_else(|| node.child_by_field_name("return_type"))
         .or_else(|| node.child_by_field_name("field_type"))
         .or_else(|| node.child_by_field_name("value_type"))
-        .or_else(|| node.child_by_field_name("right"))
-    {
-        Some(extract_type_ref(type_node, source))
-    } else {
-        None
-    }
+        .or_else(|| node.child_by_field_name("right")).map(|type_node| extract_type_ref(type_node, source))
 }
 
 /// Tries to extract a Union type from typical constructs like `union_type`, `binary_operator` (|), or `Union[...]`
@@ -145,8 +139,8 @@ fn try_extract_union(node: Node, source: &str) -> Option<TypeRef> {
         }
     }
 
-    if kind == "binary_operator" {
-        if node_text(node, source).contains('|') {
+    if kind == "binary_operator"
+        && node_text(node, source).contains('|') {
             let mut types = vec![];
             if let Some(left) = node.child_by_field_name("left") {
                 types.push(extract_type_ref(left, source));
@@ -158,12 +152,11 @@ fn try_extract_union(node: Node, source: &str) -> Option<TypeRef> {
                 return Some(TypeRef::Union(types));
             }
         }
-    }
 
-    if kind == "generic_type" {
-        if let Some(name_node) = node.child(0) {
-            if node_text(name_node, source).trim() == "Union" {
-                if let Some(params) = node.child(1) {
+    if kind == "generic_type"
+        && let Some(name_node) = node.child(0)
+            && node_text(name_node, source).trim() == "Union"
+                && let Some(params) = node.child(1) {
                     let mut types = vec![];
                     let mut cursor = params.walk();
                     for child in params.children(&mut cursor) {
@@ -179,8 +172,5 @@ fn try_extract_union(node: Node, source: &str) -> Option<TypeRef> {
                         return Some(TypeRef::Union(types));
                     }
                 }
-            }
-        }
-    }
     None
 }

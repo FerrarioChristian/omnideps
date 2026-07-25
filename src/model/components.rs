@@ -19,6 +19,8 @@ pub enum StructuredTypeKind {
 pub struct Field {
     pub name: Identifier,
     pub ty: TypeRef,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub annotations: Vec<TypeRef>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize)]
@@ -63,6 +65,8 @@ pub struct Function {
     pub signature: Signature,
     pub body: Option<Block>,
     pub is_constructor: bool,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub annotations: Vec<TypeRef>,
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -88,6 +92,8 @@ pub struct StructuredType {
     pub super_types: Vec<TypeRef>,
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub nested_types: Vec<StructuredType>,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub annotations: Vec<TypeRef>,
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -126,4 +132,5 @@ pub enum Component {
     Function(Function),
     Field(QualifiedName, TypeRef),
     Primitive(String),
+    External(QualifiedName),
 }

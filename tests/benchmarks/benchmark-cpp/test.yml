@@ -8,6 +8,7 @@ files:
 - src/Engine.cpp
 - src/Fleet.h
 - src/Fleet.cpp
+- src/annotations.cpp
 nodes:
 - name: Transport
   kind: namespace
@@ -65,6 +66,18 @@ nodes:
   kind: field
 - name: Transport.Vehicle.spec
   kind: field
+- name: my_func
+  kind: function
+- name: MyStruct
+  kind: class
+- name: MyStruct.field
+  kind: field
+- name: deprecated
+  kind: external
+- name: nodiscard
+  kind: external
+- name: maybe_unused
+  kind: external
 edges:
 - testid: UNION-DECL
   source: Transport.Vehicle.spec
@@ -182,3 +195,16 @@ edges:
   source: do_cast
   sink: float
   kind: casts_type
+
+- testid: "CPP-ANNO-1"
+  source: "my_func"
+  sink: "nodiscard"
+  kind: "annotated_with"
+- testid: "CPP-ANNO-2"
+  source: "MyStruct"
+  sink: "deprecated"
+  kind: "annotated_with"
+- testid: "CPP-ANNO-3"
+  source: "MyStruct.field"
+  sink: "maybe_unused"
+  kind: "annotated_with"

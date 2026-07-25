@@ -29,7 +29,8 @@
         'UsesReturnType': true,
         'UsesLocalType': true,
         'NestedIn': true,
-        'ModuleContainment': true
+        'ModuleContainment': true,
+        'AnnotatedWith': true
     });
     
     let behavFilters = $state({

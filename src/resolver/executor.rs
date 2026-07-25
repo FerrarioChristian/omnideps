@@ -108,11 +108,21 @@ fn execute_structured_type(
         .into_iter()
         .map(|t| evaluate_typeref(ctx, t, scope_id, true))
         .collect();
+    st.annotations = st
+        .annotations
+        .into_iter()
+        .map(|a| evaluate_typeref(ctx, a, scope_id, false))
+        .collect();
     st.fields = st
         .fields
         .into_iter()
         .map(|mut f| {
             f.ty = evaluate_typeref(ctx, f.ty, scope_id, true);
+            f.annotations = f
+                .annotations
+                .into_iter()
+                .map(|a| evaluate_typeref(ctx, a, scope_id, false))
+                .collect();
             f
         })
         .collect();
@@ -184,6 +194,11 @@ fn execute_function(ctx: &ExecutorContext, mut f: Function, parent_scope: ScopeI
         })
         .collect();
     f.signature.return_type = evaluate_typeref(ctx, f.signature.return_type, func_scope_id, true);
+    f.annotations = f
+        .annotations
+        .into_iter()
+        .map(|a| evaluate_typeref(ctx, a, func_scope_id, false))
+        .collect();
     f.body = f.body.map(|b| execute_block(ctx, b, func_scope_id, 0));
 
     f
@@ -210,6 +225,11 @@ fn execute_block(
         .into_iter()
         .map(|mut d| {
             d.ty = evaluate_typeref(ctx, d.ty, block_scope_id, true);
+            d.annotations = d
+                .annotations
+                .into_iter()
+                .map(|a| evaluate_typeref(ctx, a, block_scope_id, false))
+                .collect();
             d
         })
         .collect();
@@ -604,15 +624,14 @@ fn resolve_via_transitive_imports(
         let lang = node.language.as_deref().unwrap_or("root");
         if ctx.config.get_for(lang).transitive_imports {
             for imp in &node.imports {
-                if let Some(last) = imp.path.last() {
-                    if last == member || last == "*" {
+                if let Some(last) = imp.path.last()
+                    && (last == member || last == "*") {
                         if let Some(resolved) = find_global(ctx, &imp.path) {
                             return Some(resolved);
                         } else {
                             return Some(TypeRef::External(imp.path.clone()));
                         }
                     }
-                }
             }
         }
     }

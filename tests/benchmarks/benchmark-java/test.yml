@@ -281,6 +281,14 @@ edges:
   source: domain.direct.violating.CallConstructor
   sink: technology.direct.dao.AccountDAO
   kind: includes
+- testid: "JAVA-ANNO-1"
+  source: "com.example.AnnotatedClass"
+  sink: "com.example.MyAnnotation"
+  kind: "annotated_with"
+- testid: "JAVA-ANNO-2"
+  source: "com.example.AnnotatedClass.myMethod"
+  sink: "com.example.Inject"
+  kind: "annotated_with"
 - testid: INH-1
   source: domain.direct.violating.InheritanceExtends
   sink: technology.direct.dao.HistoryDAO
