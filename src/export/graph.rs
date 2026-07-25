@@ -54,6 +54,18 @@ fn traverse_module_for_edges(
         });
     }
 
+    for ta in &m.type_aliases {
+        let mut ta_name = m_name.clone();
+        ta_name.extend(ta.name.clone());
+        if let Some(to) = type_ref_target(&ta.target) {
+            edges.push(Dependency {
+                from: ta_name.clone(),
+                to,
+                kind: DependencyEdgeKind::Aliases,
+            });
+        }
+    }
+
     for st in &m.structured_types {
         let mut st_name = m_name.clone();
         st_name.extend(st.name.clone());
@@ -261,6 +273,15 @@ fn add_block_edges(ff: &Function, ff_name: &QualifiedName, block: &Block, edges:
             });
         }
     }
+    for cast in &block.type_casts {
+        if let Some(to) = type_ref_target(cast) {
+            edges.push(Dependency {
+                from: ff_name.clone(),
+                to: to.clone(),
+                kind: DependencyEdgeKind::CastsTo,
+            });
+        }
+    }
 
     // 3. Recurse into sub-blocks
     for sub in &block.sub_blocks {
@@ -280,6 +301,14 @@ fn flatten_modules(modules: &[Module], prefix: QualifiedName) -> Vec<Component> 
         m_clone.name = m_name.clone();
         flat.push(Component::Module(m_clone));
         
+        for ta in &m.type_aliases {
+            let mut ta_name = m_name.clone();
+            ta_name.extend(ta.name.clone());
+            let mut ta_clone = ta.clone();
+            ta_clone.name = ta_name.clone();
+            flat.push(Component::TypeAlias(ta_clone));
+        }
+
         for st in &m.structured_types {
             flat.extend(flatten_structured_type(st, &m_name));
         }

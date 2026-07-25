@@ -36,6 +36,12 @@ pub struct Signature {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize)]
+pub struct TypeAlias {
+    pub name: QualifiedName,
+    pub target: TypeRef,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize)]
 pub struct Block {
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub declarations: Vec<Field>,
@@ -45,6 +51,8 @@ pub struct Block {
     pub instantiates: Vec<TypeRef>,
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub accesses: Vec<TypeRef>,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub type_casts: Vec<TypeRef>,
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub sub_blocks: Vec<Block>,
 }
@@ -101,6 +109,8 @@ pub struct Module {
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub structured_types: Vec<StructuredType>,
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub type_aliases: Vec<TypeAlias>,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub free_functions: Vec<Function>,
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub impl_blocks: Vec<ImplBlock>,
@@ -112,6 +122,7 @@ pub struct Module {
 pub enum Component {
     Module(Module),
     StructuredType(StructuredType),
+    TypeAlias(TypeAlias),
     Function(Function),
     Field(QualifiedName, TypeRef),
     Primitive(String),

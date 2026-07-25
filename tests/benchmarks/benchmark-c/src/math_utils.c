@@ -11,3 +11,9 @@ int multiply(int a, int b) {
     }
     return result;
 }
+
+typedef int MyInt;
+
+float divide(int a, int b) {
+    return (float)a / (float)b;
+}

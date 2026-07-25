@@ -128,11 +128,11 @@ $$ \text{Scope} = \langle id, parent, \text{symbols} : \text{String}
 \to \text{Symbol} \rangle $$
 
 Dove un $\text{Symbol}$ rappresenta il tipo somma delle entità architetturali:
-$$ \text{Symbol} = \text{Module}(id) \mid \text{Type}(id) \mid
+$$ \text{Symbol} = \text{Module}(id) \mid \text{Type}(id) \mid \text{TypeAlias}(\tau) \mid
 \text{Value}(\tau) $$
-L'intuizione architetturale fondamentale risiede nell'entità
-\text{Value}, che conserva il tipo ($\tau$) o la sua query non
-risolta. Questa struttura permette al valutatore di inferire i tipi
+L'intuizione architetturale fondamentale risiede nelle entità
+\text{Value} e \text{TypeAlias}, che conservano il tipo ($\tau$) o la sua query non
+risolta. In modo trasparente, la risoluzione di un \text{TypeAlias} espande la query sottostante per recuperare il riferimento definitivo senza che le procedure chiamanti debbano gestire l'indirezione. Questa struttura permette al valutatore di inferire i tipi
 di ritorno attraversando l'albero bottom-up, partendo dallo scope più
 profondo (il blocco di codice corrente) fino alla radice globale.
 

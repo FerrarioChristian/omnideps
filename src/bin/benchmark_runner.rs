@@ -73,6 +73,7 @@ fn verify_graph_adherence(graph: &DependencyGraph, manifest: &TestManifest) -> T
             Component::StructuredType(s) => flatten_name(&s.name),
             Component::Function(f) => flatten_name(&f.name),
             Component::Field(name, _) => flatten_name(name),
+            Component::TypeAlias(t) => flatten_name(&t.name),
             Component::Primitive(p) => p.clone(),
         };
         // Some nodes like roots might be prefixed or not depending on config, but let's try direct matches
@@ -84,6 +85,7 @@ fn verify_graph_adherence(graph: &DependencyGraph, manifest: &TestManifest) -> T
     for edge in &graph.edges {
         let from = flatten_name(&edge.from);
         let to = flatten_name(&edge.to);
+        println!("EDGE: {} -> {} ({:?})", from, to, edge.kind);
         edges_map.entry(from).or_default().insert(to);
     }
 
@@ -102,6 +104,7 @@ fn verify_graph_adherence(graph: &DependencyGraph, manifest: &TestManifest) -> T
                 Component::StructuredType(st) => format!("{:?}", st.kind),
                 Component::Function(_) => "Function".to_string(),
                 Component::Field(_, _) => "Field".to_string(),
+                Component::TypeAlias(_) => "TypeAlias".to_string(),
                 Component::Primitive(_) => "Primitive".to_string(),
             }
         } else {

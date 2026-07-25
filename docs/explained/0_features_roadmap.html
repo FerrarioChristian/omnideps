@@ -122,16 +122,30 @@ vector&lt;int&gt; vec; // C++</pre>
         </tr>
         <tr>
             <td>Type Alias</td>
-            <td><span class="status-no">No</span></td>
+            <td><span class="status-yes">Sì</span></td>
             <td>
                 <pre>type UserId = string; // TS
 typedef int length_t; // C</pre>
             </td>
             <td>
-                Attualmente ignorato.
-                <div class="implementation-idea"><strong>Idea di implementazione:</strong> Creare una variante <code>TypeAlias</code> in <code>ParsedItem</code>. In fase di costruzione della Symbol Table (&Sigma;), mappare l'alias al suo <code>TypeRef</code> originale in un registro <code>aliases</code> di modulo. Il risolutore appiattirebbe l'alias risolvendo direttamente il tipo sottostante.</div>
+                Supportato nativamente. Gli alias vengono parsati in <code>Component::TypeAlias</code>,
+                registrati nel <code>ScopeTree</code> e risolti trasparentemente dal <code>Executor</code>
+                generando nodi e archi grafici dedicati.
             </td>
-            <td>-</td>
+            <td>Nodo: <span class="ir-node">TypeAlias</span><br>Arco: <code>Aliases</code></td>
+        </tr>
+        <tr>
+            <td>Type Casts</td>
+            <td><span class="status-yes">Sì</span></td>
+            <td>
+                <pre>let a = x as i32;
+int b = (int) c;</pre>
+            </td>
+            <td>
+                Parsati durante l'ispezione dei blocchi e salvati nel <code>Block</code> come
+                referenze di tipo castate.
+            </td>
+            <td>Arco: <code>CastsTo</code></td>
         </tr>
         <tr>
             <td>Union Types</td>

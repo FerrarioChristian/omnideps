@@ -158,6 +158,14 @@ const style = [
 		}
 	},
 	{
+		selector: 'node[type = "TypeAlias"]',
+		style: {
+			'background-color': '#9b59b6',
+			'shape': 'diamond',
+			'padding': '8px'
+		}
+	},
+	{
 		selector: 'edge',
 		style: {
 			'width': 2,
@@ -239,6 +247,24 @@ const style = [
 			'line-style': 'solid',
 			'width': 2,
 			'opacity': 0.8
+		}
+	},
+	{
+		selector: 'edge[label = "CastsTo"]',
+		style: {
+			'line-color': '#00a8ff',
+			'target-arrow-color': '#00a8ff',
+			'line-style': 'dashed',
+			'width': 2
+		}
+	},
+	{
+		selector: 'edge[label = "Aliases"]',
+		style: {
+			'line-color': '#ff00ff',
+			'target-arrow-color': '#ff00ff',
+			'line-style': 'dotted',
+			'width': 2
 		}
 	},
 	{

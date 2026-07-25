@@ -12,6 +12,8 @@ pub enum Symbol {
     Module(ScopeId),
     /// Un tipo strutturato (Classe, Struct). Punta al suo Scope.
     Type(ScopeId),
+    /// Un Type Alias. Punta al tipo bersaglio.
+    TypeAlias(TypeRef),
     /// Un valore concreto: Variabile locale, parametro, campo o funzione.
     /// Il TypeRef indica il tipo del valore (o il tipo di ritorno per le funzioni).
     Value(TypeRef),
@@ -121,6 +123,12 @@ impl ScopeTree {
             if !self.arena[scope_id].imports.contains(imp) {
                 self.arena[scope_id].imports.push(imp.clone());
             }
+        }
+
+        // Type Aliases
+        for ta in &m.type_aliases {
+            let name = ta.name.last().cloned().unwrap_or_default();
+            self.define_symbol(scope_id, name, Symbol::TypeAlias(ta.target.clone()));
         }
 
         // Tipi strutturati

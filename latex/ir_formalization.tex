@@ -153,6 +153,11 @@ dove:
     dei tipi annidati (\textit{nested types}).
 \end{itemize}
 
+\subsection{Type Alias ($\mathcal{TA}$)}
+Un \textbf{Type Alias} permette di definire un nuovo nome per un tipo esistente. È modellato come la tupla:
+$$\mathcal{TA} = \langle \text{id} \in \mathcal{QN}, \text{target} \in \tau \rangle$$
+dove \text{target} è il riferimento al tipo originale. In fase di costruzione del grafo, vengono mantenuti come nodi indipendenti per tracciare accuratamente l'uso semantico dei domini.
+
 \subsection{Blocchi di Implementazione ($\mathcal{B}_{lk}$)}
 Per supportare linguaggi come Rust e C++ (separazione tra
 dichiarazione e definizione), in fase di estrazione introduciamo il
@@ -185,7 +190,7 @@ disgiunta (sum type) dei costrutti strutturali definitivi del
 sistema. Ogni componente rappresenta l'unità logica che può comparire
 come vertice nel grafo delle dipendenze:
 $$\mathcal{C} ::= \text{Mod}(\mathcal{M}) \mid
-\text{StructuredType}(\mathcal{S}) \mid \text{Function}(\mathcal{F})
+\text{StructuredType}(\mathcal{S}) \mid \text{TypeAlias}(\mathcal{TA}) \mid \text{Function}(\mathcal{F})
 \mid \text{Field}(F)$$
 
 \subsection{Modulo ($\mathcal{M}$)}
@@ -194,7 +199,7 @@ L'intera struttura del programma è catturata dal tipo \textbf{Modulo}
 del file system o dei namespace:
 $$\mathcal{M} = \langle \mathcal{QN}, \mathcal{I}_{imports},
 \vec{\mathcal{M}_{nest}},
-\vec{\mathcal{S}}, \vec{\mathcal{F}}, \vec{F}_{free},
+\vec{\mathcal{S}}, \vec{\mathcal{TA}}, \vec{\mathcal{F}}, \vec{F}_{free},
 \vec{\mathcal{B}}_{lk} \rangle$$
 dove $\mathcal{I}_{imports}$ è l'insieme delle dipendenze esplicite
 (import/use/include) definite nel modulo. Ogni elemento in
@@ -305,8 +310,10 @@ componenti target:
     utilizzo di altri componenti o moduli esterni.
   \item \textbf{Relazioni Comportamentali}: Generati dai blocchi
     interni $\mathcal{B}$, includono \textit{AccessesField},
-    \textit{Instantiates}, e \textit{Calls}, modellando accuratamente
-    i flussi di invocazione, la creazione di istanze e l'accesso in memoria.
+    \textit{Instantiates}, \textit{Calls}, e \textit{CastsTo}, modellando accuratamente
+    i flussi di invocazione, la creazione di istanze, l'accesso in memoria e le conversioni di tipo.
+  \item \textbf{Aliases}: Espande la nozione di referenza catturando il legame semantico 
+    da un TypeAlias verso il suo bersaglio originario.
 \end{itemize}
 
 \includegraphics[width=\textwidth]{images/mermaid-diagram-guest-low.png}

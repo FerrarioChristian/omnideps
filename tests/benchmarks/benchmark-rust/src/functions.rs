@@ -8,10 +8,16 @@ use crate::traits::TraitB;
 
 static STATIC_SA: StructA = StructA {x: 1.0, y: 0.0};
 
+pub type MyAlias = StructA;
+
 pub fn function_with_local_variables() {
   let sa: StructA = StructA {x: 0.0, y: 0.0};
   let sb = StructB {x: sa.clone(), y: EnumA::FIRST};
   println!("{}", STATIC_SA.x);
+}
+
+pub fn function_with_alias(a: MyAlias) {
+  println!("{}", a.x);
 }
 
 pub fn function_with_parameters(sa: &StructA) {

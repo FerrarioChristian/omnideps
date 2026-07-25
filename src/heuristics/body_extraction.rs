@@ -24,6 +24,7 @@ pub fn extract_block(node: Node, source: &str) -> crate::model::Block {
     let mut calls = vec![];
     let mut instantiates = vec![];
     let mut accesses = vec![];
+    let mut type_casts = vec![];
     let mut sub_blocks = vec![];
 
     let mut cursor = node.walk();
@@ -94,16 +95,18 @@ pub fn extract_block(node: Node, source: &str) -> crate::model::Block {
             let mut inner_calls = vec![];
             let mut inner_inst = vec![];
             let mut inner_accesses = vec![];
+            let mut inner_casts = vec![];
             if let Some(val) = child.child_by_field_name("value").or_else(|| child.child_by_field_name("declarator")) {
-                find_behavioral_deps(val, source, &mut inner_calls, &mut inner_inst, &mut inner_accesses);
+                find_behavioral_deps(val, source, &mut inner_calls, &mut inner_inst, &mut inner_accesses, &mut inner_casts);
             } else {
                 // If there's no clear value field, scan the whole declaration just in case (excluding the type/name to avoid false positives)
                 // Actually, find_behavioral_deps is safe to run on the whole node because it looks for call_expression / new_expression
-                find_behavioral_deps(child, source, &mut inner_calls, &mut inner_inst, &mut inner_accesses);
+                find_behavioral_deps(child, source, &mut inner_calls, &mut inner_inst, &mut inner_accesses, &mut inner_casts);
             }
             calls.extend(inner_calls);
             instantiates.extend(inner_inst);
             accesses.extend(inner_accesses);
+            type_casts.extend(inner_casts);
         }
         // 2. Nested Blocks
         else if kind.contains("body") || kind.contains("block") || kind == "compound_statement" {
@@ -114,10 +117,12 @@ pub fn extract_block(node: Node, source: &str) -> crate::model::Block {
             let mut inner_calls = vec![];
             let mut inner_inst = vec![];
             let mut inner_accesses = vec![];
-            find_behavioral_deps(child, source, &mut inner_calls, &mut inner_inst, &mut inner_accesses);
+            let mut inner_casts = vec![];
+            find_behavioral_deps(child, source, &mut inner_calls, &mut inner_inst, &mut inner_accesses, &mut inner_casts);
             calls.extend(inner_calls);
             instantiates.extend(inner_inst);
             accesses.extend(inner_accesses);
+            type_casts.extend(inner_casts);
         }
     }
 
@@ -126,6 +131,7 @@ pub fn extract_block(node: Node, source: &str) -> crate::model::Block {
         calls,
         instantiates,
         accesses,
+        type_casts,
         sub_blocks,
     }
 }
@@ -139,6 +145,7 @@ fn find_behavioral_deps(
     calls: &mut Vec<TypeRef>,
     instantiates: &mut Vec<TypeRef>,
     accesses: &mut Vec<TypeRef>,
+    type_casts: &mut Vec<TypeRef>,
 ) {
     let kind = node.kind();
 
@@ -183,16 +190,24 @@ fn find_behavioral_deps(
     if matches!(kind, "field_access" | "member_expression" | "property_identifier" | "member_access" | "identifier" | "field_expression") {
         accesses.push(extract_type_ref(node, source));
     }
+    
+    // --- Type Casts ---
+    if matches!(kind, "cast_expression" | "type_cast_expression") {
+        if let Some(type_node) = node.child_by_field_name("type") {
+            let ty = extract_type_ref(type_node, source);
+            type_casts.push(ty);
+        }
+    }
 
     // --- Token Tree Coalescing (e.g. for Rust macros or generic unparsed blocks) ---
     if kind == "token_tree" {
-        parse_token_tree_macro(node, source, calls, instantiates, accesses);
+        parse_token_tree_macro(node, source, calls, instantiates, accesses, type_casts);
         return;
     }
 
     let mut cursor = node.walk();
     for child in node.children(&mut cursor) {
-        find_behavioral_deps(child, source, calls, instantiates, accesses);
+        find_behavioral_deps(child, source, calls, instantiates, accesses, type_casts);
     }
 }
 
@@ -284,6 +299,7 @@ fn parse_token_tree_macro(
     calls: &mut Vec<TypeRef>,
     instantiates: &mut Vec<TypeRef>,
     accesses: &mut Vec<TypeRef>,
+    type_casts: &mut Vec<TypeRef>,
 ) {
     let mut current_path: Vec<String> = vec![];
     let mut expect_ident = true;
@@ -318,7 +334,7 @@ fn parse_token_tree_macro(
             expect_ident = true;
             
             // Recurse into this child
-            find_behavioral_deps(child, source, calls, instantiates, accesses);
+            find_behavioral_deps(child, source, calls, instantiates, accesses, type_casts);
         }
         i += 1;
     }

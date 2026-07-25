@@ -24,8 +24,17 @@ pub fn is_structured_type(node: Node) -> bool {
         return false;
     }
     let kind = node.kind();
-    (kind == "type_definition"
-        || kind.contains("struct")
+    if kind == "type_definition" {
+        let mut cursor = node.walk();
+        for child in node.children(&mut cursor) {
+            let child_kind = child.kind();
+            if child_kind.contains("struct") || child_kind.contains("enum") || child_kind.contains("union") {
+                return true;
+            }
+        }
+        return false;
+    }
+    (kind.contains("struct")
         || kind.contains("class")
         || kind.contains("interface")
         || kind.contains("trait")
@@ -87,4 +96,16 @@ pub fn is_free_variable(node: Node) -> bool {
     }
     let kind = node.kind();
     kind == "static_item" || kind == "const_item" || kind == "global_variable_declaration"
+}
+
+/// Identifies type aliases (e.g. typedef, using, type = ...).
+pub fn is_type_alias(node: Node) -> bool {
+    if !node.is_named() {
+        return false;
+    }
+    let kind = node.kind();
+    matches!(
+        kind,
+        "type_alias_declaration" | "alias_declaration" | "type_item" | "type_alias_statement"
+    ) || (kind == "type_definition" && !is_structured_type(node)) // C/C++ typedef can be struct or just alias
 }

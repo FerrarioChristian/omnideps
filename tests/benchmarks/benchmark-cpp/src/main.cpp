@@ -22,3 +22,9 @@ int main() {
 
     return 0;
 }
+
+using MyEngine = automotive::IEngine;
+
+void do_cast() {
+    float f = (float)10;
+}

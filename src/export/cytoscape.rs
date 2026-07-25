@@ -118,6 +118,10 @@ pub fn export_graphs(graphs: &[DependencyGraph], out_path: &Path) -> anyhow::Res
                     };
                     add_node(&mut elements, &mut added_nodes, id, label, ty_str, parent);
                 }
+                Component::TypeAlias(t) => {
+                    let qn = t.name.join("::");
+                    add_node(&mut elements, &mut added_nodes, qn.clone(), qn.clone(), "TypeAlias".to_string(), None);
+                }
                 Component::Primitive(prim) => {
                     add_node(&mut elements, &mut added_nodes, prim.clone(), prim.clone(), "Primitive".to_string(), None);
                 }

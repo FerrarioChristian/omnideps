@@ -293,3 +293,7 @@ edges:
   source: domain.direct.violating.InheritanceImplementsInterface
   sink: technology.direct.dao.IMapDAO
   kind: isImplementationOf
+- testid: CAST-1
+  source: domain.direct.allowed.TypeCast.testCast
+  sink: domain.direct.Base
+  kind: casts_type

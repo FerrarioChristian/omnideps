@@ -183,6 +183,12 @@
         background-color: #1abc9c;
         clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
     }
+    .node-type-alias {
+        width: 80px;
+        height: 80px;
+        background-color: #9b59b6;
+        clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
+    }
 
     /* Frecce (Archi) */
     .edge-container {
@@ -229,6 +235,12 @@
     
     .edge-nested .edge-line { height: 1px; background-color: #7f8c8d; opacity: 0.5; }
     .edge-nested .edge-arrow { border-left: 6px solid #7f8c8d; opacity: 0.5; }
+
+    .edge-caststo .edge-line { height: 2px; border-top: 2px dashed #00a8ff; background: transparent; }
+    .edge-caststo .edge-arrow { border-left: 8px solid #00a8ff; }
+
+    .edge-aliases .edge-line { height: 2px; border-top: 2px dotted #ff00ff; background: transparent; }
+    .edge-aliases .edge-arrow { border-left: 8px solid #ff00ff; }
     
     .interaction-box {
         background: rgba(20, 20, 20, 0.5);
@@ -323,6 +335,13 @@
                         <p>Esagoni turchesi. Rappresentano i tipi fondamentali del linguaggio (es. <code>int</code>, <code>String</code>, <code>boolean</code>) che vengono referenziati direttamente dal codice.</p>
                     </div>
                 </div>
+                <div class="legend-card">
+                    <div class="visual-element node-type-alias">Type<br/>Alias</div>
+                    <div class="description">
+                        <h3>Type Alias</h3>
+                        <p>Diamanti magenta. Rappresentano alias di tipi (es. <code>type</code> in Python/TypeScript, <code>typedef</code> in C).</p>
+                    </div>
+                </div>
             </div>
 
             <h2>2. Relazioni Architetturali (Archi)</h2>
@@ -395,6 +414,26 @@
                     <div class="description">
                         <h3>Imports (Inclusione)</h3>
                         <p>Linea viola solida. Generata dalle dichiarazioni di importazione/use esplicite a livello di modulo.</p>
+                    </div>
+                </div>
+                <div class="legend-card">
+                    <div class="visual-element edge-container edge-caststo">
+                        <div class="edge-line"></div>
+                        <div class="edge-arrow"></div>
+                    </div>
+                    <div class="description">
+                        <h3>CastsTo (Conversione di Tipo)</h3>
+                        <p>Linea blu (ceruleo) tratteggiata. Generata dai cast o conversioni esplicite di tipo.</p>
+                    </div>
+                </div>
+                <div class="legend-card">
+                    <div class="visual-element edge-container edge-aliases">
+                        <div class="edge-line"></div>
+                        <div class="edge-arrow"></div>
+                    </div>
+                    <div class="description">
+                        <h3>Aliases (Alias di Tipo)</h3>
+                        <p>Linea magenta puntigliata. Generata da un TypeAlias verso il suo tipo bersaglio originale.</p>
                     </div>
                 </div>
                 <div class="legend-card">

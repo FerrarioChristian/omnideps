@@ -269,3 +269,7 @@ edges:
   source: test_constructors.Dog.__init__
   sink: test_constructors.Animal.__init__
   kind: calls
+- testid: ALIA-1
+  source: utils.MyAlias
+  sink: str
+  kind: aliases

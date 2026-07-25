@@ -122,3 +122,11 @@ edges:
   source: get_width
   sink: Point.x
   kind: accesses_field
+- testid: ALIA-1
+  source: MyInt
+  sink: int
+  kind: aliases
+- testid: CAST-1
+  source: divide
+  sink: float
+  kind: casts_to

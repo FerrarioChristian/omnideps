@@ -66,3 +66,4 @@ CALL-10,functions.function_with_inherited_trait_methods,traits.TraitB.new_trait_
 CALL-11,functions.function_with_inherited_trait_methods,structs.StructA.static_method,method_invocation
 EXTE-1,traits.TraitB,traits.TraitA,extends
 CAST-1,functions.function_with_type_casts,enums.EnumB,casts_type
+ACCE-99,functions.function_with_alias,structs.StructA.x,field_access

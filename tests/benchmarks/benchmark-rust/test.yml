@@ -353,3 +353,11 @@ edges:
   source: functions.function_with_type_casts
   sink: enums.EnumB
   kind: casts_type
+- testid: ALIA-1
+  source: functions.MyAlias
+  sink: structs.StructA
+  kind: aliases
+- testid: DECL-99
+  source: functions.function_with_alias
+  sink: functions.MyAlias
+  kind: uses_type

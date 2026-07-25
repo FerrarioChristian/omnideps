@@ -41,6 +41,7 @@ fn walk_cst(node: tree_sitter::Node, source: &str, modules: &mut Vec<Module>, la
                 imports: vec![],
                 sub_modules: vec![],
                 structured_types: vec![],
+            type_aliases: vec![],
                 free_functions: vec![],
                 impl_blocks: vec![],
                 free_variables: vec![],
@@ -75,6 +76,9 @@ fn walk_cst(node: tree_sitter::Node, source: &str, modules: &mut Vec<Module>, la
             }
             crate::heuristics::ParsedItem::ImplBlock(ib) => modules[0].impl_blocks.push(ib),
             crate::heuristics::ParsedItem::Imports(i) => modules[0].imports.extend(i),
+            crate::heuristics::ParsedItem::Component(crate::model::Component::TypeAlias(t)) => {
+                modules[0].type_aliases.push(t);
+            }
             crate::heuristics::ParsedItem::Component(crate::model::Component::Primitive(_)) => {}
         }
         return;
@@ -116,6 +120,7 @@ pub fn parse_source(
             imports: vec![],
             sub_modules: vec![],
             structured_types: vec![],
+            type_aliases: vec![],
             free_functions: vec![],
             impl_blocks: vec![],
             free_variables: vec![],
@@ -128,6 +133,7 @@ pub fn parse_source(
             global_root.free_variables.extend(file_mod.free_variables);
             global_root.impl_blocks.extend(file_mod.impl_blocks);
             global_root.imports.extend(file_mod.imports);
+            global_root.type_aliases.extend(file_mod.type_aliases);
         }
         modules.push(global_root);
     }
@@ -167,6 +173,7 @@ fn apply_directory_strategy(modules: &mut Vec<Module>, path: &std::path::Path, f
                 imports: vec![],
                 sub_modules: vec![current],
                 structured_types: vec![],
+            type_aliases: vec![],
                 free_functions: vec![],
                 impl_blocks: vec![],
                 free_variables: vec![],
@@ -181,6 +188,7 @@ fn apply_directory_strategy(modules: &mut Vec<Module>, path: &std::path::Path, f
             imports: vec![],
             sub_modules: vec![current],
             structured_types: vec![],
+            type_aliases: vec![],
             free_functions: vec![],
             impl_blocks: vec![],
             free_variables: vec![],
@@ -205,6 +213,7 @@ fn apply_package_strategy(modules: &mut Vec<Module>, package_path: Vec<String>, 
         imports: content_module.imports,
         sub_modules: content_module.sub_modules, // If there are any nested modules parsed from file
         structured_types: content_module.structured_types,
+        type_aliases: content_module.type_aliases,
         free_functions: content_module.free_functions,
         impl_blocks: content_module.impl_blocks,
         free_variables: content_module.free_variables,
@@ -219,6 +228,7 @@ fn apply_package_strategy(modules: &mut Vec<Module>, package_path: Vec<String>, 
             imports: vec![],
             sub_modules: vec![current],
             structured_types: vec![],
+            type_aliases: vec![],
             free_functions: vec![],
             impl_blocks: vec![],
             free_variables: vec![],
@@ -234,6 +244,7 @@ fn apply_package_strategy(modules: &mut Vec<Module>, package_path: Vec<String>, 
         imports: vec![],
         sub_modules: vec![current],
         structured_types: vec![],
+            type_aliases: vec![],
         free_functions: vec![],
         impl_blocks: vec![],
         free_variables: vec![],

@@ -36,6 +36,9 @@ pub fn dispatch_node(node: Node, source: &str, lang_name: &str, config: &crate::
             return Some(ParsedItem::ImplBlock(implb));
         }
     }
+    if let Some(ta) = parsers::try_parse_type_alias(node, source) {
+        return Some(ParsedItem::Component(Component::TypeAlias(ta)));
+    }
     if let Some(fv) = parsers::try_parse_free_variable(node, source) {
         return Some(ParsedItem::Component(Component::Field(vec![fv.name], fv.ty)));
     }

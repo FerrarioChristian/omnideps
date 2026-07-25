@@ -54,6 +54,7 @@ pub fn extract_identifier(node: Node, source: &str) -> Option<String> {
         .or_else(|| node.child_by_field_name("type_identifier"))
         .or_else(|| node.child_by_field_name("identifier"))
         .or_else(|| node.child_by_field_name("pattern"))
+        .or_else(|| node.child_by_field_name("left"))
     {
         let text = node_text(n, source).trim().to_string();
         if !text.is_empty() { return Some(text); }

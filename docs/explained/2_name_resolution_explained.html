@@ -1236,5 +1236,21 @@ struct User { name: String }</code></pre>
         <p style="margin-bottom: 0;">Formalmente, la transizione da v2 a v3 corrisponde al passaggio da una <em>valutazione eager</em> (risolvi subito) a una <em>valutazione deferred</em> (costruisci la query, valutala dopo). Questo è lo stesso principio usato nei compilatori moderni che separano la fase di type-checking (analisi semantica) dalla fase di code generation.</p>
     </div>
 
+    <!-- ============================================================ -->
+    <!-- SEZIONE 6 -->
+    <!-- ============================================================ -->
+    <h2 id="extensions">6. Estensioni Architetturali (Aliases e Casts)</h2>
+    <p>L'architettura del resolver è progettata per gestire in modo trasparente pattern complessi tipici della programmazione moderna:</p>
+
+    <h3>6.1 Type Aliases</h3>
+    <p>Gli <strong>Alias di tipo</strong> (es. <code>type MyString = String</code>) vengono rappresentati nello Scope Tree tramite <code>Symbol::TypeAlias(TypeRef)</code>. Durante la fase 2b (Execution), quando il risolutore incontra un simbolo di questo genere:</p>
+    <ul>
+        <li>Se la query originaria richiede di risolvere il "tipo" dell'entità, il <code>TypeAlias</code> viene automaticamente valutato sostituendolo con il <code>TypeRef</code> originario.</li>
+        <li>Questo meccanismo di indirezione trasparente assicura che gli alias abbiano l'identico comportamento dei tipi nativi senza che le funzioni chiamanti debbano gestire l'espansione.</li>
+    </ul>
+
+    <h3>6.2 Type Casts</h3>
+    <p>I <strong>Type Casts</strong> (es. <code>(int) x</code> oppure <code>x as i32</code>) vengono intercettati a livello di <code>Block</code> dall'estrattore euristico e memorizzati in un vettore <code>type_casts</code>. La fase 2b li attraversa e risolve ogni cast generato come farebbe con un parametro o un valore di ritorno locale. Nel grafo finale, ogni cast si traduce in una dipendenza semantica di tipo <code>CastsTo</code>.</p>
+
 </body>
 </html>

@@ -162,3 +162,11 @@ edges:
   source: Fleet.startAll
   sink: Fleet.cars
   kind: accesses_field
+- testid: ALIA-1
+  source: MyEngine
+  sink: automotive.IEngine
+  kind: aliases
+- testid: CAST-1
+  source: do_cast
+  sink: float
+  kind: casts_type

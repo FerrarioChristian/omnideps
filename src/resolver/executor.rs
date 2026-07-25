@@ -65,6 +65,11 @@ pub fn execute_module(ctx: &ExecutorContext, mut m: Module, parent_scope: ScopeI
         fv.ty = evaluate_typeref(ctx, fv.ty.clone(), scope_id, true);
     }
 
+    for ta in m.type_aliases.iter_mut() {
+        ta.target = evaluate_typeref(ctx, ta.target.clone(), scope_id, true);
+        println!("Executor TypeAlias after eval: {:?} target={:?}", ta.name, ta.target);
+    }
+
     m.free_functions = m
         .free_functions
         .into_iter()
@@ -223,6 +228,11 @@ fn execute_block(
         .into_iter()
         .map(|a| evaluate_typeref(ctx, a, block_scope_id, false))
         .collect();
+    b.type_casts = b
+        .type_casts
+        .into_iter()
+        .map(|c| evaluate_typeref(ctx, c, block_scope_id, false))
+        .collect();
 
     let sub_blocks: Vec<Block> = b
         .sub_blocks
@@ -263,15 +273,13 @@ pub fn evaluate_typeref(
             }
 
             let mut visited = std::collections::HashSet::new();
-            let res = if let Some(resolved) =
+            if let Some(resolved) =
                 evaluate_query(ctx, &query, scope_id, resolve_type, &mut visited)
             {
                 resolved
             } else {
                 TypeRef::Unresolved(qn.clone())
-            };
-            println!("evaluate_typeref for {:?}: returned {:?}", qn, res);
-            res
+            }
         }
         _ => tr,
     }
@@ -490,7 +498,7 @@ fn symbol_to_typeref(
             let path = build_path_from_scope(ctx.tree, *id);
             TypeRef::Resolved(path)
         }
-        Symbol::Value(ty) => {
+        Symbol::Value(ty) | Symbol::TypeAlias(ty) => {
             if resolve_type {
                 match ty {
                     TypeRef::ResolutionQuery(q) => evaluate_query(ctx, q, scope_id, true, visited)
@@ -543,7 +551,7 @@ pub fn find_global(ctx: &ExecutorContext, path: &[String]) -> Option<TypeRef> {
         if let Some(sym) = ctx.tree.arena[curr].symbols.get(part) {
             match sym {
                 Symbol::Module(id) | Symbol::Type(id) => curr = *id,
-                Symbol::Value(ty) => {
+                Symbol::Value(ty) | Symbol::TypeAlias(ty) => {
                     if i == path.len() - 1 {
                         return Some(ty.clone());
                     } else {

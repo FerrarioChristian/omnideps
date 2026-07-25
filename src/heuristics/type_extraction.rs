@@ -48,7 +48,7 @@ pub fn extract_type_ref(node: Node, source: &str) -> TypeRef {
     // 0. Handle direct access and identifiers
     if matches!(
         kind,
-        "field_access" | "scoped_identifier" | "qualified_identifier" | "identifier" | "type_identifier" | "attribute" | "field_expression"
+        "field_access" | "scoped_identifier" | "qualified_identifier" | "identifier" | "type_identifier" | "attribute" | "field_expression" | "primitive_type" | "predefined_type"
     ) {
         let text = node_text(node, source);
         if !text.is_empty() {
@@ -105,6 +105,7 @@ fn try_extract_from_type_field(node: Node, source: &str) -> Option<TypeRef> {
         .or_else(|| node.child_by_field_name("return_type"))
         .or_else(|| node.child_by_field_name("field_type"))
         .or_else(|| node.child_by_field_name("value_type"))
+        .or_else(|| node.child_by_field_name("right"))
     {
         Some(extract_type_ref(type_node, source))
     } else {

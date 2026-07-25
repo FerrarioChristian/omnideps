@@ -20,6 +20,7 @@ pub fn try_parse_module_node(node: Node, source: &str) -> Option<Module> {
         imports: vec![],
         sub_modules: vec![],
         structured_types: vec![],
+            type_aliases: vec![],
         free_functions: vec![],
         impl_blocks: vec![],
         free_variables: vec![],
@@ -259,6 +260,25 @@ pub fn try_parse_free_variable(node: Node, source: &str) -> Option<crate::model:
     }
 
     None
+}
+
+pub fn try_parse_type_alias(node: Node, source: &str) -> Option<crate::model::TypeAlias> {
+    if !is_type_alias(node) {
+        return None;
+    }
+
+    let name = extract_identifier(node, source);
+    println!("TypeAlias: name={:?} from node: {:?}", name, node.kind());
+    let name = name?;
+    
+    // For type alias, we can typically extract the type ref right from the node
+    let target = extract_type_ref(node, source);
+    println!("TypeAlias: name={:?} target={:?}", name, target);
+    
+    Some(crate::model::TypeAlias {
+        name: vec![name],
+        target,
+    })
 }
 
 #[cfg(test)]
