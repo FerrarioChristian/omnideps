@@ -52,9 +52,12 @@ pub fn extract_block(node: Node, source: &str) -> crate::model::Block {
                 | "let_declaration"
                 | "assignment"
                 | "declaration"
+                | "for_range_loop"
+                | "for_in_statement"
+                | "catch_clause"
         ) {
             let name_opt;
-            if let Some(decl_node) = child.child_by_field_name("declarator") {
+            if let Some(decl_node) = child.child_by_field_name("declarator").or_else(|| child.child_by_field_name("left")) {
                 if let Some(name_node) = decl_node.child_by_field_name("name") {
                     name_opt = extract_identifier(name_node, source);
                 } else {
@@ -97,7 +100,9 @@ pub fn extract_block(node: Node, source: &str) -> crate::model::Block {
             let mut inner_inst = vec![];
             let mut inner_accesses = vec![];
             let mut inner_casts = vec![];
-            if let Some(val) = child.child_by_field_name("value").or_else(|| child.child_by_field_name("declarator")) {
+            if let Some(val) = child.child_by_field_name("value")
+                .or_else(|| child.child_by_field_name("right"))
+                .or_else(|| child.child_by_field_name("declarator")) {
                 find_behavioral_deps(val, source, &mut inner_calls, &mut inner_inst, &mut inner_accesses, &mut inner_casts);
             } else {
                 // If there's no clear value field, scan the whole declaration just in case (excluding the type/name to avoid false positives)
@@ -108,6 +113,16 @@ pub fn extract_block(node: Node, source: &str) -> crate::model::Block {
             instantiates.extend(inner_inst);
             accesses.extend(inner_accesses);
             type_casts.extend(inner_casts);
+            
+            // Recurse into body/block if it's a loop or catch clause
+            if child.kind() == "for_range_loop" || child.kind() == "for_in_statement" || child.kind() == "catch_clause" {
+                let mut gcursor = child.walk();
+                for grandchild in child.children(&mut gcursor) {
+                    if grandchild.kind().contains("body") || grandchild.kind().contains("block") || grandchild.kind() == "compound_statement" {
+                        sub_blocks.push(extract_block(grandchild, source));
+                    }
+                }
+            }
         }
         // 2. Nested Blocks
         else if kind.contains("body") || kind.contains("block") || kind == "compound_statement" {

@@ -28,7 +28,7 @@ pub fn dispatch_node(node: Node, source: &str, lang_name: &str, config: &crate::
     }
     let lang_modules = &config.get_for(lang_name).modules;
     if (lang_modules.inline_mod_based || lang_modules.namespace_based)
-        && let Some(m) = parsers::try_parse_module_node(node, source) {
+        && let Some(m) = parsers::try_parse_module_node(node, source, lang_name) {
             return Some(ParsedItem::Component(Component::Module(m)));
         }
     if let Some(st) = parsers::try_parse_structured_type(node, source, lang_name, config) {

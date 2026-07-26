@@ -37,6 +37,7 @@ pub struct Scope {
 pub struct ScopeTree {
     pub arena: Vec<Scope>,
     pub root: ScopeId,
+    pub pending_impl_blocks: Vec<(crate::model::ImplBlock, ScopeId, String)>,
 }
 
 impl ScopeTree {
@@ -54,10 +55,16 @@ impl ScopeTree {
                 language: None,
             }],
             root: 0,
+            pending_impl_blocks: vec![],
         };
 
         for m in modules {
             tree.register_module(m, 0, config);
+        }
+
+        let pending = std::mem::take(&mut tree.pending_impl_blocks);
+        for (ib, parent_id, lang) in pending {
+            tree.register_impl_block(&ib, parent_id, config, &lang);
         }
 
         tree
@@ -138,7 +145,7 @@ impl ScopeTree {
 
         // Impl blocks
         for ib in &m.impl_blocks {
-            self.register_impl_block(ib, scope_id, config, m.language.as_deref().unwrap_or(""));
+            self.pending_impl_blocks.push((ib.clone(), scope_id, m.language.as_deref().unwrap_or("").to_string()));
         }
 
         // Funzioni libere
@@ -201,7 +208,7 @@ impl ScopeTree {
             target_scope_id = Some(*id);
         }
 
-        let class_scope = if let Some(id) = target_scope_id {
+        println!("register_impl_block target_name: {} resolved to: {:?}", target_name, target_scope_id); let class_scope = if let Some(id) = target_scope_id {
             id
         } else {
             let id = self.new_scope(parent_id, target_name.clone());

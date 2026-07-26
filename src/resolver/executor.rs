@@ -464,9 +464,11 @@ fn evaluate_query_find(
                         // If not found in the tree, it might be an external library
                         return Some(TypeRef::External(imp.path.clone()));
                     }
-                } else if last == "*" {
+                } else if last == "*" || imp.is_wildcard {
                     let mut specific_path = imp.path.clone();
-                    specific_path.pop();
+                    if last == "*" {
+                        specific_path.pop();
+                    }
                     specific_path.push(name.to_string());
 
                     if let Some(resolved) = find_global(ctx, &specific_path) {
@@ -475,7 +477,9 @@ fn evaluate_query_find(
 
                     // Check if the base module exists. If not, we assume the symbol comes from it.
                     let mut base_path = imp.path.clone();
-                    base_path.pop();
+                    if last == "*" {
+                        base_path.pop();
+                    }
                     if find_global(ctx, &base_path).is_none() {
                         return Some(TypeRef::External(specific_path));
                     }

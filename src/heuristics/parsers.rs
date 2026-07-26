@@ -7,7 +7,7 @@ use super::structural_extraction::*;
 use super::text_parsing::*;
 use super::type_extraction::*;
 
-pub fn try_parse_module_node(node: Node, source: &str) -> Option<Module> {
+pub fn try_parse_module_node(node: Node, source: &str, lang_name: &str) -> Option<Module> {
     if !is_module(node) {
         return None;
     }
@@ -15,7 +15,7 @@ pub fn try_parse_module_node(node: Node, source: &str) -> Option<Module> {
     let name = extract_identifier(node, source).unwrap_or_else(|| "unnamed_module".to_string());
     Some(Module {
         name: vec![name],
-        language: None,
+        language: Some(lang_name.to_string()),
         file_path: None,
         imports: vec![],
         sub_modules: vec![],
@@ -123,7 +123,7 @@ pub fn try_parse_function(node: Node, source: &str) -> Option<Function> {
     let annotations = super::annotation_extraction::extract_annotations(node, source);
 
     Some(Function {
-        name: vec![name],
+        name: split_qualified_name(&name),
         signature: crate::model::Signature {
             parameters,
             return_type,
@@ -161,12 +161,17 @@ pub fn try_parse_impl_block(
 }
 
 pub fn try_parse_imports(node: Node, source: &str) -> Option<Vec<Import>> {
-    if !is_import(node) {
+    let kind = node.kind();
+    if !kind.contains("import")
+        && !kind.contains("use")
+        && kind != "using_declaration"
+        && kind != "preproc_include"
+    {
         return None;
     }
 
     let text = node_text(node, source);
-    let is_wildcard = text.contains('*') || text.contains(".*") || text.contains("::*");
+    let is_wildcard = text.contains('*') || text.contains(".*") || text.contains("::*") || text.starts_with("using namespace ");
 
     // Attempt to find alias
     let mut alias = None;
@@ -187,8 +192,8 @@ pub fn try_parse_imports(node: Node, source: &str) -> Option<Vec<Import>> {
         let base_path = split_qualified_name(&node_text(p_node, source));
         let mut cursor = node.walk();
         for child in node.children(&mut cursor) {
-            let kind = child.kind();
-            if matches!(kind, "aliased_import" | "dotted_name" | "name" | "identifier")
+            let child_kind = child.kind();
+            if matches!(child_kind, "aliased_import" | "dotted_name" | "name" | "identifier")
                 && child.id() != p_node.id() {
                     let txt = node_text(child, source);
                     let mut full_path = base_path.clone();
@@ -233,6 +238,7 @@ pub fn try_parse_imports(node: Node, source: &str) -> Option<Vec<Import>> {
                         .replace("<", "")
                         .replace(">", "");
                     p = split_qualified_name(&txt);
+                    // For using_declaration we DO want to break here since the identifier is the path
                     break;
                 }
             }
