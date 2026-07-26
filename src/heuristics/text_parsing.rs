@@ -1,7 +1,7 @@
 //! Provides foundational utilities for raw text extraction and manipulation from Tree-sitter nodes.
-//! 
-//! This module contains helper functions designed to isolate the low-level string 
-//! parsing (e.g., splitting qualified names, extracting raw text) from the higher-level 
+//!
+//! This module contains helper functions designed to isolate the low-level string
+//! parsing (e.g., splitting qualified names, extracting raw text) from the higher-level
 //! structural and semantic extraction phases.
 
 use crate::model::QualifiedName;
@@ -26,7 +26,7 @@ pub fn node_text(node: Node, source: &str) -> String {
 pub fn split_qualified_name(text: &str) -> QualifiedName {
     // Remove generic parameters for basic name resolution
     let text = text.split('<').next().unwrap_or(text);
-    
+
     text.split(&[':', '.'][..])
         .filter(|s| !s.trim().is_empty())
         .map(|s| s.trim().to_string())
@@ -44,9 +44,14 @@ pub fn extract_name_from_text(text: &str) -> Option<QualifiedName> {
 
 /// Tries to extract a simple identifier (string) from common child field names.
 pub fn extract_identifier(node: Node, source: &str) -> Option<String> {
-    if matches!(node.kind(), "identifier" | "type_identifier" | "pattern" | "name" | "scoped_identifier") {
+    if matches!(
+        node.kind(),
+        "identifier" | "type_identifier" | "pattern" | "name" | "scoped_identifier"
+    ) {
         let text = node_text(node, source).trim().to_string();
-        if !text.is_empty() { return Some(text); }
+        if !text.is_empty() {
+            return Some(text);
+        }
     }
 
     if let Some(n) = node
@@ -57,24 +62,40 @@ pub fn extract_identifier(node: Node, source: &str) -> Option<String> {
         .or_else(|| node.child_by_field_name("left"))
     {
         let text = node_text(n, source).trim().to_string();
-        if !text.is_empty() { return Some(text); }
+        if !text.is_empty() {
+            return Some(text);
+        }
     }
 
     if let Some(decl) = node.child_by_field_name("declarator") {
         if let Some(n) = decl.child_by_field_name("declarator") {
             let text = node_text(n, source).trim().to_string();
-            if !text.is_empty() { return Some(text); }
+            if !text.is_empty() {
+                return Some(text);
+            }
         }
-        
+
         if let Some(n) = decl.child_by_field_name("name") {
             let text = node_text(n, source).trim().to_string();
-            if !text.is_empty() { return Some(text); }
+            if !text.is_empty() {
+                return Some(text);
+            }
         }
 
         let text = node_text(decl, source).trim().to_string();
         // Take just the name before '(' or '='
-        let name_part = text.split('(').next().unwrap_or(text.as_str()).split('=').next().unwrap_or("").trim().to_string();
-        if !name_part.is_empty() { return Some(name_part); }
+        let name_part = text
+            .split('(')
+            .next()
+            .unwrap_or(text.as_str())
+            .split('=')
+            .next()
+            .unwrap_or("")
+            .trim()
+            .to_string();
+        if !name_part.is_empty() {
+            return Some(name_part);
+        }
     }
 
     None
@@ -82,7 +103,10 @@ pub fn extract_identifier(node: Node, source: &str) -> Option<String> {
 
 /// Extracts a qualified name (e.g. A::B::C) by traversing identifiers.
 pub fn extract_qualified_name(node: Node, source: &str) -> Option<QualifiedName> {
-    if matches!(node.kind(), "identifier" | "type_identifier" | "name" | "scoped_identifier") {
+    if matches!(
+        node.kind(),
+        "identifier" | "type_identifier" | "name" | "scoped_identifier"
+    ) {
         return Some(split_qualified_name(&node_text(node, source)));
     }
 

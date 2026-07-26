@@ -28,7 +28,10 @@ pub fn is_structured_type(node: Node) -> bool {
         let mut cursor = node.walk();
         for child in node.children(&mut cursor) {
             let child_kind = child.kind();
-            if child_kind.contains("struct") || child_kind.contains("enum") || child_kind.contains("union") {
+            if child_kind.contains("struct")
+                || child_kind.contains("enum")
+                || child_kind.contains("union")
+            {
                 return true;
             }
         }
@@ -86,7 +89,11 @@ pub fn is_import(node: Node) -> bool {
     }
     matches!(
         node.kind(),
-        "use_declaration" | "import_declaration" | "import_statement" | "import_from_statement" | "preproc_include"
+        "use_declaration"
+            | "import_declaration"
+            | "import_statement"
+            | "import_from_statement"
+            | "preproc_include"
     )
 }
 

@@ -128,9 +128,11 @@ impl TestReport {
 
     pub fn bool_to_markdown(value: bool) -> String {
         if value {
-            "![OK](https://github.githubassets.com/images/icons/emoji/unicode/2714.png?v8)".to_string()
+            "![OK](https://github.githubassets.com/images/icons/emoji/unicode/2714.png?v8)"
+                .to_string()
         } else {
-            "![KO](https://github.githubassets.com/images/icons/emoji/unicode/274c.png?v8)".to_string()
+            "![KO](https://github.githubassets.com/images/icons/emoji/unicode/274c.png?v8)"
+                .to_string()
         }
     }
 
@@ -183,7 +185,11 @@ impl TestReport {
             self.nodes.len(),
             self.nodes.len() - self.node_not_found_count,
             self.node_not_found_count,
-            if self.nodes.is_empty() { 0.0 } else { (self.node_not_found_count as f64) / (self.nodes.len() as f64) }
+            if self.nodes.is_empty() {
+                0.0
+            } else {
+                (self.node_not_found_count as f64) / (self.nodes.len() as f64)
+            }
         );
         markdown += &format!(
             "| {} | {} | {} | {} | {:.4} |\n",
@@ -191,7 +197,11 @@ impl TestReport {
             self.edges.len(),
             self.edges.len() - self.edge_not_found_count,
             self.edge_not_found_count,
-            if self.edges.is_empty() { 0.0 } else { (self.edge_not_found_count as f64) / (self.edges.len() as f64) }
+            if self.edges.is_empty() {
+                0.0
+            } else {
+                (self.edge_not_found_count as f64) / (self.edges.len() as f64)
+            }
         );
 
         markdown

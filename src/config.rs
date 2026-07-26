@@ -37,91 +37,106 @@ impl AnalyzerConfig {
     /// Creates the default architectural strategies based on language semantics.
     pub fn default_strategies() -> Self {
         let mut languages = HashMap::new();
-        
+
         // Python: Directory Based and File Based
-        languages.insert("python".to_string(), LanguageConfig {
-            modules: ModuleConfig {
-                file_based: true,
-                directory_based: true,
-                package_decl_based: false,
-                namespace_based: false,
-                inline_mod_based: false,
+        languages.insert(
+            "python".to_string(),
+            LanguageConfig {
+                modules: ModuleConfig {
+                    file_based: true,
+                    directory_based: true,
+                    package_decl_based: false,
+                    namespace_based: false,
+                    inline_mod_based: false,
+                },
+                transitive_imports: true,
+                support_impl_blocks: false,
+                forward_declarations: false,
+                self_keyword: None,
+                implicit_first_param_as_self: true,
+                extract_dynamic_fields: true,
             },
-            transitive_imports: true,
-            support_impl_blocks: false,
-            forward_declarations: false,
-            self_keyword: None,
-            implicit_first_param_as_self: true,
-            extract_dynamic_fields: true,
-        });
+        );
 
         // Rust: File, Directory and Inline Mod Based
-        languages.insert("rust".to_string(), LanguageConfig {
-            modules: ModuleConfig {
-                file_based: true,
-                directory_based: true,
-                package_decl_based: false,
-                namespace_based: false,
-                inline_mod_based: true,
+        languages.insert(
+            "rust".to_string(),
+            LanguageConfig {
+                modules: ModuleConfig {
+                    file_based: true,
+                    directory_based: true,
+                    package_decl_based: false,
+                    namespace_based: false,
+                    inline_mod_based: true,
+                },
+                transitive_imports: false,
+                support_impl_blocks: true,
+                forward_declarations: false,
+                self_keyword: Some("self".to_string()),
+                implicit_first_param_as_self: false,
+                extract_dynamic_fields: false,
             },
-            transitive_imports: false,
-            support_impl_blocks: true,
-            forward_declarations: false,
-            self_keyword: Some("self".to_string()),
-            implicit_first_param_as_self: false,
-            extract_dynamic_fields: false,
-        });
+        );
 
         // Java: Package Decl Based
-        languages.insert("java".to_string(), LanguageConfig {
-            modules: ModuleConfig {
-                file_based: false,
-                directory_based: false,
-                package_decl_based: true,
-                namespace_based: false,
-                inline_mod_based: false,
+        languages.insert(
+            "java".to_string(),
+            LanguageConfig {
+                modules: ModuleConfig {
+                    file_based: false,
+                    directory_based: false,
+                    package_decl_based: true,
+                    namespace_based: false,
+                    inline_mod_based: false,
+                },
+                transitive_imports: false,
+                support_impl_blocks: false,
+                forward_declarations: false,
+                self_keyword: Some("this".to_string()),
+                implicit_first_param_as_self: false,
+                extract_dynamic_fields: false,
             },
-            transitive_imports: false,
-            support_impl_blocks: false,
-            forward_declarations: false,
-            self_keyword: Some("this".to_string()),
-            implicit_first_param_as_self: false,
-            extract_dynamic_fields: false,
-        });
+        );
 
         // C++: Namespace Based
-        languages.insert("cpp".to_string(), LanguageConfig {
-            modules: ModuleConfig {
-                file_based: false,
-                directory_based: false,
-                package_decl_based: false,
-                namespace_based: true,
-                inline_mod_based: false,
+        languages.insert(
+            "cpp".to_string(),
+            LanguageConfig {
+                modules: ModuleConfig {
+                    file_based: false,
+                    directory_based: false,
+                    package_decl_based: false,
+                    namespace_based: true,
+                    inline_mod_based: false,
+                },
+                transitive_imports: false,
+                support_impl_blocks: true,
+                forward_declarations: true,
+                self_keyword: Some("this".to_string()),
+                implicit_first_param_as_self: false,
+                extract_dynamic_fields: false,
             },
-            transitive_imports: false,
-            support_impl_blocks: true,
-            forward_declarations: true,
-            self_keyword: Some("this".to_string()),
-            implicit_first_param_as_self: false,
-            extract_dynamic_fields: false,
-        });
-        
+        );
+
         // C: None
-        languages.insert("c".to_string(), LanguageConfig {
-            modules: ModuleConfig {
-                file_based: false,
-                directory_based: false,
-                package_decl_based: false,
-                namespace_based: false,
-                inline_mod_based: false,
+        languages.insert(
+            "c".to_string(),
+            LanguageConfig {
+                modules: ModuleConfig {
+                    file_based: false,
+                    directory_based: false,
+                    package_decl_based: false,
+                    namespace_based: false,
+                    inline_mod_based: false,
+                },
+                transitive_imports: false,
+                support_impl_blocks: false,
+                forward_declarations: true,
+                self_keyword: None,
+                implicit_first_param_as_self: false,
+                extract_dynamic_fields: false,
             },
-            transitive_imports: false,
-            support_impl_blocks: false,
-            forward_declarations: true,
-            self_keyword: None,
-            implicit_first_param_as_self: false,
-            extract_dynamic_fields: false,
-        });
+        );
 
         Self {
             default_config: LanguageConfig {

@@ -3,7 +3,13 @@ use tree_sitter::Language;
 
 /// Extracts the basic Intermediate Representation (IR) modules from a source file given its Tree-sitter Language.
 /// It parses the source code into an AST and delegates node matching to the heuristics dispatcher.
-pub fn generic_extract(lang: Language, source: &str, lang_name: &str, file_path: Option<String>, config: &crate::config::AnalyzerConfig) -> anyhow::Result<(Vec<Module>, Option<Vec<String>>)> {
+pub fn generic_extract(
+    lang: Language,
+    source: &str,
+    lang_name: &str,
+    file_path: Option<String>,
+    config: &crate::config::AnalyzerConfig,
+) -> anyhow::Result<(Vec<Module>, Option<Vec<String>>)> {
     let mut parser = tree_sitter::Parser::new();
     parser.set_language(&lang).unwrap();
 
@@ -16,7 +22,9 @@ pub fn generic_extract(lang: Language, source: &str, lang_name: &str, file_path:
     if config.get_for(lang_name).modules.package_decl_based {
         let mut cursor = root.walk();
         for child in root.children(&mut cursor) {
-            if let Some(pkg) = crate::heuristics::parsers::try_parse_package_declaration(child, source) {
+            if let Some(pkg) =
+                crate::heuristics::parsers::try_parse_package_declaration(child, source)
+            {
                 package_path = Some(pkg);
                 break;
             }
@@ -25,14 +33,30 @@ pub fn generic_extract(lang: Language, source: &str, lang_name: &str, file_path:
 
     let mut modules = vec![];
     let mut pending_attributes = vec![];
-    walk_cst(root, source, &mut modules, &mut pending_attributes, lang_name, file_path, config);
+    walk_cst(
+        root,
+        source,
+        &mut modules,
+        &mut pending_attributes,
+        lang_name,
+        file_path,
+        config,
+    );
     Ok((modules, package_path))
 }
 
 /// Recursively traverses the Concrete Syntax Tree (CST).
 /// When a recognized component is found, it's added to the IR and the recursion stops for that branch
 /// to prevent duplicating internal methods/functions as top-level components.
-fn walk_cst(node: tree_sitter::Node, source: &str, modules: &mut Vec<Module>, pending_attributes: &mut Vec<crate::model::TypeRef>, lang_name: &str, file_path: Option<String>, config: &crate::config::AnalyzerConfig) {
+fn walk_cst(
+    node: tree_sitter::Node,
+    source: &str,
+    modules: &mut Vec<Module>,
+    pending_attributes: &mut Vec<crate::model::TypeRef>,
+    lang_name: &str,
+    file_path: Option<String>,
+    config: &crate::config::AnalyzerConfig,
+) {
     if let Some(comp) = crate::heuristics::dispatch_node(node, source, lang_name, config) {
         if modules.is_empty() {
             modules.push(Module {
@@ -42,25 +66,35 @@ fn walk_cst(node: tree_sitter::Node, source: &str, modules: &mut Vec<Module>, pe
                 imports: vec![],
                 sub_modules: vec![],
                 structured_types: vec![],
-            type_aliases: vec![],
+                type_aliases: vec![],
                 free_functions: vec![],
                 impl_blocks: vec![],
                 free_variables: vec![],
             });
         }
-        
+
         match comp {
             crate::heuristics::ParsedItem::Component(crate::model::Component::Module(m)) => {
                 // Traverse children to populate the new module before adding it
                 let mut cursor = node.walk();
                 let mut new_modules = vec![m];
                 for child in node.children(&mut cursor) {
-                    walk_cst(child, source, &mut new_modules, pending_attributes, lang_name, file_path.clone(), config);
+                    walk_cst(
+                        child,
+                        source,
+                        &mut new_modules,
+                        pending_attributes,
+                        lang_name,
+                        file_path.clone(),
+                        config,
+                    );
                 }
                 // The new module is now populated (it is located at new_modules[0])
                 modules[0].sub_modules.push(new_modules.remove(0));
             }
-            crate::heuristics::ParsedItem::Component(crate::model::Component::StructuredType(mut st)) => {
+            crate::heuristics::ParsedItem::Component(crate::model::Component::StructuredType(
+                mut st,
+            )) => {
                 st.annotations.append(pending_attributes);
                 modules[0].structured_types.push(st);
             }
@@ -70,14 +104,26 @@ fn walk_cst(node: tree_sitter::Node, source: &str, modules: &mut Vec<Module>, pe
                 let mut cursor = node.walk();
                 for child in node.children(&mut cursor) {
                     if child.kind().contains("body") || child.kind().contains("block") {
-                        walk_cst(child, source, modules, pending_attributes, lang_name, file_path.clone(), config);
+                        walk_cst(
+                            child,
+                            source,
+                            modules,
+                            pending_attributes,
+                            lang_name,
+                            file_path.clone(),
+                            config,
+                        );
                     }
                 }
             }
             crate::heuristics::ParsedItem::Component(crate::model::Component::Field(name, ty)) => {
                 if let Some(n) = name.last() {
                     let annotations = std::mem::take(pending_attributes);
-                    modules[0].free_variables.push(crate::model::Field { name: n.clone(), ty, annotations });
+                    modules[0].free_variables.push(crate::model::Field {
+                        name: n.clone(),
+                        ty,
+                        annotations,
+                    });
                 }
             }
             crate::heuristics::ParsedItem::ImplBlock(ib) => modules[0].impl_blocks.push(ib),
@@ -97,7 +143,15 @@ fn walk_cst(node: tree_sitter::Node, source: &str, modules: &mut Vec<Module>, pe
 
     let mut cursor = node.walk();
     for child in node.children(&mut cursor) {
-        walk_cst(child, source, modules, pending_attributes, lang_name, file_path.clone(), config);
+        walk_cst(
+            child,
+            source,
+            modules,
+            pending_attributes,
+            lang_name,
+            file_path.clone(),
+            config,
+        );
     }
 }
 
@@ -112,10 +166,16 @@ pub fn parse_source(
     config: &crate::config::AnalyzerConfig,
 ) -> anyhow::Result<(Vec<Module>, PrimitiveRegistry)> {
     let file_path_str = path.to_string_lossy().to_string();
-    let (mut modules, package_path) = generic_extract(lang.to_tree_sitter_lang(), source, lang.name(), Some(file_path_str.clone()), config)?;
-    
+    let (mut modules, package_path) = generic_extract(
+        lang.to_tree_sitter_lang(),
+        source,
+        lang.name(),
+        Some(file_path_str.clone()),
+        config,
+    )?;
+
     let lang_config = config.get_for(lang.name());
-    
+
     if lang_config.modules.file_based && lang_config.modules.directory_based {
         apply_directory_strategy(&mut modules, path, &file_path_str, lang.name());
     } else if lang_config.modules.package_decl_based {
@@ -139,7 +199,9 @@ pub fn parse_source(
         if !modules.is_empty() {
             let file_mod = modules.remove(0);
             global_root.sub_modules.extend(file_mod.sub_modules);
-            global_root.structured_types.extend(file_mod.structured_types);
+            global_root
+                .structured_types
+                .extend(file_mod.structured_types);
             global_root.free_functions.extend(file_mod.free_functions);
             global_root.free_variables.extend(file_mod.free_variables);
             global_root.impl_blocks.extend(file_mod.impl_blocks);
@@ -150,14 +212,18 @@ pub fn parse_source(
     }
 
     // Load primitives from external registry
-    let prim_registry = PrimitiveRegistry::load(lang.name()).unwrap_or_else(|_| {
-        PrimitiveRegistry::empty()
-    });
+    let prim_registry =
+        PrimitiveRegistry::load(lang.name()).unwrap_or_else(|_| PrimitiveRegistry::empty());
 
     Ok((modules, prim_registry))
 }
 
-fn apply_directory_strategy(modules: &mut Vec<Module>, path: &std::path::Path, file_path_str: &str, lang_name: &str) {
+fn apply_directory_strategy(
+    modules: &mut Vec<Module>,
+    path: &std::path::Path,
+    file_path_str: &str,
+    lang_name: &str,
+) {
     let mut path_components: Vec<String> = path
         .components()
         .filter_map(|c| {
@@ -165,11 +231,12 @@ fn apply_directory_strategy(modules: &mut Vec<Module>, path: &std::path::Path, f
             if s == "." || s == ".." { None } else { Some(s) }
         })
         .collect();
-        
+
     if let Some(last) = path_components.last_mut()
-        && let Some(stem) = std::path::Path::new(last).file_stem() {
-            *last = stem.to_string_lossy().to_string();
-        }
+        && let Some(stem) = std::path::Path::new(last).file_stem()
+    {
+        *last = stem.to_string_lossy().to_string();
+    }
 
     if !path_components.is_empty() {
         let mut current = modules.remove(0);
@@ -183,14 +250,14 @@ fn apply_directory_strategy(modules: &mut Vec<Module>, path: &std::path::Path, f
                 imports: vec![],
                 sub_modules: vec![current],
                 structured_types: vec![],
-            type_aliases: vec![],
+                type_aliases: vec![],
                 free_functions: vec![],
                 impl_blocks: vec![],
                 free_variables: vec![],
             };
             current = outer;
         }
-        
+
         let global_root = Module {
             name: vec!["root".to_string()],
             language: Some(lang_name.to_string()),
@@ -207,14 +274,19 @@ fn apply_directory_strategy(modules: &mut Vec<Module>, path: &std::path::Path, f
     }
 }
 
-fn apply_package_strategy(modules: &mut Vec<Module>, package_path: Vec<String>, file_path_str: &str, lang_name: &str) {
+fn apply_package_strategy(
+    modules: &mut Vec<Module>,
+    package_path: Vec<String>,
+    file_path_str: &str,
+    lang_name: &str,
+) {
     if package_path.is_empty() || modules.is_empty() {
         return;
     }
-    
+
     // The components are currently inside the "root" module extracted by generic_extract
     let content_module = modules.remove(0);
-    
+
     // We unpack the contents of this module (classes, functions, etc.) directly into the package
     let mut current = Module {
         name: vec![package_path.last().unwrap().clone()],
@@ -245,7 +317,7 @@ fn apply_package_strategy(modules: &mut Vec<Module>, package_path: Vec<String>, 
         };
         current = outer;
     }
-    
+
     // Put everything back under the "root" universe module to keep parity with DirectoryBased
     let global_root = Module {
         name: vec!["root".to_string()],
@@ -254,7 +326,7 @@ fn apply_package_strategy(modules: &mut Vec<Module>, package_path: Vec<String>, 
         imports: vec![],
         sub_modules: vec![current],
         structured_types: vec![],
-            type_aliases: vec![],
+        type_aliases: vec![],
         free_functions: vec![],
         impl_blocks: vec![],
         free_variables: vec![],
@@ -284,7 +356,7 @@ fn link_out_of_line_methods(modules: &mut Vec<Module>, config: &crate::config::A
         let lang = module.language.as_deref().unwrap_or("root");
         if config.get_for(lang).forward_declarations {
             let mut methods_to_move = vec![];
-            
+
             // Extract functions that have qualified names (e.g., MyClass::my_method)
             module.free_functions.retain(|ff| {
                 if ff.name.len() > 1 {
@@ -299,7 +371,7 @@ fn link_out_of_line_methods(modules: &mut Vec<Module>, config: &crate::config::A
             for method in methods_to_move {
                 let class_name = &method.name[..method.name.len() - 1];
                 let method_name = method.name.last().unwrap().clone();
-                
+
                 let mut found = false;
                 for st in &mut module.structured_types {
                     if st.name == class_name {
@@ -310,14 +382,16 @@ fn link_out_of_line_methods(modules: &mut Vec<Module>, config: &crate::config::A
                         break;
                     }
                 }
-                
+
                 // If not found in current module, maybe it's cross-module?
                 // For simplicity in C++, we assume the definition is in the same namespace block,
                 // or we could use the ImplBlock logic. Let's create an ImplBlock!
                 if !found {
                     module.impl_blocks.push(crate::model::ImplBlock {
                         name: class_name.to_vec(),
-                        impl_for: crate::model::TypeRef::ResolutionQuery(crate::model::Query::Find(class_name.last().unwrap().clone())),
+                        impl_for: crate::model::TypeRef::ResolutionQuery(
+                            crate::model::Query::Find(class_name.last().unwrap().clone()),
+                        ),
                         implements_trait: None,
                         methods: vec![{
                             let mut m = method.clone();
@@ -329,7 +403,7 @@ fn link_out_of_line_methods(modules: &mut Vec<Module>, config: &crate::config::A
                 }
             }
         }
-        
+
         link_out_of_line_methods(&mut module.sub_modules, config);
     }
 }

@@ -8,19 +8,21 @@ pub fn extract_annotations(node: Node, source: &str) -> Vec<TypeRef> {
     let mut annotations = Vec::new();
 
     let _kind = node.kind();
-    
+
     // 1. Python: `decorated_definition` wraps the `decorator` and the actual `definition`.
     if let Some(parent) = node.parent()
-        && parent.kind() == "decorated_definition" {
-            let mut cursor = parent.walk();
-            for child in parent.children(&mut cursor) {
-                if child.kind() == "decorator"
-                    && let Some(dec_name) = extract_python_decorator(child, source) {
-                        annotations.push(TypeRef::Unresolved(dec_name));
-                    }
+        && parent.kind() == "decorated_definition"
+    {
+        let mut cursor = parent.walk();
+        for child in parent.children(&mut cursor) {
+            if child.kind() == "decorator"
+                && let Some(dec_name) = extract_python_decorator(child, source)
+            {
+                annotations.push(TypeRef::Unresolved(dec_name));
             }
         }
-    
+    }
+
     // Rust: attributes are often previous siblings
     let mut prev = node.prev_sibling();
     while let Some(sibling) = prev {
@@ -63,7 +65,7 @@ pub fn extract_annotations(node: Node, source: &str) -> Vec<TypeRef> {
     for child in node.children(&mut cursor) {
         let child_kind = child.kind();
         println!("Checking child kind: {}", child_kind);
-        
+
         // Java annotations are sometimes inside a `modifiers` node.
         if child_kind == "modifiers" {
             let mut mod_cursor = child.walk();
@@ -81,9 +83,10 @@ pub fn extract_annotations(node: Node, source: &str) -> Vec<TypeRef> {
                         let mut name_extracted = qname.clone();
                         // Strip leading '@' if it exists in the first element
                         if let Some(first) = name_extracted.first_mut()
-                            && first.starts_with('@') {
-                                *first = first[1..].to_string();
-                            }
+                            && first.starts_with('@')
+                        {
+                            *first = first[1..].to_string();
+                        }
                         annotations.push(TypeRef::Unresolved(name_extracted));
                     } else {
                         println!("extract_qualified_name failed for {:?}", m.kind());
@@ -91,9 +94,13 @@ pub fn extract_annotations(node: Node, source: &str) -> Vec<TypeRef> {
                 }
             }
         }
-        
+
         // C++ / Rust attributes / Java annotations that are direct children
-        if child_kind == "attribute_item" || child_kind == "inner_attribute_item" || child_kind == "marker_annotation" || child_kind == "annotation" {
+        if child_kind == "attribute_item"
+            || child_kind == "inner_attribute_item"
+            || child_kind == "marker_annotation"
+            || child_kind == "annotation"
+        {
             let name_node = child.child_by_field_name("name");
             if let Some(n) = name_node {
                 if let Some(qname) = extract_qualified_name(n, source) {
@@ -122,7 +129,6 @@ pub fn extract_annotations(node: Node, source: &str) -> Vec<TypeRef> {
             }
         }
     }
-    
 
     annotations
 }
@@ -136,10 +142,11 @@ fn extract_python_decorator(decorator_node: Node, source: &str) -> Option<Vec<St
             let txt = super::text_parsing::node_text(child, source);
             return Some(super::text_parsing::split_qualified_name(&txt));
         } else if kind == "call"
-            && let Some(func) = child.child_by_field_name("function") {
-                let txt = super::text_parsing::node_text(func, source);
-                return Some(super::text_parsing::split_qualified_name(&txt));
-            }
+            && let Some(func) = child.child_by_field_name("function")
+        {
+            let txt = super::text_parsing::node_text(func, source);
+            return Some(super::text_parsing::split_qualified_name(&txt));
+        }
     }
     None
 }

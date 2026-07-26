@@ -3,9 +3,9 @@ use super::queries::TypeRef;
 pub type Identifier = String;
 pub type QualifiedName = Vec<Identifier>;
 
-
-
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
+)]
 pub enum StructuredTypeKind {
     Class,
     Struct,
@@ -15,7 +15,9 @@ pub enum StructuredTypeKind {
     EnumVariant,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
+)]
 pub struct Field {
     pub name: Identifier,
     pub ty: TypeRef,
@@ -23,7 +25,9 @@ pub struct Field {
     pub annotations: Vec<TypeRef>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
+)]
 pub struct Parameter {
     pub name: Option<Identifier>,
     pub ty: TypeRef,
@@ -37,13 +41,17 @@ pub struct Signature {
     pub return_type: TypeRef,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
+)]
 pub struct TypeAlias {
     pub name: QualifiedName,
     pub target: TypeRef,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
+)]
 pub struct Block {
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub declarations: Vec<Field>,

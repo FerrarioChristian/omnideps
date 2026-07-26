@@ -84,36 +84,61 @@ pub fn extract_fields(
                     | "field"
                     | "member_declaration"
                     | "variable_declarator"
-            ) && let Some(name) = super::text_parsing::extract_identifier(child, src) {
+            ) && let Some(name) = super::text_parsing::extract_identifier(child, src)
+            {
                 let ty = super::type_extraction::extract_type_ref(child, src);
                 let annotations = super::annotation_extraction::extract_annotations(child, src);
-                fields.push(Field { name, ty, annotations });
+                fields.push(Field {
+                    name,
+                    ty,
+                    annotations,
+                });
             }
 
             // Dynamic fields inside methods (e.g. self.username = username)
-            if enter_functions && child.kind() == "assignment"
+            if enter_functions
+                && child.kind() == "assignment"
                 && let Some(left) = child.child_by_field_name("left")
                 && matches!(left.kind(), "attribute" | "field_expression")
                 && let Some(obj) = left.child_by_field_name("object")
                 && Some(super::text_parsing::node_text(obj, src)) == child_active_self_kw
-                && let Some(attr) = left.child_by_field_name("attribute").or_else(|| left.child_by_field_name("field"))
-                && let Some(name) = super::text_parsing::extract_identifier(attr, src) {
-                    let ty = if let Some(right) = child.child_by_field_name("right") {
-                        crate::heuristics::body_extraction::infer_variable_type(right, src)
-                    } else {
-                        crate::model::TypeRef::Failed(vec![])
-                    };
-                    fields.push(Field { name, ty, annotations: vec![] });
-                }
+                && let Some(attr) = left
+                    .child_by_field_name("attribute")
+                    .or_else(|| left.child_by_field_name("field"))
+                && let Some(name) = super::text_parsing::extract_identifier(attr, src)
+            {
+                let ty = if let Some(right) = child.child_by_field_name("right") {
+                    crate::heuristics::body_extraction::infer_variable_type(right, src)
+                } else {
+                    crate::model::TypeRef::Failed(vec![])
+                };
+                fields.push(Field {
+                    name,
+                    ty,
+                    annotations: vec![],
+                });
+            }
 
             if child.child_count() > 0 && (enter_functions || !is_func) {
-                fields.extend(traverse_for_fields(child, src, enter_functions, child_active_self_kw, implicit_first_param));
+                fields.extend(traverse_for_fields(
+                    child,
+                    src,
+                    enter_functions,
+                    child_active_self_kw,
+                    implicit_first_param,
+                ));
             }
         }
         fields
     }
 
-    let mut fields = traverse_for_fields(node, source, enter_functions, initial_self_kw, implicit_first_param);
+    let mut fields = traverse_for_fields(
+        node,
+        source,
+        enter_functions,
+        initial_self_kw,
+        implicit_first_param,
+    );
 
     // Handle Rust's Tuple Structs / Enum Tuple Variants
     fn extract_tuple_fields(n: Node, src: &str, fds: &mut Vec<Field>) {
@@ -140,8 +165,8 @@ pub fn extract_fields(
         } else {
             let mut c = n.walk();
             for child in n.children(&mut c) {
-                if !crate::heuristics::classifiers::is_function(child) 
-                    && !crate::heuristics::classifiers::is_structured_type(child) 
+                if !crate::heuristics::classifiers::is_function(child)
+                    && !crate::heuristics::classifiers::is_structured_type(child)
                 {
                     extract_tuple_fields(child, src, fds);
                 }
@@ -154,8 +179,13 @@ pub fn extract_fields(
     let mut deduped = std::collections::HashMap::new();
     for f in fields {
         let entry = deduped.entry(f.name.clone()).or_insert_with(|| f.clone());
-        if matches!(entry.ty, crate::model::TypeRef::Failed(_) | crate::model::TypeRef::Unresolved(_)) 
-            && !matches!(f.ty, crate::model::TypeRef::Failed(_) | crate::model::TypeRef::Unresolved(_)) {
+        if matches!(
+            entry.ty,
+            crate::model::TypeRef::Failed(_) | crate::model::TypeRef::Unresolved(_)
+        ) && !matches!(
+            f.ty,
+            crate::model::TypeRef::Failed(_) | crate::model::TypeRef::Unresolved(_)
+        ) {
             *entry = f;
         }
     }
@@ -180,12 +210,9 @@ pub fn extract_nested_types(
     lang_name: &str,
     config: &crate::config::AnalyzerConfig,
 ) -> Vec<StructuredType> {
-    extract_list_of(
-        node,
-        source,
-        false,
-        |child, src| crate::heuristics::parsers::try_parse_structured_type(child, src, lang_name, config),
-    )
+    extract_list_of(node, source, false, |child, src| {
+        crate::heuristics::parsers::try_parse_structured_type(child, src, lang_name, config)
+    })
 }
 
 /// Extracts formal parameters from a function or method signature.

@@ -55,15 +55,20 @@ pub fn export_graphs(graphs: &[DependencyGraph], out_path: &Path) -> anyhow::Res
 
     // Helper to add a node
     let add_node = |elements: &mut Vec<CytoscapeElement>,
-                        added_nodes: &mut HashSet<String>,
-                        id: String,
-                        label: String,
-                        ty: String,
-                        parent: Option<String>| {
+                    added_nodes: &mut HashSet<String>,
+                    id: String,
+                    label: String,
+                    ty: String,
+                    parent: Option<String>| {
         if !added_nodes.contains(&id) {
             added_nodes.insert(id.clone());
             elements.push(CytoscapeElement {
-                data: CytoscapeData::Node { id, label, ty, parent },
+                data: CytoscapeData::Node {
+                    id,
+                    label,
+                    ty,
+                    parent,
+                },
             });
         }
     };
@@ -73,8 +78,12 @@ pub fn export_graphs(graphs: &[DependencyGraph], out_path: &Path) -> anyhow::Res
         let mut parent_types = std::collections::HashMap::new();
         for node in &graph.nodes {
             match node {
-                Component::Module(m) => { parent_types.insert(qn_to_id(&m.name), "Module"); }
-                Component::StructuredType(st) => { parent_types.insert(qn_to_id(&st.name), "Struct"); }
+                Component::Module(m) => {
+                    parent_types.insert(qn_to_id(&m.name), "Module");
+                }
+                Component::StructuredType(st) => {
+                    parent_types.insert(qn_to_id(&st.name), "Struct");
+                }
                 _ => {}
             }
         }
@@ -89,28 +98,54 @@ pub fn export_graphs(graphs: &[DependencyGraph], out_path: &Path) -> anyhow::Res
                     }
                     let label = m.name.last().cloned().unwrap_or_else(|| "root".to_string());
                     let parent = get_parent_id(&m.name);
-                    add_node(&mut elements, &mut added_nodes, id, label, "Module".to_string(), parent);
+                    add_node(
+                        &mut elements,
+                        &mut added_nodes,
+                        id,
+                        label,
+                        "Module".to_string(),
+                        parent,
+                    );
                 }
                 Component::StructuredType(st) => {
                     let id = qn_to_id(&st.name);
-                    let label = st.name.last().cloned().unwrap_or_else(|| "Unknown".to_string());
+                    let label = st
+                        .name
+                        .last()
+                        .cloned()
+                        .unwrap_or_else(|| "Unknown".to_string());
                     let parent = get_parent_id(&st.name);
-                    add_node(&mut elements, &mut added_nodes, id, label, format!("{:?}", st.kind), parent);
+                    add_node(
+                        &mut elements,
+                        &mut added_nodes,
+                        id,
+                        label,
+                        format!("{:?}", st.kind),
+                        parent,
+                    );
                 }
                 Component::Function(f) => {
                     let id = qn_to_id(&f.name);
                     let name = f.name.last().cloned().unwrap_or_else(|| "".to_string());
                     let label = format!("{}()", name);
                     let parent = get_parent_id(&f.name);
-                    let ty_str = if f.is_constructor { "Constructor".to_string() } else { "Function".to_string() };
+                    let ty_str = if f.is_constructor {
+                        "Constructor".to_string()
+                    } else {
+                        "Function".to_string()
+                    };
                     add_node(&mut elements, &mut added_nodes, id, label, ty_str, parent);
                 }
                 Component::Field(name, _ty) => {
                     let id = qn_to_id(name);
                     let label = name.last().cloned().unwrap_or_else(|| "".to_string());
                     let parent = get_parent_id(name);
-                    let parent_type = parent.as_ref().and_then(|p| parent_types.get(p)).copied().unwrap_or("Unknown");
-                    
+                    let parent_type = parent
+                        .as_ref()
+                        .and_then(|p| parent_types.get(p))
+                        .copied()
+                        .unwrap_or("Unknown");
+
                     let ty_str = if parent_type == "Module" {
                         "StaticVariable".to_string()
                     } else {
@@ -120,15 +155,36 @@ pub fn export_graphs(graphs: &[DependencyGraph], out_path: &Path) -> anyhow::Res
                 }
                 Component::TypeAlias(t) => {
                     let qn = t.name.join("::");
-                    add_node(&mut elements, &mut added_nodes, qn.clone(), qn.clone(), "TypeAlias".to_string(), None);
+                    add_node(
+                        &mut elements,
+                        &mut added_nodes,
+                        qn.clone(),
+                        qn.clone(),
+                        "TypeAlias".to_string(),
+                        None,
+                    );
                 }
                 Component::Primitive(prim) => {
-                    add_node(&mut elements, &mut added_nodes, prim.clone(), prim.clone(), "Primitive".to_string(), None);
+                    add_node(
+                        &mut elements,
+                        &mut added_nodes,
+                        prim.clone(),
+                        prim.clone(),
+                        "Primitive".to_string(),
+                        None,
+                    );
                 }
                 Component::External(u) => {
                     let qn = u.join("::");
                     let name = u.last().cloned().unwrap_or_default();
-                    add_node(&mut elements, &mut added_nodes, qn, name, "External".to_string(), None);
+                    add_node(
+                        &mut elements,
+                        &mut added_nodes,
+                        qn,
+                        name,
+                        "External".to_string(),
+                        None,
+                    );
                 }
             }
         }
@@ -151,12 +207,26 @@ pub fn export_graphs(graphs: &[DependencyGraph], out_path: &Path) -> anyhow::Res
             // Ensure source node exists
             if !added_nodes.contains(&source_id) {
                 let node_label = source_id.split("::").last().unwrap_or("").to_string();
-                add_node(&mut elements, &mut added_nodes, source_id.clone(), node_label, "External".to_string(), None);
+                add_node(
+                    &mut elements,
+                    &mut added_nodes,
+                    source_id.clone(),
+                    node_label,
+                    "External".to_string(),
+                    None,
+                );
             }
             // Ensure target node exists
             if !added_nodes.contains(&target_id) {
                 let node_label = target_id.split("::").last().unwrap_or("").to_string();
-                add_node(&mut elements, &mut added_nodes, target_id.clone(), node_label, "External".to_string(), None);
+                add_node(
+                    &mut elements,
+                    &mut added_nodes,
+                    target_id.clone(),
+                    node_label,
+                    "External".to_string(),
+                    None,
+                );
             }
 
             let edge_sig = format!("{}->{}:{}", source_id, target_id, label);

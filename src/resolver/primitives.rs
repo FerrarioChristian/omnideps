@@ -1,7 +1,7 @@
 //! A data-driven registry for language-specific primitive types.
 //!
 //! This module decouples primitive type recognition from the AST extraction logic, allowing
-//! the resolver to intercept and mark tokens like `String` or `int` as `PrimitiveType` 
+//! the resolver to intercept and mark tokens like `String` or `int` as `PrimitiveType`
 //! instead of logging them as `Failed` resolutions.
 
 use std::collections::{HashMap, HashSet};
@@ -16,14 +16,14 @@ impl PrimitiveRegistry {
     pub fn load(lang_name: &str) -> anyhow::Result<Self> {
         let primitives_json = include_str!("../../primitives.json");
         let registry: HashMap<String, Vec<String>> = serde_json::from_str(primitives_json)?;
-        
+
         let lang_primitives = registry
             .get(lang_name)
             .cloned()
             .unwrap_or_default()
             .into_iter()
             .collect();
-            
+
         Ok(Self { lang_primitives })
     }
 

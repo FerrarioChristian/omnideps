@@ -1,6 +1,8 @@
 use super::components::{Component, QualifiedName};
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
+)]
 pub enum DependencyEdgeKind {
     IsA,
     Implements,
@@ -19,7 +21,9 @@ pub enum DependencyEdgeKind {
     AnnotatedWith,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
+)]
 pub struct Dependency {
     pub from: QualifiedName,
     pub to: QualifiedName,

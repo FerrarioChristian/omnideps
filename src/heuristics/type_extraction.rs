@@ -204,4 +204,3 @@ fn try_extract_union(node: Node, source: &str) -> Option<TypeRef> {
     }
     None
 }
-

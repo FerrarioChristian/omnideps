@@ -20,8 +20,12 @@ struct Cli {
 fn main() -> Result<()> {
     let cli = Cli::parse();
 
-    let input_str = fs::read_to_string(&cli.input)
-        .with_context(|| format!("Impossibile leggere il file di input: {}", cli.input.display()))?;
+    let input_str = fs::read_to_string(&cli.input).with_context(|| {
+        format!(
+            "Impossibile leggere il file di input: {}",
+            cli.input.display()
+        )
+    })?;
 
     // Prova a deserializzare come Vec<DependencyGraph>, se fallisce prova come singolo DependencyGraph
     let graphs: Vec<DependencyGraph> = match serde_json::from_str(&input_str) {

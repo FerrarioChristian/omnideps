@@ -67,7 +67,10 @@ pub fn execute_module(ctx: &ExecutorContext, mut m: Module, parent_scope: ScopeI
 
     for ta in m.type_aliases.iter_mut() {
         ta.target = evaluate_typeref(ctx, ta.target.clone(), scope_id, true);
-        println!("Executor TypeAlias after eval: {:?} target={:?}", ta.name, ta.target);
+        println!(
+            "Executor TypeAlias after eval: {:?} target={:?}",
+            ta.name, ta.target
+        );
     }
 
     m.free_functions = m
@@ -273,7 +276,7 @@ pub fn evaluate_typeref(
     resolve_type: bool,
 ) -> TypeRef {
     match tr {
-                        TypeRef::ResolutionQuery(query) => {
+        TypeRef::ResolutionQuery(query) => {
             let mut visited = std::collections::HashSet::new();
             if let Some(resolved) =
                 evaluate_query(ctx, &query, scope_id, resolve_type, &mut visited)
@@ -294,19 +297,24 @@ pub fn evaluate_typeref(
                 query = Query::Extract(Box::new(query), part.clone());
             }
 
-                        let mut visited = std::collections::HashSet::new();
+            let mut visited = std::collections::HashSet::new();
             if let Some(resolved) =
                 evaluate_query(ctx, &query, scope_id, resolve_type, &mut visited)
             {
-                if qn[0] == "StructA" { println!("EVALUATED Unresolved StructA to: {:?}", resolved); }
+                if qn[0] == "StructA" {
+                    println!("EVALUATED Unresolved StructA to: {:?}", resolved);
+                }
                 resolved
             } else {
-                if qn[0] == "StructA" { println!("EVALUATED Unresolved StructA to NONE"); }
+                if qn[0] == "StructA" {
+                    println!("EVALUATED Unresolved StructA to NONE");
+                }
                 TypeRef::Unresolved(qn.clone())
             }
         }
         TypeRef::Union(variants) => {
-            let evaluated = variants.into_iter()
+            let evaluated = variants
+                .into_iter()
                 .map(|v| evaluate_typeref(ctx, v, scope_id, resolve_type))
                 .collect::<Vec<_>>();
             println!("UNION EVALUATED TO: {:?}", evaluated);
@@ -629,16 +637,16 @@ fn resolve_via_transitive_imports(
         if ctx.config.get_for(lang).transitive_imports {
             for imp in &node.imports {
                 if let Some(last) = imp.path.last()
-                    && (last == member || last == "*") {
-                        if let Some(resolved) = find_global(ctx, &imp.path) {
-                            return Some(resolved);
-                        } else {
-                            return Some(TypeRef::External(imp.path.clone()));
-                        }
+                    && (last == member || last == "*")
+                {
+                    if let Some(resolved) = find_global(ctx, &imp.path) {
+                        return Some(resolved);
+                    } else {
+                        return Some(TypeRef::External(imp.path.clone()));
                     }
+                }
             }
         }
     }
     None
 }
-

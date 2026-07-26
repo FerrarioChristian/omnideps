@@ -56,7 +56,7 @@ fn count_refs_in_func(f: &Function, resolved: &mut usize, failed: &mut usize) {
         tally_ref(&p.ty, resolved, failed);
     }
     tally_ref(&f.signature.return_type, resolved, failed);
-    
+
     if let Some(body) = &f.body {
         count_refs_in_block(body, resolved, failed);
     }

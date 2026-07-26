@@ -4,10 +4,7 @@ use language_agnostic_analyzer::{
     analyzer::{analyze_project, parse_source},
     config::AnalyzerConfig,
     language::SupportedLanguage,
-    model::{
-        Component, DependencyGraph, TestManifest, TestReport, TestReportEdge,
-        TestReportNode,
-    },
+    model::{Component, DependencyGraph, TestManifest, TestReport, TestReportEdge, TestReportNode},
     resolver::primitives::PrimitiveRegistry,
 };
 use std::collections::{HashMap, HashSet};
@@ -39,15 +36,16 @@ fn analyze_directory(dir: &std::path::Path, config: &AnalyzerConfig) -> Result<D
     for entry in WalkDir::new(&src_dir).into_iter().filter_map(|e| e.ok()) {
         if entry.file_type().is_file()
             && let Some(lang) = SupportedLanguage::from_path(entry.path())
-                && let Ok(source) = fs::read_to_string(entry.path()) {
-                    let rel_path = entry.path().strip_prefix(&src_dir).unwrap_or(entry.path());
-                    if let Ok((mut file_modules, file_primitives)) =
-                        parse_source(lang, &source, rel_path, config)
-                    {
-                        all_modules.append(&mut file_modules);
-                        combined_primitives.merge(file_primitives);
-                    }
-                }
+            && let Ok(source) = fs::read_to_string(entry.path())
+        {
+            let rel_path = entry.path().strip_prefix(&src_dir).unwrap_or(entry.path());
+            if let Ok((mut file_modules, file_primitives)) =
+                parse_source(lang, &source, rel_path, config)
+            {
+                all_modules.append(&mut file_modules);
+                combined_primitives.merge(file_primitives);
+            }
+        }
     }
 
     let (_, graph, _) = analyze_project(all_modules, combined_primitives, config);
@@ -93,10 +91,10 @@ fn verify_graph_adherence(graph: &DependencyGraph, manifest: &TestManifest) -> T
     // Verify Nodes
     for node in &manifest.nodes {
         let exists = nodes_map.contains_key(&node.name);
-        
+
         // For now, as agreed, we ignore strict kind matching between tree-sitter AST kinds and our high-level Component kinds.
-        let same_kind = exists; 
-        
+        let same_kind = exists;
+
         let actual_kind = if exists {
             match nodes_map.get(&node.name).unwrap() {
                 Component::Module(_) => "Module".to_string(),
@@ -115,20 +113,23 @@ fn verify_graph_adherence(graph: &DependencyGraph, manifest: &TestManifest) -> T
             report.node_not_found_count += 1;
         }
 
-        report.nodes.push(TestReportNode::craft(node, exists, same_kind, actual_kind));
+        report
+            .nodes
+            .push(TestReportNode::craft(node, exists, same_kind, actual_kind));
     }
 
     // Verify Edges
     for edge in &manifest.edges {
         let source_exists = nodes_map.contains_key(&edge.source);
         let sink_exists = nodes_map.contains_key(&edge.sink);
-        
+
         let mut edge_exists = false;
         if source_exists
             && let Some(sinks) = edges_map.get(&edge.source)
-                && sinks.contains(&edge.sink) {
-                    edge_exists = true;
-                }
+            && sinks.contains(&edge.sink)
+        {
+            edge_exists = true;
+        }
 
         if !edge_exists {
             report.edge_not_found_count += 1;
@@ -140,9 +141,9 @@ fn verify_graph_adherence(graph: &DependencyGraph, manifest: &TestManifest) -> T
             }
         }
 
-        // Like the predecessor, we don't strictly check edge kinds for now. 
+        // Like the predecessor, we don't strictly check edge kinds for now.
         // We just verify that *a* dependency exists between the two nodes.
-        let same_kind = edge_exists; 
+        let same_kind = edge_exists;
 
         report.edges.push(TestReportEdge::craft(
             edge,
@@ -187,9 +188,19 @@ fn main() -> Result<()> {
 
     println!("Report Markdown salvato in {}", md_path.display());
     println!("Report JSON salvato in {}", json_path.display());
-    
-    println!("Statistiche nodi: Trovati {}, Non Trovati {}, Totali {}", report.nodes.len() - report.node_not_found_count, report.node_not_found_count, report.nodes.len());
-    println!("Statistiche archi: Trovati {}, Non Trovati {}, Totali {}", report.edges.len() - report.edge_not_found_count, report.edge_not_found_count, report.edges.len());
+
+    println!(
+        "Statistiche nodi: Trovati {}, Non Trovati {}, Totali {}",
+        report.nodes.len() - report.node_not_found_count,
+        report.node_not_found_count,
+        report.nodes.len()
+    );
+    println!(
+        "Statistiche archi: Trovati {}, Non Trovati {}, Totali {}",
+        report.edges.len() - report.edge_not_found_count,
+        report.edge_not_found_count,
+        report.edges.len()
+    );
 
     Ok(())
 }

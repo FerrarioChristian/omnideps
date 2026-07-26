@@ -1,10 +1,10 @@
 use anyhow::Result;
 use clap::Parser;
 use language_agnostic_analyzer::{
-    analyzer::{parse_source, analyze_project},
-    model::AnalysisSummary,
+    analyzer::{analyze_project, parse_source},
     debug::print_references,
     language::SupportedLanguage,
+    model::AnalysisSummary,
     resolver::primitives::PrimitiveRegistry,
 };
 use std::fs;
@@ -26,9 +26,21 @@ fn main() -> anyhow::Result<()> {
     };
 
     if cli.path.is_file() {
-        analyze_single_file(&cli.path, cli.output.as_deref(), cli.csv.as_deref(), cli.debug_refs, &config)?;
+        analyze_single_file(
+            &cli.path,
+            cli.output.as_deref(),
+            cli.csv.as_deref(),
+            cli.debug_refs,
+            &config,
+        )?;
     } else if cli.path.is_dir() {
-        analyze_directory(&cli.path, cli.output.as_deref(), cli.csv.as_deref(), cli.debug_refs, &config)?;
+        analyze_directory(
+            &cli.path,
+            cli.output.as_deref(),
+            cli.csv.as_deref(),
+            cli.debug_refs,
+            &config,
+        )?;
     } else {
         println!("Percorso non valido!");
     }
@@ -47,7 +59,7 @@ fn analyze_single_file(
     let lang = SupportedLanguage::from_path(path)
         .ok_or_else(|| anyhow::anyhow!("Language not supported for file: {}", path.display()))?;
     let source = fs::read_to_string(path)?;
-    
+
     let rel_path = path.file_name().map(std::path::Path::new).unwrap_or(path);
     // Phase 1: Parse
     let (modules, primitives) = parse_source(lang, &source, rel_path, config)?;
@@ -103,21 +115,25 @@ fn analyze_directory(
     for entry in WalkDir::new(dir).into_iter().filter_map(|e| e.ok()) {
         if entry.file_type().is_file()
             && let Some(lang) = SupportedLanguage::from_path(entry.path())
-            && let Ok(source) = fs::read_to_string(entry.path()) {
-                let rel_path = entry.path().strip_prefix(dir).unwrap_or(entry.path());
-                if let Ok((mut file_modules, file_primitives)) = parse_source(lang, &source, rel_path, config) {
-                    all_modules.append(&mut file_modules);
-                    combined_primitives.merge(file_primitives);
-                }
+            && let Ok(source) = fs::read_to_string(entry.path())
+        {
+            let rel_path = entry.path().strip_prefix(dir).unwrap_or(entry.path());
+            if let Ok((mut file_modules, file_primitives)) =
+                parse_source(lang, &source, rel_path, config)
+            {
+                all_modules.append(&mut file_modules);
+                combined_primitives.merge(file_primitives);
             }
+        }
     }
 
     // Phase 2-4: Unified Resolution and Graph Building
-    let (resolved_modules, graph, summary) = analyze_project(all_modules, combined_primitives, config);
+    let (resolved_modules, graph, summary) =
+        analyze_project(all_modules, combined_primitives, config);
 
     println!("=== ANALISI CARTELLA {} ===", dir.display());
     print_summary(&summary);
-    
+
     if debug_refs {
         print_references(&resolved_modules);
     }
@@ -134,7 +150,10 @@ fn analyze_directory(
                 .and_then(|n| n.to_str())
                 .unwrap_or("graph.json");
             let cyto_path = parent.join(format!("cyto_{}", file_name));
-            language_agnostic_analyzer::export::cytoscape::export_graphs(std::slice::from_ref(&graph), &cyto_path)?;
+            language_agnostic_analyzer::export::cytoscape::export_graphs(
+                std::slice::from_ref(&graph),
+                &cyto_path,
+            )?;
             println!("Grafo Cytoscape salvato in {}", cyto_path.display());
         }
     }
@@ -162,4 +181,3 @@ fn save_summary_csv(s: &AnalysisSummary, path: &std::path::Path) -> Result<()> {
     fs::write(path, csv)?;
     Ok(())
 }
-

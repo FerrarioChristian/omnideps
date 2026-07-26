@@ -54,10 +54,14 @@ fn visit_structured_type(st: &StructuredType) {
 fn visit_function(f: &Function, context: &str) {
     let fn_context = format!("{}::{}", context, f.name.last().unwrap_or(&"".to_string()));
     for p in &f.signature.parameters {
-        print_ref(&format!("Param '{}'", p.name.as_deref().unwrap_or("?")), &fn_context, &p.ty);
+        print_ref(
+            &format!("Param '{}'", p.name.as_deref().unwrap_or("?")),
+            &fn_context,
+            &p.ty,
+        );
     }
     print_ref("Return", &fn_context, &f.signature.return_type);
-    
+
     if let Some(body) = &f.body {
         visit_block(body, &fn_context);
     }

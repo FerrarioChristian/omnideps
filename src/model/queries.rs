@@ -4,7 +4,9 @@ use super::components::QualifiedName;
 ///
 /// As per theoretical guidelines, the Lexical Scoping phase shouldn't execute paths immediately,
 /// but instead produce a `Query` (substitution) which is later evaluated by navigating the global IR.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
+)]
 pub enum Query {
     /// Find-going-up: search for a component named `String` ascending the lexical scope.
     Find(String),
@@ -15,7 +17,9 @@ pub enum Query {
 }
 
 /// Represents the state of a type reference during the analysis pipeline.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
+)]
 pub enum TypeRef {
     Primitive(String),
     /// A raw text path extracted by the parser before any substitution.

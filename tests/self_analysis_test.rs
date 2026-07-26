@@ -1,6 +1,6 @@
-use language_agnostic_analyzer::analyzer::{parse_source, analyze_project};
-use language_agnostic_analyzer::language::SupportedLanguage;
+use language_agnostic_analyzer::analyzer::{analyze_project, parse_source};
 use language_agnostic_analyzer::config::AnalyzerConfig;
+use language_agnostic_analyzer::language::SupportedLanguage;
 use std::fs;
 use std::path::Path;
 use walkdir::WalkDir;
@@ -27,13 +27,19 @@ fn test_self_analysis() {
             // Analyze only Rust files in the src directory
             if ext == "rs" {
                 let lang = SupportedLanguage::Rust;
-                let source = fs::read_to_string(path).expect("Unable to read source file for testing");
+                let source =
+                    fs::read_to_string(path).expect("Unable to read source file for testing");
 
                 let parse_result = parse_source(lang, &source, path, &config);
-                assert!(parse_result.is_ok(), "Self-analysis failed for file {:?}", path);
+                assert!(
+                    parse_result.is_ok(),
+                    "Self-analysis failed for file {:?}",
+                    path
+                );
 
                 let (modules, primitives) = parse_result.unwrap();
-                let (_resolved_modules, graph, _summary) = analyze_project(modules, primitives, &config);
+                let (_resolved_modules, graph, _summary) =
+                    analyze_project(modules, primitives, &config);
                 all_graphs.push(graph);
             }
         }
@@ -45,7 +51,8 @@ fn test_self_analysis() {
     );
 
     let json_path = outputs_dir.join("self_analysis.json");
-    let json = serde_json::to_string_pretty(&all_graphs).expect("Failed to serialize self-analysis graph.");
+    let json = serde_json::to_string_pretty(&all_graphs)
+        .expect("Failed to serialize self-analysis graph.");
     fs::write(&json_path, json).expect("Unable to write self-analysis graph JSON.");
 
     let cyto_path = outputs_dir.join("cyto_self_analysis.json");

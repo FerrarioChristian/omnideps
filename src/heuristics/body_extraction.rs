@@ -1,7 +1,7 @@
 //! Responsible for deeply analyzing the internal behavior of methods and functions.
 //!
 //! This module delves into function bodies, parsing `{}` blocks recursively to extract
-//! local variable declarations, instantiated types, and method calls. It powers the 
+//! local variable declarations, instantiated types, and method calls. It powers the
 //! Behavioral Lexical Scoping engine.
 
 use crate::model::{Field, TypeRef};
@@ -12,8 +12,8 @@ use super::type_extraction::extract_type_ref;
 
 /// Recursively traverses a compound statement or block node to abstract its hierarchical structure.
 ///
-/// Captures all local variable declarations (reusing the `Field` struct to map `name` to `type`), 
-/// discovers behavioral dependencies (calls and instantiations), and recursively extracts 
+/// Captures all local variable declarations (reusing the `Field` struct to map `name` to `type`),
+/// discovers behavioral dependencies (calls and instantiations), and recursively extracts
 /// sub-blocks (e.g., within `if` or `while` statements) to preserve exact scope boundaries.
 ///
 /// # Arguments
@@ -30,12 +30,13 @@ pub fn extract_block(node: Node, source: &str) -> crate::model::Block {
     let mut cursor = node.walk();
     for mut child in node.children(&mut cursor) {
         let mut kind = child.kind();
-        
+
         if kind == "expression_statement"
-            && let Some(inner) = child.child(0) {
-                child = inner;
-                kind = child.kind();
-            }
+            && let Some(inner) = child.child(0)
+        {
+            child = inner;
+            kind = child.kind();
+        }
 
         // 1. Variable Declarations
         if matches!(
@@ -57,7 +58,10 @@ pub fn extract_block(node: Node, source: &str) -> crate::model::Block {
                 | "catch_clause"
         ) {
             let name_opt;
-            if let Some(decl_node) = child.child_by_field_name("declarator").or_else(|| child.child_by_field_name("left")) {
+            if let Some(decl_node) = child
+                .child_by_field_name("declarator")
+                .or_else(|| child.child_by_field_name("left"))
+            {
                 if let Some(name_node) = decl_node.child_by_field_name("name") {
                     name_opt = extract_identifier(name_node, source);
                 } else {
@@ -72,19 +76,19 @@ pub fn extract_block(node: Node, source: &str) -> crate::model::Block {
             }
 
             if let Some(name) = name_opt {
-                // For declarations, check if there is an explicit type. 
+                // For declarations, check if there is an explicit type.
                 // Using extract_type_ref on the whole declaration node can falsely extract the variable name as type.
                 let mut ty = if let Some(type_node) = child.child_by_field_name("type") {
                     extract_type_ref(type_node, source)
                 } else {
                     infer_variable_type(child, source)
                 };
-                
+
                 if matches!(ty, TypeRef::Failed(_)) {
                     // Fallback to old behavior if everything fails
                     let extracted = extract_type_ref(child, source);
                     if !matches!(extracted, TypeRef::Failed(_)) {
-                        // Check if the extracted "type" is just the variable name itself, 
+                        // Check if the extracted "type" is just the variable name itself,
                         // if so it's a false positive from the identifier fallback
                         if extracted != TypeRef::Unresolved(vec![name.clone()]) {
                             ty = extracted;
@@ -92,33 +96,59 @@ pub fn extract_block(node: Node, source: &str) -> crate::model::Block {
                     }
                 }
                 let annotations = super::annotation_extraction::extract_annotations(child, source);
-                declarations.push(Field { name, ty, annotations });
+                declarations.push(Field {
+                    name,
+                    ty,
+                    annotations,
+                });
             }
-            
+
             // WE MUST ALSO check the right-hand side (initializer/value) for behavioral deps!
             let mut inner_calls = vec![];
             let mut inner_inst = vec![];
             let mut inner_accesses = vec![];
             let mut inner_casts = vec![];
-            if let Some(val) = child.child_by_field_name("value")
+            if let Some(val) = child
+                .child_by_field_name("value")
                 .or_else(|| child.child_by_field_name("right"))
-                .or_else(|| child.child_by_field_name("declarator")) {
-                find_behavioral_deps(val, source, &mut inner_calls, &mut inner_inst, &mut inner_accesses, &mut inner_casts);
+                .or_else(|| child.child_by_field_name("declarator"))
+            {
+                find_behavioral_deps(
+                    val,
+                    source,
+                    &mut inner_calls,
+                    &mut inner_inst,
+                    &mut inner_accesses,
+                    &mut inner_casts,
+                );
             } else {
                 // If there's no clear value field, scan the whole declaration just in case (excluding the type/name to avoid false positives)
                 // Actually, find_behavioral_deps is safe to run on the whole node because it looks for call_expression / new_expression
-                find_behavioral_deps(child, source, &mut inner_calls, &mut inner_inst, &mut inner_accesses, &mut inner_casts);
+                find_behavioral_deps(
+                    child,
+                    source,
+                    &mut inner_calls,
+                    &mut inner_inst,
+                    &mut inner_accesses,
+                    &mut inner_casts,
+                );
             }
             calls.extend(inner_calls);
             instantiates.extend(inner_inst);
             accesses.extend(inner_accesses);
             type_casts.extend(inner_casts);
-            
+
             // Recurse into body/block if it's a loop or catch clause
-            if child.kind() == "for_range_loop" || child.kind() == "for_in_statement" || child.kind() == "catch_clause" {
+            if child.kind() == "for_range_loop"
+                || child.kind() == "for_in_statement"
+                || child.kind() == "catch_clause"
+            {
                 let mut gcursor = child.walk();
                 for grandchild in child.children(&mut gcursor) {
-                    if grandchild.kind().contains("body") || grandchild.kind().contains("block") || grandchild.kind() == "compound_statement" {
+                    if grandchild.kind().contains("body")
+                        || grandchild.kind().contains("block")
+                        || grandchild.kind() == "compound_statement"
+                    {
                         sub_blocks.push(extract_block(grandchild, source));
                     }
                 }
@@ -134,7 +164,14 @@ pub fn extract_block(node: Node, source: &str) -> crate::model::Block {
             let mut inner_inst = vec![];
             let mut inner_accesses = vec![];
             let mut inner_casts = vec![];
-            find_behavioral_deps(child, source, &mut inner_calls, &mut inner_inst, &mut inner_accesses, &mut inner_casts);
+            find_behavioral_deps(
+                child,
+                source,
+                &mut inner_calls,
+                &mut inner_inst,
+                &mut inner_accesses,
+                &mut inner_casts,
+            );
             calls.extend(inner_calls);
             instantiates.extend(inner_inst);
             accesses.extend(inner_accesses);
@@ -176,9 +213,10 @@ fn find_behavioral_deps(
             instantiates.push(extract_type_ref(t_node, source));
         }
     } else if kind == "struct_expression"
-        && let Some(name_node) = node.child_by_field_name("name") {
-            instantiates.push(extract_type_ref(name_node, source));
-        }
+        && let Some(name_node) = node.child_by_field_name("name")
+    {
+        instantiates.push(extract_type_ref(name_node, source));
+    }
 
     // --- Calls ---
     if matches!(kind, "call_expression" | "call") {
@@ -187,29 +225,41 @@ fn find_behavioral_deps(
         // Java
         let mut parts = vec![];
         if let Some(obj) = node.child_by_field_name("object")
-            && let TypeRef::Unresolved(qn) = extract_type_ref(obj, source) {
-                parts.extend(qn);
-            }
+            && let TypeRef::Unresolved(qn) = extract_type_ref(obj, source)
+        {
+            parts.extend(qn);
+        }
         if let Some(name) = node.child_by_field_name("name")
-            && let TypeRef::Unresolved(qn) = extract_type_ref(name, source) {
-                parts.extend(qn);
-            }
+            && let TypeRef::Unresolved(qn) = extract_type_ref(name, source)
+        {
+            parts.extend(qn);
+        }
         if !parts.is_empty() {
             calls.push(TypeRef::Unresolved(parts));
         }
     }
 
     // --- Accesses ---
-    if matches!(kind, "field_access" | "member_expression" | "property_identifier" | "member_access" | "identifier" | "field_expression" | "attribute") {
+    if matches!(
+        kind,
+        "field_access"
+            | "member_expression"
+            | "property_identifier"
+            | "member_access"
+            | "identifier"
+            | "field_expression"
+            | "attribute"
+    ) {
         accesses.push(extract_type_ref(node, source));
     }
-    
+
     // --- Type Casts ---
     if matches!(kind, "cast_expression" | "type_cast_expression")
-        && let Some(type_node) = node.child_by_field_name("type") {
-            let ty = extract_type_ref(type_node, source);
-            type_casts.push(ty);
-        }
+        && let Some(type_node) = node.child_by_field_name("type")
+    {
+        let ty = extract_type_ref(type_node, source);
+        type_casts.push(ty);
+    }
 
     // --- Token Tree Coalescing (e.g. for Rust macros or generic unparsed blocks) ---
     if kind == "token_tree" {
@@ -225,12 +275,15 @@ fn find_behavioral_deps(
 
 /// Provides a "best-effort" type inference for implicitly typed local variables (like `let x = ...` or `auto y = ...`).
 ///
-/// It inspects the right-hand side of an assignment (`value` field or direct children). If the 
-/// assignment stems from an explicit instantiation (e.g. `new_expression`), it extracts the target 
+/// It inspects the right-hand side of an assignment (`value` field or direct children). If the
+/// assignment stems from an explicit instantiation (e.g. `new_expression`), it extracts the target
 /// class and deduces the variable's type.
 pub fn infer_variable_type(node: Node, source: &str) -> TypeRef {
     // 1. If it has a explicit "value" or "right" field (like Rust let_declaration or Python assignment)
-    if let Some(val) = node.child_by_field_name("value").or_else(|| node.child_by_field_name("right")) {
+    if let Some(val) = node
+        .child_by_field_name("value")
+        .or_else(|| node.child_by_field_name("right"))
+    {
         if matches!(val.kind(), "object_creation_expression" | "new_expression") {
             if let Some(t_node) = val.child_by_field_name("type") {
                 return extract_type_ref(t_node, source);
@@ -249,8 +302,12 @@ pub fn infer_variable_type(node: Node, source: &str) -> TypeRef {
         }
         // It could just be an identifier (e.g. let x = Factory;)
         let text = node_text(val, source);
-        if !text.is_empty() && text.chars().all(|c| c.is_alphanumeric() || c == '_' || c == ':') {
-             return TypeRef::Unresolved(split_qualified_name(&text));
+        if !text.is_empty()
+            && text
+                .chars()
+                .all(|c| c.is_alphanumeric() || c == '_' || c == ':')
+        {
+            return TypeRef::Unresolved(split_qualified_name(&text));
         }
     }
 
@@ -280,19 +337,20 @@ pub fn infer_variable_type(node: Node, source: &str) -> TypeRef {
 
 /// Extracts a method or function call dependency from a call expression node.
 ///
-/// It correctly handles `qualified_identifier` and `scoped_identifier` nodes by 
-/// extracting the full path to the function being called, ensuring that static 
+/// It correctly handles `qualified_identifier` and `scoped_identifier` nodes by
+/// extracting the full path to the function being called, ensuring that static
 /// method calls (e.g., `StructA::static_method`) are correctly resolved instead of just their scope.
-fn extract_call_dependency(
-    node: Node,
-    source: &str,
-    calls: &mut Vec<TypeRef>,
-) {
+fn extract_call_dependency(node: Node, source: &str, calls: &mut Vec<TypeRef>) {
     if let Some(f) = node.child_by_field_name("function") {
         let f_kind = f.kind();
         if matches!(
             f_kind,
-            "qualified_identifier" | "scoped_identifier" | "field_expression" | "attribute" | "identifier" | "type_identifier"
+            "qualified_identifier"
+                | "scoped_identifier"
+                | "field_expression"
+                | "attribute"
+                | "identifier"
+                | "type_identifier"
         ) {
             calls.push(extract_type_ref(f, source));
         }
@@ -300,10 +358,10 @@ fn extract_call_dependency(
 }
 
 /// Extracts behavioral dependencies (calls and accesses) from a `token_tree` node.
-/// 
-/// In Tree-sitter (especially for Rust macros like `println!`), `token_tree` nodes 
-/// contain a flat list of tokens without semantic grouping. This function implements 
-/// a state machine (Token Coalescing) to reconstruct qualified paths 
+///
+/// In Tree-sitter (especially for Rust macros like `println!`), `token_tree` nodes
+/// contain a flat list of tokens without semantic grouping. This function implements
+/// a state machine (Token Coalescing) to reconstruct qualified paths
 /// (e.g., `StructA::method().x`) and correctly categorize them as method calls or field accesses.
 fn parse_token_tree_macro(
     node: Node,
@@ -321,8 +379,12 @@ fn parse_token_tree_macro(
     while i < count {
         let child = node.child(i as u32).unwrap();
         let c_kind = child.kind();
-        
-        if expect_ident && (c_kind == "identifier" || c_kind == "type_identifier" || c_kind == "scoped_identifier") {
+
+        if expect_ident
+            && (c_kind == "identifier"
+                || c_kind == "type_identifier"
+                || c_kind == "scoped_identifier")
+        {
             let text = node_text(child, source);
             if c_kind == "scoped_identifier" {
                 current_path.extend(split_qualified_name(&text));
@@ -341,16 +403,16 @@ fn parse_token_tree_macro(
             } else if current_path.len() == 1 {
                 accesses.push(TypeRef::Unresolved(current_path.clone()));
             }
-            
+
             current_path.clear();
             expect_ident = true;
-            
+
             // Recurse into this child
             find_behavioral_deps(child, source, calls, instantiates, accesses, type_casts);
         }
         i += 1;
     }
-    
+
     if !current_path.is_empty() {
         accesses.push(TypeRef::Unresolved(current_path));
     }

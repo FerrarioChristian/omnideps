@@ -1,6 +1,6 @@
-use crate::model::{Module, StructuredType, TypeRef, Function, ImplBlock, Block};
-use std::collections::HashMap;
 use crate::config::AnalyzerConfig;
+use crate::model::{Block, Function, ImplBlock, Module, StructuredType, TypeRef};
+use std::collections::HashMap;
 
 /// Un identificatore univoco per uno Scope all'interno dell'Arena.
 pub type ScopeId = usize;
@@ -97,7 +97,7 @@ impl ScopeTree {
             if part == "root" {
                 continue;
             }
-            
+
             // Check if this part already exists as a child of parent_id
             let mut found = None;
             for child in &self.arena {
@@ -106,7 +106,7 @@ impl ScopeTree {
                     break;
                 }
             }
-            
+
             parent_id = if let Some(existing_id) = found {
                 existing_id
             } else {
@@ -117,9 +117,9 @@ impl ScopeTree {
                 id
             };
         }
-        
+
         let scope_id = parent_id;
-        
+
         // Update language if not set
         if self.arena[scope_id].language.is_none() {
             self.arena[scope_id].language = m.language.clone();
@@ -140,19 +140,38 @@ impl ScopeTree {
 
         // Tipi strutturati
         for st in &m.structured_types {
-            self.register_structured_type(st, scope_id, config, m.language.as_deref().unwrap_or(""));
+            self.register_structured_type(
+                st,
+                scope_id,
+                config,
+                m.language.as_deref().unwrap_or(""),
+            );
         }
 
         // Impl blocks
         for ib in &m.impl_blocks {
-            self.pending_impl_blocks.push((ib.clone(), scope_id, m.language.as_deref().unwrap_or("").to_string()));
+            self.pending_impl_blocks.push((
+                ib.clone(),
+                scope_id,
+                m.language.as_deref().unwrap_or("").to_string(),
+            ));
         }
 
         // Funzioni libere
         for ff in &m.free_functions {
             let name = ff.name.last().cloned().unwrap_or_default();
-            self.define_symbol(scope_id, name.clone(), Symbol::Value(ff.signature.return_type.clone()));
-            self.register_function(ff, scope_id, config, m.language.as_deref().unwrap_or(""), None);
+            self.define_symbol(
+                scope_id,
+                name.clone(),
+                Symbol::Value(ff.signature.return_type.clone()),
+            );
+            self.register_function(
+                ff,
+                scope_id,
+                config,
+                m.language.as_deref().unwrap_or(""),
+                None,
+            );
         }
 
         // Variabili libere
@@ -166,22 +185,36 @@ impl ScopeTree {
         }
     }
 
-    fn register_structured_type(&mut self, st: &StructuredType, parent_id: ScopeId, config: &AnalyzerConfig, lang: &str) {
+    fn register_structured_type(
+        &mut self,
+        st: &StructuredType,
+        parent_id: ScopeId,
+        config: &AnalyzerConfig,
+        lang: &str,
+    ) {
         let name = st.name.last().cloned().unwrap_or_default();
         let class_scope = self.new_scope(parent_id, name.clone());
-        
+
         self.arena[class_scope].super_types = st.super_types.clone();
 
         self.define_symbol(parent_id, name.clone(), Symbol::Type(class_scope));
 
         for field in &st.fields {
-            self.define_symbol(class_scope, field.name.clone(), Symbol::Value(field.ty.clone()));
+            self.define_symbol(
+                class_scope,
+                field.name.clone(),
+                Symbol::Value(field.ty.clone()),
+            );
         }
 
         let type_ref = TypeRef::Resolved(st.name.clone());
         for method in &st.methods {
             let m_name = method.name.last().cloned().unwrap_or_default();
-            self.define_symbol(class_scope, m_name, Symbol::Value(method.signature.return_type.clone()));
+            self.define_symbol(
+                class_scope,
+                m_name,
+                Symbol::Value(method.signature.return_type.clone()),
+            );
             self.register_function(method, class_scope, config, lang, Some(type_ref.clone()));
         }
 
@@ -190,7 +223,13 @@ impl ScopeTree {
         }
     }
 
-    fn register_impl_block(&mut self, ib: &ImplBlock, parent_id: ScopeId, config: &AnalyzerConfig, lang: &str) {
+    fn register_impl_block(
+        &mut self,
+        ib: &ImplBlock,
+        parent_id: ScopeId,
+        config: &AnalyzerConfig,
+        lang: &str,
+    ) {
         // Find if the target class scope already exists in parent
         let target_name = match &ib.impl_for {
             TypeRef::Resolved(qn) | TypeRef::External(qn) => qn.last().cloned().unwrap_or_default(),
@@ -208,7 +247,11 @@ impl ScopeTree {
             target_scope_id = Some(*id);
         }
 
-        println!("register_impl_block target_name: {} resolved to: {:?}", target_name, target_scope_id); let class_scope = if let Some(id) = target_scope_id {
+        println!(
+            "register_impl_block target_name: {} resolved to: {:?}",
+            target_name, target_scope_id
+        );
+        let class_scope = if let Some(id) = target_scope_id {
             id
         } else {
             let id = self.new_scope(parent_id, target_name.clone());
@@ -218,7 +261,11 @@ impl ScopeTree {
 
         for method in &ib.methods {
             let m_name = method.name.last().cloned().unwrap_or_default();
-            self.define_symbol(class_scope, m_name, Symbol::Value(method.signature.return_type.clone()));
+            self.define_symbol(
+                class_scope,
+                m_name,
+                Symbol::Value(method.signature.return_type.clone()),
+            );
             self.register_function(method, class_scope, config, lang, Some(ib.impl_for.clone()));
         }
 
@@ -227,19 +274,30 @@ impl ScopeTree {
         }
     }
 
-    fn register_function(&mut self, func: &Function, parent_id: ScopeId, config: &AnalyzerConfig, lang: &str, parent_class_type: Option<TypeRef>) {
+    fn register_function(
+        &mut self,
+        func: &Function,
+        parent_id: ScopeId,
+        config: &AnalyzerConfig,
+        lang: &str,
+        parent_class_type: Option<TypeRef>,
+    ) {
         let name = func.name.last().cloned().unwrap_or_default();
         let func_scope = self.new_scope(parent_id, name);
         let lang_config = config.get_for(lang);
 
         let mut params = func.signature.parameters.iter();
-        
+
         if lang_config.implicit_first_param_as_self
             && let Some(class_type) = &parent_class_type
-                && let Some(first_param) = params.next() {
-                    let p_name = first_param.name.clone().unwrap_or_else(|| "self".to_string());
-                    self.define_symbol(func_scope, p_name, Symbol::Value(class_type.clone()));
-                }
+            && let Some(first_param) = params.next()
+        {
+            let p_name = first_param
+                .name
+                .clone()
+                .unwrap_or_else(|| "self".to_string());
+            self.define_symbol(func_scope, p_name, Symbol::Value(class_type.clone()));
+        }
 
         for param in params {
             if let Some(p_name) = &param.name {
@@ -248,9 +306,10 @@ impl ScopeTree {
         }
 
         if let Some(ref class_type) = parent_class_type
-            && let Some(ref kw) = lang_config.self_keyword {
-                self.define_symbol(func_scope, kw.clone(), Symbol::Value(class_type.clone()));
-            }
+            && let Some(ref kw) = lang_config.self_keyword
+        {
+            self.define_symbol(func_scope, kw.clone(), Symbol::Value(class_type.clone()));
+        }
 
         if let Some(block) = &func.body {
             self.register_block(block, func_scope, 0);
@@ -261,7 +320,11 @@ impl ScopeTree {
         let block_scope = self.new_scope(parent_id, format!("block_{}", index));
 
         for decl in &block.declarations {
-            self.define_symbol(block_scope, decl.name.clone(), Symbol::Value(decl.ty.clone()));
+            self.define_symbol(
+                block_scope,
+                decl.name.clone(),
+                Symbol::Value(decl.ty.clone()),
+            );
         }
 
         for (i, sub) in block.sub_blocks.iter().enumerate() {

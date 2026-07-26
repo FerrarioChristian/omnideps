@@ -20,7 +20,7 @@ pub fn try_parse_module_node(node: Node, source: &str, lang_name: &str) -> Optio
         imports: vec![],
         sub_modules: vec![],
         structured_types: vec![],
-            type_aliases: vec![],
+        type_aliases: vec![],
         free_functions: vec![],
         impl_blocks: vec![],
         free_variables: vec![],
@@ -61,17 +61,20 @@ pub fn try_parse_structured_type(
     let name =
         extract_qualified_name(node, source).unwrap_or_else(|| vec!["unnamed_type".to_string()]);
     let mut fields = extract_fields(node, source, lang_name, config);
-    
+
     // Handle C/C++ typedef struct/enum by extracting fields from the inner specifier
     if node.kind() == "type_definition" {
         let mut cursor = node.walk();
         for child in node.children(&mut cursor) {
-            if child.kind() == "struct_specifier" || child.kind() == "enum_specifier" || child.kind() == "union_specifier" {
+            if child.kind() == "struct_specifier"
+                || child.kind() == "enum_specifier"
+                || child.kind() == "union_specifier"
+            {
                 fields.extend(extract_fields(child, source, lang_name, config));
             }
         }
     }
-    
+
     let methods = extract_methods(node, source);
     let super_types = extract_super_types(node, source);
     let nested_types = extract_nested_types(node, source, lang_name, config);
@@ -97,7 +100,7 @@ pub fn try_parse_function(node: Node, source: &str) -> Option<Function> {
 
     let name = extract_identifier(node, source).unwrap_or_else(|| "unnamed_function".to_string());
     let is_constructor = node.kind().contains("constructor");
-    
+
     let parameters = extract_parameters(node, source);
     let return_type = extract_return_type(node, source);
 
@@ -171,7 +174,10 @@ pub fn try_parse_imports(node: Node, source: &str) -> Option<Vec<Import>> {
     }
 
     let text = node_text(node, source);
-    let is_wildcard = text.contains('*') || text.contains(".*") || text.contains("::*") || text.starts_with("using namespace ");
+    let is_wildcard = text.contains('*')
+        || text.contains(".*")
+        || text.contains("::*")
+        || text.starts_with("using namespace ");
 
     // Attempt to find alias
     let mut alias = None;
@@ -193,20 +199,27 @@ pub fn try_parse_imports(node: Node, source: &str) -> Option<Vec<Import>> {
         let mut cursor = node.walk();
         for child in node.children(&mut cursor) {
             let child_kind = child.kind();
-            if matches!(child_kind, "aliased_import" | "dotted_name" | "name" | "identifier")
-                && child.id() != p_node.id() {
-                    let txt = node_text(child, source);
-                    let mut full_path = base_path.clone();
-                    full_path.extend(split_qualified_name(&txt));
-                    imports.push(Import {
-                        path: full_path,
-                        alias: alias.clone(),
-                        is_wildcard,
-                    });
-                }
+            if matches!(
+                child_kind,
+                "aliased_import" | "dotted_name" | "name" | "identifier"
+            ) && child.id() != p_node.id()
+            {
+                let txt = node_text(child, source);
+                let mut full_path = base_path.clone();
+                full_path.extend(split_qualified_name(&txt));
+                imports.push(Import {
+                    path: full_path,
+                    alias: alias.clone(),
+                    is_wildcard,
+                });
+            }
         }
         if imports.is_empty() {
-            imports.push(Import { path: base_path, alias, is_wildcard });
+            imports.push(Import {
+                path: base_path,
+                alias,
+                is_wildcard,
+            });
         }
     } else {
         let path = if let Some(p_node) = node
@@ -269,7 +282,11 @@ pub fn try_parse_free_variable(node: Node, source: &str) -> Option<crate::model:
     if let Some(name) = extract_identifier(node, source) {
         let ty = extract_type_ref(node, source);
         let annotations = super::annotation_extraction::extract_annotations(node, source);
-        return Some(crate::model::Field { name, ty, annotations });
+        return Some(crate::model::Field {
+            name,
+            ty,
+            annotations,
+        });
     }
 
     None
@@ -283,11 +300,11 @@ pub fn try_parse_type_alias(node: Node, source: &str) -> Option<crate::model::Ty
     let name = extract_identifier(node, source);
     println!("TypeAlias: name={:?} from node: {:?}", name, node.kind());
     let name = name?;
-    
+
     // For type alias, we can typically extract the type ref right from the node
     let target = extract_type_ref(node, source);
     println!("TypeAlias: name={:?} target={:?}", name, target);
-    
+
     Some(crate::model::TypeAlias {
         name: vec![name],
         target,
