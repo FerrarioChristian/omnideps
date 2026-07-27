@@ -53,13 +53,15 @@ pub fn export_graphs(graphs: &[DependencyGraph], out_path: &Path) -> anyhow::Res
 
     let mut global_edge_id = 0;
 
-    // Helper to add a node
     let add_node = |elements: &mut Vec<CytoscapeElement>,
                     added_nodes: &mut HashSet<String>,
                     id: String,
                     label: String,
                     ty: String,
                     parent: Option<String>| {
+        if id.is_empty() {
+            return;
+        }
         if !added_nodes.contains(&id) {
             added_nodes.insert(id.clone());
             elements.push(CytoscapeElement {

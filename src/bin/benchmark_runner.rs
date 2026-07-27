@@ -92,6 +92,7 @@ fn verify_graph_adherence(graph: &DependencyGraph, manifest: &TestManifest) -> T
     for node in &manifest.nodes {
         let exists = nodes_map.contains_key(&node.name);
 
+        // TODO: Implement strict kind checking for nodes if needed in the future.
         // For now, as agreed, we ignore strict kind matching between tree-sitter AST kinds and our high-level Component kinds.
         let same_kind = exists;
 
@@ -141,6 +142,7 @@ fn verify_graph_adherence(graph: &DependencyGraph, manifest: &TestManifest) -> T
             }
         }
 
+        // TODO: Implement strict kind checking for edges if needed in the future.
         // Like the predecessor, we don't strictly check edge kinds for now.
         // We just verify that *a* dependency exists between the two nodes.
         let same_kind = edge_exists;

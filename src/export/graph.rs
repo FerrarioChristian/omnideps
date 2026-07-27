@@ -66,9 +66,8 @@ fn traverse_module_for_edges(
     edges: &mut Vec<Dependency>,
 ) {
     let mut m_name = prefix.clone();
-    if !m.name.is_empty() && (m.name.len() > 1 || m.name[0] != "root" || prefix.is_empty()) {
-        m_name.extend(m.name.clone());
-    }
+    let name_to_add: Vec<String> = m.name.iter().filter(|s| *s != "root").cloned().collect();
+    m_name.extend(name_to_add);
 
     if let Some(parent) = parent_id {
         edges.push(Dependency {
@@ -222,8 +221,20 @@ fn type_ref_targets(tr: &TypeRef) -> Vec<QualifiedName> {
         TypeRef::Resolved(to)
         | TypeRef::External(to)
         | TypeRef::Unresolved(to)
-        | TypeRef::Failed(to) => vec![to.clone()],
-        TypeRef::Primitive(s) => vec![vec![s.clone()]],
+        | TypeRef::Failed(to) => {
+            if to.is_empty() {
+                vec![]
+            } else {
+                vec![to.clone()]
+            }
+        }
+        TypeRef::Primitive(s) => {
+            if s.is_empty() {
+                vec![]
+            } else {
+                vec![vec![s.clone()]]
+            }
+        }
         TypeRef::Union(types) => types.iter().flat_map(type_ref_targets).collect(),
         _ => vec![],
     }
@@ -360,9 +371,8 @@ fn flatten_modules(modules: &[Module], prefix: QualifiedName) -> Vec<Component> 
     let mut flat = vec![];
     for m in modules {
         let mut m_name = prefix.clone();
-        if !m.name.is_empty() && (m.name.len() > 1 || m.name[0] != "root" || prefix.is_empty()) {
-            m_name.extend(m.name.clone());
-        }
+        let name_to_add: Vec<String> = m.name.iter().filter(|s| *s != "root").cloned().collect();
+        m_name.extend(name_to_add);
 
         let mut m_clone = m.clone();
         m_clone.name = m_name.clone();

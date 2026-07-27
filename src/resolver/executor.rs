@@ -67,10 +67,23 @@ pub fn execute_module(ctx: &ExecutorContext, mut m: Module, parent_scope: ScopeI
 
     for ta in m.type_aliases.iter_mut() {
         ta.target = evaluate_typeref(ctx, ta.target.clone(), scope_id, true);
-        println!(
-            "Executor TypeAlias after eval: {:?} target={:?}",
-            ta.name, ta.target
-        );
+    }
+
+    for imp in m.imports.iter_mut() {
+        if let Some(TypeRef::Resolved(resolved_path)) = find_global(ctx, &imp.path) {
+            imp.path = resolved_path;
+        } else if imp.is_wildcard {
+            // Se è un wildcard import (es. structs::*), tentiamo di risolvere la cartella base
+            let mut base_path = imp.path.clone();
+            if base_path.last().map(|s| s.as_str()) == Some("*") {
+                base_path.pop();
+            }
+            if let Some(TypeRef::Resolved(resolved_base)) = find_global(ctx, &base_path) {
+                let mut new_path = resolved_base;
+                new_path.push("*".to_string());
+                imp.path = new_path;
+            }
+        }
     }
 
     m.free_functions = m
@@ -338,7 +351,7 @@ fn build_path_from_scope(tree: &ScopeTree, scope_id: ScopeId) -> QualifiedName {
     let mut path = vec![];
     let mut curr = Some(scope_id);
     while let Some(id) = curr {
-        if !tree.arena[id].name.starts_with("block") {
+        if !tree.arena[id].name.starts_with("block") && tree.arena[id].name != "root" {
             path.push(tree.arena[id].name.clone());
         }
         curr = tree.arena[id].parent;
