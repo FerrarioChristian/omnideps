@@ -1,7 +1,9 @@
 [package]
 name = "language-agnostic-analyzer"
+description = "A language-agnostic code analyzer using tree-sitter"
 version = "0.1.0"
 edition = "2024"
+default-run = "language-agnostic-analyzer"
 
 [dependencies]
 tree-sitter = "0.26.8"

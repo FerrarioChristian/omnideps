@@ -140,16 +140,29 @@ fn traverse_module_for_edges(
 
     for ib in &m.impl_blocks {
         for to in type_ref_targets(&ib.impl_for) {
-            for mut meth in ib.methods.clone() {
+            edges.push(Dependency {
+                from: m_name.clone(),
+                to: to.clone(),
+                kind: DependencyEdgeKind::Implements,
+            });
+            if let Some(trait_ref) = &ib.implements_trait {
+                for t in type_ref_targets(trait_ref) {
+                    edges.push(Dependency {
+                        from: to.clone(),
+                        to: t.clone(),
+                        kind: DependencyEdgeKind::Implements,
+                    });
+                }
+            }
+            for meth in &ib.methods {
                 let mut m_name = to.clone();
                 m_name.extend(meth.name.clone());
-                meth.name = m_name.clone();
                 edges.push(Dependency {
                     from: to.clone(),
                     to: m_name.clone(),
                     kind: DependencyEdgeKind::NestedIn,
                 });
-                add_function_edges(&meth, &m_name, edges);
+                add_function_edges(meth, &m_name, edges);
                 add_annotation_edges(&meth.annotations, &m_name, edges);
             }
             for nested in &ib.nested_types {
@@ -161,6 +174,17 @@ fn traverse_module_for_edges(
                     kind: DependencyEdgeKind::NestedIn,
                 });
                 traverse_structured_type_edges(nested, &to, edges);
+            }
+            for ta in &ib.type_aliases {
+                let mut ta_name = to.clone();
+                ta_name.extend(ta.name.clone());
+                for target_to in type_ref_targets(&ta.target) {
+                    edges.push(Dependency {
+                        from: ta_name.clone(),
+                        to: target_to,
+                        kind: DependencyEdgeKind::Aliases,
+                    });
+                }
             }
         }
     }
@@ -413,6 +437,12 @@ fn flatten_modules(modules: &[Module], prefix: QualifiedName) -> Vec<Component> 
                 }
                 for nested in &ib.nested_types {
                     flat.extend(flatten_structured_type(nested, &to));
+                }
+                for mut ta in ib.type_aliases.clone() {
+                    let mut ta_name = to.clone();
+                    ta_name.extend(ta.name.clone());
+                    ta.name = ta_name;
+                    flat.push(Component::TypeAlias(ta));
                 }
             }
         }

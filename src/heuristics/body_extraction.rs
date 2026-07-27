@@ -267,8 +267,28 @@ fn find_behavioral_deps(
         return;
     }
 
+    // Do not recurse into compound identifiers or types to avoid spurious accesses for their parts
+    if matches!(
+        kind,
+        "scoped_identifier" | "qualified_identifier" | "field_access" | "member_expression"
+    ) {
+        return;
+    }
+
     let mut cursor = node.walk();
     for child in node.children(&mut cursor) {
+        // Skip recursing into the 'function' part of a call, because we already extracted it as a Call.
+        if matches!(kind, "call_expression" | "call" | "method_invocation") {
+            if let Some(f_node) = node
+                .child_by_field_name("function")
+                .or_else(|| node.child_by_field_name("name"))
+            {
+                if child.id() == f_node.id() {
+                    continue;
+                }
+            }
+        }
+
         find_behavioral_deps(child, source, calls, instantiates, accesses, type_casts);
     }
 }

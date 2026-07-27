@@ -399,6 +399,7 @@ fn link_out_of_line_methods(modules: &mut Vec<Module>, config: &crate::config::A
                             m
                         }],
                         nested_types: vec![],
+                        type_aliases: vec![],
                     });
                 }
             }

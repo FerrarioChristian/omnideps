@@ -185,6 +185,14 @@ fn execute_impl_block(
         .into_iter()
         .map(|n| execute_structured_type(ctx, n, scope_id))
         .collect();
+    ib.type_aliases = ib
+        .type_aliases
+        .into_iter()
+        .map(|mut ta| {
+            ta.target = evaluate_typeref(ctx, ta.target, scope_id, true);
+            ta
+        })
+        .collect();
     ib
 }
 
@@ -525,7 +533,13 @@ fn evaluate_query_extract(
 ) -> Option<TypeRef> {
     let parent_ty = evaluate_query(ctx, parent_q, scope_id, true, visited)?;
 
-    if let Some(target_scope) = find_scope_for_type(ctx.tree, &parent_ty) {
+    // First resolve the parent type if it's Unresolved, to ensure find_scope_for_type works
+    let mut resolved_parent_ty = parent_ty.clone();
+    if let TypeRef::Unresolved(_) | TypeRef::ResolutionQuery(_) = resolved_parent_ty {
+        resolved_parent_ty = evaluate_typeref(ctx, resolved_parent_ty, scope_id, true);
+    }
+
+    if let Some(target_scope) = find_scope_for_type(ctx.tree, &resolved_parent_ty) {
         if let Some(res) =
             find_symbol_in_scope_and_supers(ctx, target_scope, member, resolve_type, visited)
         {

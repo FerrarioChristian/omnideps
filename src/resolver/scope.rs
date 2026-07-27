@@ -272,6 +272,34 @@ impl ScopeTree {
         for nested in &ib.nested_types {
             self.register_structured_type(nested, class_scope, config, lang);
         }
+
+        for ta in &ib.type_aliases {
+            let ta_name = ta.name.last().cloned().unwrap_or_default();
+            self.define_symbol(
+                class_scope,
+                ta_name.clone(),
+                Symbol::TypeAlias(ta.target.clone()),
+            );
+
+            // TODO:
+            // Magic support for Rust's `Deref` trait which implies inheritance
+            if ta_name == "Target" {
+                if let Some(trait_ref) = &ib.implements_trait {
+                    let is_deref = match trait_ref {
+                        TypeRef::Resolved(qn) | TypeRef::Unresolved(qn) | TypeRef::External(qn) => {
+                            qn.last().map(|s| s.as_str()) == Some("Deref")
+                        }
+                        TypeRef::ResolutionQuery(q) => {
+                            crate::resolver::executor::extract_base_name(q) == "Deref"
+                        }
+                        _ => false,
+                    };
+                    if is_deref {
+                        self.arena[class_scope].super_types.push(ta.target.clone());
+                    }
+                }
+            }
+        }
     }
 
     fn register_function(

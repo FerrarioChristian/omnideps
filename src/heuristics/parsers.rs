@@ -153,6 +153,12 @@ pub fn try_parse_impl_block(
     let impl_for = extract_impl_for(node, source);
     let implements_trait = extract_implements_trait(node, source);
     let nested_types = extract_nested_types(node, source, lang_name, config);
+    let type_aliases = crate::heuristics::structural_extraction::extract_list_of(
+        node,
+        source,
+        false,
+        |child, src| try_parse_type_alias(child, src),
+    );
 
     Some(ImplBlock {
         name,
@@ -160,6 +166,7 @@ pub fn try_parse_impl_block(
         impl_for,
         implements_trait,
         nested_types,
+        type_aliases,
     })
 }
 

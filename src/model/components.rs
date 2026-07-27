@@ -86,6 +86,8 @@ pub struct ImplBlock {
     pub implements_trait: Option<TypeRef>,
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub nested_types: Vec<StructuredType>,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub type_aliases: Vec<TypeAlias>,
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
