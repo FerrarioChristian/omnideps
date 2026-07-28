@@ -305,3 +305,15 @@ edges:
   source: domain.direct.allowed.TypeCast.testCast
   sink: domain.direct.Base
   kind: casts_type
+- testid: IMP-2
+  source: domain.imports.ExplicitImportTest
+  sink: technology.direct.dao.AccountDAO
+  kind: includes
+- testid: IMP-3
+  source: domain.imports.WildcardImportTest
+  sink: technology.direct.dao
+  kind: includes
+- testid: IMP-4
+  source: domain.imports.StaticImportTest
+  sink: java.lang.Math.PI
+  kind: includes
