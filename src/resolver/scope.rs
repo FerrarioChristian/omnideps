@@ -207,7 +207,17 @@ impl ScopeTree {
             );
         }
 
-        let type_ref = TypeRef::Resolved(st.name.clone());
+        let mut path = vec![];
+        let mut curr = Some(class_scope);
+        while let Some(id) = curr {
+            if !self.arena[id].name.starts_with("block") && self.arena[id].name != "root" {
+                path.push(self.arena[id].name.clone());
+            }
+            curr = self.arena[id].parent;
+        }
+        path.reverse();
+        let type_ref = TypeRef::Resolved(path);
+        
         for method in &st.methods {
             let m_name = method.name.last().cloned().unwrap_or_default();
             self.define_symbol(
@@ -216,6 +226,10 @@ impl ScopeTree {
                 Symbol::Value(method.signature.return_type.clone()),
             );
             self.register_function(method, class_scope, config, lang, Some(type_ref.clone()));
+        }
+
+        for import in &st.imports {
+            self.arena[class_scope].imports.push(import.clone());
         }
 
         for nested in &st.nested_types {

@@ -81,6 +81,7 @@ pub fn try_parse_structured_type(
 
     let annotations = super::annotation_extraction::extract_annotations(node, source);
     println!("Type {:?} annotations: {:?}", name, annotations);
+    println!("FIELDS FOR {:?}: {:?}", name, fields);
 
     Some(StructuredType {
         name,
@@ -90,12 +91,28 @@ pub fn try_parse_structured_type(
         super_types,
         nested_types,
         annotations,
+        imports: vec![],
     })
 }
 
-pub fn try_parse_function(node: Node, source: &str) -> Option<Function> {
+pub fn try_parse_function(mut node: Node, source: &str) -> Option<Function> {
     if !is_function(node) {
         return None;
+    }
+
+    if node.kind() == "decorated_definition" {
+        if let Some(definition) = node.child_by_field_name("definition") {
+            node = definition;
+        } else {
+            // fallback, find the first function child
+            let mut cursor = node.walk();
+            for child in node.children(&mut cursor) {
+                if child.kind().contains("function") || child.kind().contains("method") {
+                    node = child;
+                    break;
+                }
+            }
+        }
     }
 
     let name = extract_identifier(node, source).unwrap_or_else(|| "unnamed_function".to_string());

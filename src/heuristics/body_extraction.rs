@@ -38,8 +38,7 @@ pub fn extract_block(node: Node, source: &str) -> crate::model::Block {
             kind = child.kind();
         }
 
-        // 1. Variable Declarations
-        if matches!(
+        let mut is_declaration = matches!(
             kind,
             "field_declaration"
                 | "property_declaration"
@@ -56,7 +55,18 @@ pub fn extract_block(node: Node, source: &str) -> crate::model::Block {
                 | "for_range_loop"
                 | "for_in_statement"
                 | "catch_clause"
-        ) {
+        );
+
+        if kind == "assignment" {
+            if let Some(left) = child.child_by_field_name("left") {
+                if matches!(left.kind(), "attribute" | "field_expression" | "subscript_expression" | "member_expression") {
+                    is_declaration = false;
+                }
+            }
+        }
+
+        // 1. Variable Declarations
+        if is_declaration {
             let name_opt;
             if let Some(decl_node) = child
                 .child_by_field_name("declarator")
@@ -220,7 +230,7 @@ fn find_behavioral_deps(
 
     // --- Calls ---
     if matches!(kind, "call_expression" | "call") {
-        extract_call_dependency(node, source, calls);
+        extract_call_dependency(node, source, calls, accesses);
     } else if kind == "method_invocation" {
         // Java
         let mut parts = vec![];
@@ -316,7 +326,16 @@ pub fn infer_variable_type(node: Node, source: &str) -> TypeRef {
             // In languages like Python, object creation is just a call node (e.g. `Admin(...)`)
             if let Some(f_node) = val.child_by_field_name("function") {
                 let extracted = extract_type_ref(f_node, source);
-                // println!("INFERRED CALL TYPE (value branch): {:?}", extracted);
+                if let crate::model::TypeRef::Unresolved(path) = &extracted {
+                    if !path.is_empty() {
+                        let mut curr = crate::model::Query::Find(path[0].clone());
+                        for part in &path[1..] {
+                            curr = crate::model::Query::Extract(Box::new(curr), part.clone());
+                        }
+                        let query = crate::model::Query::Call(Box::new(curr));
+                        return crate::model::TypeRef::ResolutionQuery(query);
+                    }
+                }
                 return extracted;
             }
         }
@@ -344,10 +363,18 @@ pub fn infer_variable_type(node: Node, source: &str) -> TypeRef {
                 return extract_type_ref(name_node, source);
             }
         } else if kind == "call" {
-            // In languages like Python, object creation is just a call node (e.g. `Admin(...)`)
             if let Some(f_node) = child.child_by_field_name("function") {
                 let extracted = extract_type_ref(f_node, source);
-                println!("INFERRED CALL TYPE: {:?}", extracted);
+                if let crate::model::TypeRef::Unresolved(path) = &extracted {
+                    if !path.is_empty() {
+                        let mut curr = crate::model::Query::Find(path[0].clone());
+                        for part in &path[1..] {
+                            curr = crate::model::Query::Extract(Box::new(curr), part.clone());
+                        }
+                        let query = crate::model::Query::Call(Box::new(curr));
+                        return crate::model::TypeRef::ResolutionQuery(query);
+                    }
+                }
                 return extracted;
             }
         }
@@ -360,7 +387,12 @@ pub fn infer_variable_type(node: Node, source: &str) -> TypeRef {
 /// It correctly handles `qualified_identifier` and `scoped_identifier` nodes by
 /// extracting the full path to the function being called, ensuring that static
 /// method calls (e.g., `StructA::static_method`) are correctly resolved instead of just their scope.
-fn extract_call_dependency(node: Node, source: &str, calls: &mut Vec<TypeRef>) {
+fn extract_call_dependency(
+    node: Node,
+    source: &str,
+    calls: &mut Vec<TypeRef>,
+    accesses: &mut Vec<TypeRef>,
+) {
     if let Some(f) = node.child_by_field_name("function") {
         let f_kind = f.kind();
         if matches!(
@@ -373,6 +405,14 @@ fn extract_call_dependency(node: Node, source: &str, calls: &mut Vec<TypeRef>) {
                 | "type_identifier"
         ) {
             calls.push(extract_type_ref(f, source));
+            
+            // Also extract the base object of the method call as an access (e.g. `self.permissions` in `self.permissions.append()`)
+            if let Some(obj) = f.child_by_field_name("object")
+                .or_else(|| f.child_by_field_name("value"))
+                .or_else(|| f.child_by_field_name("left"))
+            {
+                accesses.push(extract_type_ref(obj, source));
+            }
         }
     }
 }

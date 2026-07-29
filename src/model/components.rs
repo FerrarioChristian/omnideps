@@ -104,6 +104,8 @@ pub struct StructuredType {
     pub nested_types: Vec<StructuredType>,
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub annotations: Vec<TypeRef>,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub imports: Vec<Import>,
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]

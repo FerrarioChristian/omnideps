@@ -176,6 +176,18 @@ pub fn parse_source(
 
     let lang_config = config.get_for(lang.name());
 
+    if lang_config.modules.package_decl_based {
+        // Distribute file-scoped imports to the top-level structured types (classes/interfaces)
+        if !modules.is_empty() {
+            let imports = modules[0].imports.clone();
+            for st in &mut modules[0].structured_types {
+                st.imports = imports.clone();
+            }
+            // Clear module imports so they aren't incorrectly merged at the package level
+            modules[0].imports.clear();
+        }
+    }
+
     if lang_config.modules.file_based && lang_config.modules.directory_based {
         apply_directory_strategy(&mut modules, path, &file_path_str, lang.name());
     } else if lang_config.modules.package_decl_based {

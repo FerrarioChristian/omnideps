@@ -61,19 +61,23 @@ pub fn extract_type_ref(node: Node, source: &str) -> TypeRef {
 
     // 0. Handle direct access and identifiers
     if matches!(
-        kind,
-        "field_access"
+        node.kind(),
+        "type_identifier"
+            | "identifier"
             | "scoped_identifier"
             | "qualified_identifier"
-            | "identifier"
-            | "type_identifier"
+            | "scoped_type_identifier"
             | "attribute"
             | "field_expression"
+            | "field_access"
             | "primitive_type"
             | "predefined_type"
             | "template_type"
+            | "type"
+            | "string"
     ) {
         let text = node_text(node, source);
+        let text = text.replace('\'', "").replace('"', "");
         if !text.is_empty() {
             // TODO: Hack temporaneo per gestire i generici/templates
             // Sfruttando TypeRef::Union per i generics, obbligo l'analizzatore

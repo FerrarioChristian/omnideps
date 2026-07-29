@@ -252,7 +252,8 @@ pub fn extract_return_type(node: Node, source: &str) -> TypeRef {
         let after = text[arrow_pos + 2..].trim();
         let ret_type: String = after
             .chars()
-            .take_while(|c| c.is_alphanumeric() || *c == '_' || *c == ':')
+            .filter(|c| *c != '\'' && *c != '"') // Remove quotes entirely
+            .take_while(|c| c.is_alphanumeric() || *c == '_' || *c == ':' || *c == '[' || *c == ']' || *c == '.')
             .collect();
         if !ret_type.is_empty() {
             return TypeRef::Unresolved(split_qualified_name(&ret_type));

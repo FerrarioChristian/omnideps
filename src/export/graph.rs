@@ -206,6 +206,14 @@ fn traverse_structured_type_edges(
     add_field_edges(st, &st_name, edges);
     add_annotation_edges(&st.annotations, &st_name, edges);
 
+    for import in &st.imports {
+        edges.push(Dependency {
+            from: st_name.clone(),
+            to: import.path.clone(),
+            kind: DependencyEdgeKind::Imports,
+        });
+    }
+
     for f in &st.fields {
         let mut f_name = st_name.clone();
         f_name.push(f.name.clone());
@@ -280,6 +288,11 @@ fn add_field_edges(st: &StructuredType, st_name: &QualifiedName, edges: &mut Vec
     for f in &st.fields {
         let mut f_name = st_name.clone();
         f_name.push(f.name.clone());
+        edges.push(Dependency {
+            from: st_name.clone(),
+            to: f_name.clone(),
+            kind: DependencyEdgeKind::NestedIn,
+        });
         for to in type_ref_targets(&f.ty) {
             edges.push(Dependency {
                 from: f_name.clone(),

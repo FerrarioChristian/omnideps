@@ -98,6 +98,17 @@ pub fn extract_identifier(node: Node, source: &str) -> Option<String> {
         }
     }
 
+    // Fallback: look for an identifier child
+    let mut cursor = node.walk();
+    for child in node.children(&mut cursor) {
+        if child.kind() == "identifier" {
+            let text = node_text(child, source).trim().to_string();
+            if !text.is_empty() {
+                return Some(text);
+            }
+        }
+    }
+
     None
 }
 

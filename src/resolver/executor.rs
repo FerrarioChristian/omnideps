@@ -69,22 +69,8 @@ pub fn execute_module(ctx: &ExecutorContext, mut m: Module, parent_scope: ScopeI
         ta.target = evaluate_typeref(ctx, ta.target.clone(), scope_id, true);
     }
 
-    for imp in m.imports.iter_mut() {
-        if let Some(TypeRef::Resolved(resolved_path)) = find_global(ctx, &imp.path) {
-            imp.path = resolved_path;
-        } else if imp.is_wildcard {
-            // Se è un wildcard import (es. structs::*), tentiamo di risolvere la cartella base
-            let mut base_path = imp.path.clone();
-            if base_path.last().map(|s| s.as_str()) == Some("*") {
-                base_path.pop();
-            }
-            if let Some(TypeRef::Resolved(resolved_base)) = find_global(ctx, &base_path) {
-                let mut new_path = resolved_base;
-                new_path.push("*".to_string());
-                imp.path = new_path;
-            }
-        }
-    }
+    // We do not mutate `imp.path` here anymore.
+    // The graph generator should emit dependencies exactly as written in the source code (e.g. `transitive_main -> lib_b.TransitiveClass`).
 
     m.free_functions = m
         .free_functions
@@ -260,12 +246,18 @@ fn execute_block(
     b.calls = b
         .calls
         .into_iter()
-        .map(|c| evaluate_typeref(ctx, c, block_scope_id, false))
+        .map(|c| {
+            let tr = evaluate_typeref(ctx, c, block_scope_id, false);
+            redirect_to_constructor(ctx, tr)
+        })
         .collect();
     b.instantiates = b
         .instantiates
         .into_iter()
-        .map(|i| evaluate_typeref(ctx, i, block_scope_id, false))
+        .map(|i| {
+            let tr = evaluate_typeref(ctx, i, block_scope_id, false);
+            redirect_to_constructor(ctx, tr)
+        })
         .collect();
     b.accesses = b
         .accesses
@@ -286,6 +278,23 @@ fn execute_block(
         .collect();
     b.sub_blocks = sub_blocks;
     b
+}
+
+fn redirect_to_constructor(ctx: &ExecutorContext, tr: TypeRef) -> TypeRef {
+    if let TypeRef::Resolved(ref path) = tr {
+        if let Some(scope_id) = find_scope_for_type(ctx.tree, &tr) {
+            // Check if it's a class/type scope by verifying if there are any constructors.
+            let ctor_names = ["__init__", "constructor", path.last().unwrap().as_str()];
+            for cname in ctor_names {
+                if ctx.tree.arena[scope_id].symbols.contains_key(cname) {
+                    let mut new_path = path.clone();
+                    new_path.push(cname.to_string());
+                    return TypeRef::Resolved(new_path);
+                }
+            }
+        }
+    }
+    tr
 }
 
 /// Core function to resolve a `TypeRef`.
@@ -551,7 +560,23 @@ fn evaluate_query_extract(
             return Some(res);
         }
     }
-    None
+    
+    // Fallback: append member to the resolved parent type
+    match resolved_parent_ty {
+        TypeRef::Resolved(mut path) => {
+            path.push(member.to_string());
+            Some(TypeRef::Resolved(path))
+        }
+        TypeRef::External(mut path) => {
+            path.push(member.to_string());
+            Some(TypeRef::External(path))
+        }
+        TypeRef::Unresolved(mut path) => {
+            path.push(member.to_string());
+            Some(TypeRef::Unresolved(path))
+        }
+        _ => None,
+    }
 }
 
 /// Converts a raw `Symbol` found in the tree into a properly formatted `TypeRef`.
