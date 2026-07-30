@@ -19,6 +19,7 @@ clap = { version = "4.5", features = ["derive"] }
 walkdir = "2.5"
 anyhow = "1.0"
 serde_yaml = "0.9.34"
+csv = "1.3"
 
 [[bin]]
 name = "language-agnostic-analyzer"
@@ -27,3 +28,7 @@ path = "src/main.rs"
 [[bin]]
 name = "benchmark_runner"
 path = "src/bin/benchmark_runner.rs"
+
+[[bin]]
+name = "benchmark_all"
+path = "src/bin/benchmark_all.rs"
