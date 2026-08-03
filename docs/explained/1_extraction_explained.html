@@ -5,25 +5,26 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Fase 1: Estrazione CST → IR — Deep Dive Tecnico</title>
     <style>
-        :root {
-            --bg: #fafbfc;
-            --card-bg: #ffffff;
-            --text: #24292f;
-            --text-secondary: #57606a;
-            --border: #d0d7de;
-            --accent: #0969da;
-            --accent-subtle: #ddf4ff;
-            --success: #1a7f37;
-            --success-subtle: #dafbe1;
-            --warning: #9a6700;
-            --warning-subtle: #fff8c5;
-            --danger: #cf222e;
-            --danger-subtle: #ffebe9;
-            --purple: #8250df;
-            --purple-subtle: #fbefff;
-            --code-bg: #f6f8fa;
-            --pre-bg: #1b1f23;
+                        :root {
+            --bg: #1e1e1e;
+            --card-bg: rgba(30, 30, 30, 0.85);
+            --text: #ecf0f1;
+            --text-secondary: #bdc3c7;
+            --border: #444444;
+            --accent: #58a6ff;
+            --accent-subtle: rgba(88, 166, 255, 0.15);
+            --success: #3fb950;
+            --success-subtle: rgba(63, 185, 80, 0.15);
+            --warning: #d29922;
+            --warning-subtle: rgba(210, 153, 34, 0.15);
+            --danger: #f85149;
+            --danger-subtle: rgba(248, 81, 73, 0.15);
+            --purple: #bc8cff;
+            --purple-subtle: rgba(188, 140, 255, 0.15);
+            --code-bg: rgba(255, 255, 255, 0.05);
+            --pre-bg: #141414;
             --pre-text: #e6edf3;
+            --nav-bg: rgba(30, 30, 30, 0.85);
         }
 
         * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -94,7 +95,7 @@
             font-size: 0.88em;
             line-height: 1.55;
             margin: 0.8rem 0 1.2rem 0;
-            border: 1px solid #30363d;
+            border: 1px solid var(--border);
         }
         pre code {
             background: none;
@@ -132,7 +133,7 @@
 
         .info-box {
             background: var(--accent-subtle);
-            border: 1px solid #84c5f5;
+            border: 1px solid var(--accent);
             padding: 1rem 1.2rem;
             border-radius: 8px;
             margin: 1rem 0;
@@ -141,7 +142,7 @@
 
         .warn-box {
             background: var(--warning-subtle);
-            border: 1px solid #d4a72c;
+            border: 1px solid var(--warning);
             padding: 1rem 1.2rem;
             border-radius: 8px;
             margin: 1rem 0;
@@ -149,7 +150,7 @@
         .warn-box strong { color: var(--warning); }
 
         .tree-container {
-            background: #f0f3f6;
+            background: var(--code-bg);
             border: 1px solid var(--border);
             padding: 1.4rem 1.6rem;
             border-radius: 8px;
@@ -160,12 +161,12 @@
             white-space: pre;
             overflow-x: auto;
         }
-        .node { font-weight: 700; color: #cf222e; }
+        .node { font-weight: 700; color: var(--danger); }
         .symbol { color: var(--accent); font-weight: 600; }
         .import { color: #9a6700; font-style: italic; }
-        .highlight { background: #fff8c5; padding: 1px 5px; border-radius: 3px; color: var(--text); font-weight: 600; border: 1px solid #d4a72c; }
-        .arrow { color: #8b949e; }
-        .dim { color: #8b949e; font-style: italic; }
+        .highlight { background: #fff8c5; padding: 1px 5px; border-radius: 3px; color: var(--text); font-weight: 600; border: 1px solid var(--warning); }
+        .arrow { color: var(--text-secondary); }
+        .dim { color: var(--text-secondary); font-style: italic; }
         .green { color: var(--success); font-weight: 600; }
         .red { color: var(--danger); font-weight: 600; }
         .purple { color: var(--purple); font-weight: 600; }
@@ -181,7 +182,7 @@
         }
         .flowchart .box {
             background: var(--accent-subtle);
-            border: 1px solid #84c5f5;
+            border: 1px solid var(--accent);
             padding: 0.4rem 0.8rem;
             border-radius: 6px;
             font-weight: 600;
@@ -189,7 +190,7 @@
         }
         .flowchart .box.active {
             background: var(--success-subtle);
-            border-color: #4ac26b;
+            border-color: var(--success);
             color: var(--success);
         }
         .flowchart .box.purple {
@@ -202,7 +203,7 @@
             border-color: #ff8182;
             color: var(--danger);
         }
-        .flowchart .sep { color: #8b949e; font-size: 1.2em; }
+        .flowchart .sep { color: var(--text-secondary); font-size: 1.2em; }
 
         table {
             width: 100%;
@@ -287,18 +288,7 @@
 </head>
 <body>
 
-    <nav class="wiki-nav">
-        <span class="label">📖 Wiki:</span>
-        <a href="extraction_explained.html" class="active">Fase 1 — Estrazione</a>
-        <span class="sep">·</span>
-        <a href="name_resolution_explained.html">Fase 2 — Name Resolution</a>
-        <span class="sep">·</span>
-        <a href="dependency_graph_explained.html">Fase 3 — Dependency Graph</a>
-        <span class="sep">·</span>
-        <a href="features_roadmap.html">Features &amp; Roadmap</a>
-    </nav>
-
-    <h1>Deep Dive: Fase 1 — Estrazione CST → IR</h1>
+<h1>Deep Dive: Fase 1 — Estrazione CST → IR</h1>
     <p>Documentazione tecnica esaustiva dell'attraversamento dell'albero Tree-sitter e della costruzione della Rappresentazione Intermedia, con spiegazione passo-passo di ogni componente.</p>
 
     <div class="toc">
@@ -424,7 +414,6 @@
     pub sub_modules: Vec&lt;Module&gt;,              // Moduli annidati
     pub structured_types: Vec&lt;StructuredType&gt;, // Struct, class, interface, ecc.
     pub free_functions: Vec&lt;Function&gt;,         // Funzioni non legate a un tipo
-    pub free_variables: Vec&lt;Field&gt;,            // Variabili statiche/globali del modulo
     pub impl_blocks: Vec&lt;ImplBlock&gt;,           // Blocchi impl (specifici di Rust)
 }</code></pre>
 
@@ -543,9 +532,7 @@ pub struct ImplBlock {
      │
      ├─ <span class="node">ImplBlock</span> → inserisce in <code>modules[0].impl_blocks</code>.
      │
-     ├─ <span class="node">Import</span> → inserisce in <code>modules[0].imports</code>.
-     │
-     └─ <span class="node">Field</span> → inserisce in <code>modules[0].free_variables</code> (Variabili Globali/Statiche).
+     └─ <span class="node">Import</span> → inserisce in <code>modules[0].imports</code>.
 
      <span class="red">return;</span>  <span class="dim">// STOP — non scende nei figli (per i casi non-Module/Function)</span>
 

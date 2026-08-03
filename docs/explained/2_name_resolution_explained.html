@@ -5,25 +5,26 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Name Resolution: Deep Dive Tecnico</title>
     <style>
-        :root {
-            --bg: #fafbfc;
-            --card-bg: #ffffff;
-            --text: #24292f;
-            --text-secondary: #57606a;
-            --border: #d0d7de;
-            --accent: #0969da;
-            --accent-subtle: #ddf4ff;
-            --success: #1a7f37;
-            --success-subtle: #dafbe1;
-            --warning: #9a6700;
-            --warning-subtle: #fff8c5;
-            --danger: #cf222e;
-            --danger-subtle: #ffebe9;
-            --purple: #8250df;
-            --purple-subtle: #fbefff;
-            --code-bg: #f6f8fa;
-            --pre-bg: #1b1f23;
+                        :root {
+            --bg: #1e1e1e;
+            --card-bg: rgba(30, 30, 30, 0.85);
+            --text: #ecf0f1;
+            --text-secondary: #bdc3c7;
+            --border: #444444;
+            --accent: #58a6ff;
+            --accent-subtle: rgba(88, 166, 255, 0.15);
+            --success: #3fb950;
+            --success-subtle: rgba(63, 185, 80, 0.15);
+            --warning: #d29922;
+            --warning-subtle: rgba(210, 153, 34, 0.15);
+            --danger: #f85149;
+            --danger-subtle: rgba(248, 81, 73, 0.15);
+            --purple: #bc8cff;
+            --purple-subtle: rgba(188, 140, 255, 0.15);
+            --code-bg: rgba(255, 255, 255, 0.05);
+            --pre-bg: #141414;
             --pre-text: #e6edf3;
+            --nav-bg: rgba(30, 30, 30, 0.85);
         }
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
@@ -40,24 +41,24 @@
         ul, ol { padding-left: 1.5rem; margin-bottom: 1rem; }
         p.ref { color: var(--text-secondary); font-size: 0.9em; margin-bottom: 0.5rem; }
         code { background: var(--code-bg); padding: 2px 6px; border-radius: 4px; font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace; font-size: 0.88em; border: 1px solid var(--border); }
-        pre { background: var(--pre-bg); color: var(--pre-text); padding: 1.2rem 1.4rem; border-radius: 8px; overflow-x: auto; font-size: 0.88em; line-height: 1.55; margin: 0.8rem 0 1.2rem 0; border: 1px solid #30363d; }
+        pre { background: var(--pre-bg); color: var(--pre-text); padding: 1.2rem 1.4rem; border-radius: 8px; overflow-x: auto; font-size: 0.88em; line-height: 1.55; margin: 0.8rem 0 1.2rem 0; border: 1px solid var(--border); }
         pre code { background: none; border: none; padding: 0; color: inherit; }
-        .danger-box { background: var(--danger-subtle); border: 1px solid #ff8182; padding: 1rem 1.2rem; border-radius: 8px; margin: 1rem 0; }
-        .success-box { background: var(--success-subtle); border: 1px solid #4ac26b; padding: 1rem 1.2rem; border-radius: 8px; margin: 1rem 0; }
-        .info-box { background: var(--accent-subtle); border: 1px solid #84c5f5; padding: 1rem 1.2rem; border-radius: 8px; margin: 1rem 0; }
-        .warn-box { background: var(--warning-subtle); border: 1px solid #d4a72c; padding: 1rem 1.2rem; border-radius: 8px; margin: 1rem 0; }
-        .purple-box { background: var(--purple-subtle); border: 1px solid #c297ff; padding: 1rem 1.2rem; border-radius: 8px; margin: 1rem 0; }
-        .tree-container { background: #f0f3f6; border: 1px solid var(--border); padding: 1.4rem 1.6rem; border-radius: 8px; font-family: 'SFMono-Regular', Consolas, monospace; font-size: 0.92em; line-height: 1.65; margin: 1rem 0; white-space: pre; overflow-x: auto; }
-        .node { font-weight: 700; color: #cf222e; } .symbol { color: var(--accent); font-weight: 600; }
-        .dim { color: #8b949e; font-style: italic; } .green { color: var(--success); font-weight: 600; }
-        .purple-text { color: var(--purple); font-weight: 600; } .arrow { color: #8b949e; }
+        .danger-box { background: var(--danger-subtle); border: 1px solid var(--danger); padding: 1rem 1.2rem; border-radius: 8px; margin: 1rem 0; }
+        .success-box { background: var(--success-subtle); border: 1px solid var(--success); padding: 1rem 1.2rem; border-radius: 8px; margin: 1rem 0; }
+        .info-box { background: var(--accent-subtle); border: 1px solid var(--accent); padding: 1rem 1.2rem; border-radius: 8px; margin: 1rem 0; }
+        .warn-box { background: var(--warning-subtle); border: 1px solid var(--warning); padding: 1rem 1.2rem; border-radius: 8px; margin: 1rem 0; }
+        .purple-box { background: var(--purple-subtle); border: 1px solid var(--purple); padding: 1rem 1.2rem; border-radius: 8px; margin: 1rem 0; }
+        .tree-container { background: var(--code-bg); border: 1px solid var(--border); padding: 1.4rem 1.6rem; border-radius: 8px; font-family: 'SFMono-Regular', Consolas, monospace; font-size: 0.92em; line-height: 1.65; margin: 1rem 0; white-space: pre; overflow-x: auto; }
+        .node { font-weight: 700; color: var(--danger); } .symbol { color: var(--accent); font-weight: 600; }
+        .dim { color: var(--text-secondary); font-style: italic; } .green { color: var(--success); font-weight: 600; }
+        .purple-text { color: var(--purple); font-weight: 600; } .arrow { color: var(--text-secondary); }
         .import { color: var(--warning); font-weight: 600; }
         .step { border: 1px solid var(--border); border-radius: 8px; padding: 1rem 1.2rem; margin: 1rem 0; background: var(--card-bg); }
-        .step-success { border-color: #4ac26b; }
+        .step-success { border-color: var(--success); }
         .flowchart { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; margin: 1rem 0; font-family: 'SFMono-Regular', Consolas, monospace; font-size: 0.88em; }
-        .flowchart .box { background: var(--accent-subtle); border: 1px solid #84c5f5; padding: 0.4rem 0.8rem; border-radius: 6px; font-weight: 600; color: var(--accent); }
-        .flowchart .box.active { background: var(--success-subtle); border-color: #4ac26b; color: var(--success); }
-        .flowchart .sep { color: #8b949e; font-size: 1.2em; }
+        .flowchart .box { background: var(--accent-subtle); border: 1px solid var(--accent); padding: 0.4rem 0.8rem; border-radius: 6px; font-weight: 600; color: var(--accent); }
+        .flowchart .box.active { background: var(--success-subtle); border-color: var(--success); color: var(--success); }
+        .flowchart .sep { color: var(--text-secondary); font-size: 1.2em; }
         table { width: 100%; border-collapse: collapse; margin: 1rem 0; font-size: 0.95em; }
         th, td { border: 1px solid var(--border); padding: 0.6rem 0.8rem; text-align: left; }
         th { background: var(--code-bg); font-weight: 600; }
@@ -74,18 +75,7 @@
 </head>
 <body>
 
-    <nav class="wiki-nav">
-        <span class="label">📖 Wiki:</span>
-        <a href="extraction_explained.html">Fase 1 — Estrazione</a>
-        <span class="sep">·</span>
-        <a href="name_resolution_explained.html" class="active">Fase 2 — Name Resolution</a>
-        <span class="sep">·</span>
-        <a href="dependency_graph_explained.html">Fase 3 — Dependency Graph</a>
-        <span class="sep">·</span>
-        <a href="features_roadmap.html">Features &amp; Roadmap</a>
-    </nav>
-
-    <h1>Deep Dive: Il Motore di Name Resolution</h1>
+<h1>Deep Dive: Il Motore di Name Resolution</h1>
     <p>Documentazione tecnica esaustiva dell'architettura a <strong>Query Engine bifase</strong> implementata in <code>src/resolver/</code>. Questo documento copre ogni componente, algoritmo, e scelta progettuale con le relative motivazioni teoriche — materiale diretto per la tesi.</p>
 
     <div class="toc">
@@ -619,10 +609,9 @@ block.instantiates = block.instantiates.into_iter().map(|i| substitute_type(ctx,
     <h3>6.2 Perché <code>HashMap&lt;QN, RegistryEntry&gt;</code> e Non <code>HashSet&lt;QN&gt;</code></h3>
     <p>La v2 usava un <code>HashSet&lt;QualifiedName&gt;</code> — solo esistenza, nessuna informazione sul tipo. Questo era sufficiente per la risoluzione base ma impediva l'inferenza di tipo per le catene di chiamate.</p>
     <pre><code>pub enum RegistryEntry {
-    Module { imports: Vec&lt;Import&gt; },
-    StructuredType { super_types: Vec&lt;TypeRef&gt; },
-    Function { return_type: TypeRef, is_constructor: bool },
-    Field { field_type: TypeRef },
+    Module,
+    StructuredType,
+    Function { return_type: TypeRef },  // ← Questo abilita Call(Q) + resolve_call_return
 }</code></pre>
     <p><strong>Perché salvare il <code>return_type</code>?</strong> Quando l'Executor incontra <code>Call(Extract(Find("Auto"), "calcola"))</code> con <code>resolve_call_return = true</code>, deve sapere cosa restituisce <code>calcola()</code>. Chiama <code>registry.get(["root","core","calcola"])</code> e legge <code>RegistryEntry::Function { return_type: ResolutionQuery(Find("Auto")) }</code>. Poi valuta ricorsivamente <code>Find("Auto")</code> per ottenere il tipo di ritorno assoluto.</p>
 

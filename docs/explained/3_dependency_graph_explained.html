@@ -5,26 +5,26 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Fase 3: Costruzione del Dependency Graph — Deep Dive Tecnico</title>
     <style>
-        :root {
-            --bg: #fafbfc;
-            --card-bg: #ffffff;
-            --text: #24292f;
-            --text-secondary: #57606a;
-            --border: #d0d7de;
-            --accent: #0969da;
-            --accent-subtle: #ddf4ff;
-            --success: #1a7f37;
-            --success-subtle: #dafbe1;
-            --warning: #9a6700;
-            --warning-subtle: #fff8c5;
-            --danger: #cf222e;
-            --danger-subtle: #ffebe9;
-            --purple: #8250df;
-            --purple-subtle: #fbefff;
-            --code-bg: #f6f8fa;
-            --pre-bg: #1b1f23;
+                        :root {
+            --bg: #1e1e1e;
+            --card-bg: rgba(30, 30, 30, 0.85);
+            --text: #ecf0f1;
+            --text-secondary: #bdc3c7;
+            --border: #444444;
+            --accent: #58a6ff;
+            --accent-subtle: rgba(88, 166, 255, 0.15);
+            --success: #3fb950;
+            --success-subtle: rgba(63, 185, 80, 0.15);
+            --warning: #d29922;
+            --warning-subtle: rgba(210, 153, 34, 0.15);
+            --danger: #f85149;
+            --danger-subtle: rgba(248, 81, 73, 0.15);
+            --purple: #bc8cff;
+            --purple-subtle: rgba(188, 140, 255, 0.15);
+            --code-bg: rgba(255, 255, 255, 0.05);
+            --pre-bg: #141414;
             --pre-text: #e6edf3;
-            --nav-bg: #f6f8fa;
+            --nav-bg: rgba(30, 30, 30, 0.85);
         }
 
         * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -124,7 +124,7 @@
             font-size: 0.88em;
             line-height: 1.55;
             margin: 0.8rem 0 1.2rem 0;
-            border: 1px solid #30363d;
+            border: 1px solid var(--border);
         }
         pre code { background: none; border: none; padding: 0; color: inherit; }
 
@@ -148,7 +148,7 @@
 
         .info-box {
             background: var(--accent-subtle);
-            border: 1px solid #84c5f5;
+            border: 1px solid var(--accent);
             padding: 1rem 1.2rem;
             border-radius: 8px;
             margin: 1rem 0;
@@ -157,7 +157,7 @@
 
         .warn-box {
             background: var(--warning-subtle);
-            border: 1px solid #d4a72c;
+            border: 1px solid var(--warning);
             padding: 1rem 1.2rem;
             border-radius: 8px;
             margin: 1rem 0;
@@ -165,7 +165,7 @@
         .warn-box strong { color: var(--warning); }
 
         .tree-container {
-            background: #f0f3f6;
+            background: var(--code-bg);
             border: 1px solid var(--border);
             padding: 1.4rem 1.6rem;
             border-radius: 8px;
@@ -176,10 +176,10 @@
             white-space: pre;
             overflow-x: auto;
         }
-        .node { font-weight: 700; color: #cf222e; }
+        .node { font-weight: 700; color: var(--danger); }
         .symbol { color: var(--accent); font-weight: 600; }
-        .arrow { color: #8b949e; }
-        .dim { color: #8b949e; font-style: italic; }
+        .arrow { color: var(--text-secondary); }
+        .dim { color: var(--text-secondary); font-style: italic; }
         .green { color: var(--success); font-weight: 600; }
         .purple { color: var(--purple); font-weight: 600; }
 
@@ -194,7 +194,7 @@
         }
         .flowchart .box {
             background: var(--accent-subtle);
-            border: 1px solid #84c5f5;
+            border: 1px solid var(--accent);
             padding: 0.4rem 0.8rem;
             border-radius: 6px;
             font-weight: 600;
@@ -202,10 +202,10 @@
         }
         .flowchart .box.active {
             background: var(--success-subtle);
-            border-color: #4ac26b;
+            border-color: var(--success);
             color: var(--success);
         }
-        .flowchart .sep { color: #8b949e; font-size: 1.2em; }
+        .flowchart .sep { color: var(--text-secondary); font-size: 1.2em; }
 
         table {
             width: 100%;
@@ -243,26 +243,15 @@
             font-weight: 600;
             font-family: 'SFMono-Regular', Consolas, monospace;
         }
-        .edge-structural { background: var(--purple-subtle); color: var(--purple); border: 1px solid #c297ff; }
-        .edge-type { background: var(--accent-subtle); color: var(--accent); border: 1px solid #84c5f5; }
-        .edge-behavior { background: var(--success-subtle); color: var(--success); border: 1px solid #4ac26b; }
-        .edge-inherit { background: var(--warning-subtle); color: var(--warning); border: 1px solid #d4a72c; }
+        .edge-structural { background: var(--purple-subtle); color: var(--purple); border: 1px solid var(--purple); }
+        .edge-type { background: var(--accent-subtle); color: var(--accent); border: 1px solid var(--accent); }
+        .edge-behavior { background: var(--success-subtle); color: var(--success); border: 1px solid var(--success); }
+        .edge-inherit { background: var(--warning-subtle); color: var(--warning); border: 1px solid var(--warning); }
     </style>
 </head>
 <body>
 
-    <nav class="wiki-nav">
-        <span class="label">📖 Wiki:</span>
-        <a href="extraction_explained.html">Fase 1 — Estrazione</a>
-        <span class="sep">·</span>
-        <a href="name_resolution_explained.html">Fase 2 — Name Resolution</a>
-        <span class="sep">·</span>
-        <a href="dependency_graph_explained.html" class="active">Fase 3 — Dependency Graph</a>
-        <span class="sep">·</span>
-        <a href="features_roadmap.html">Features &amp; Roadmap</a>
-    </nav>
-
-    <h1>Deep Dive: Fase 3 — Costruzione del Dependency Graph</h1>
+<h1>Deep Dive: Fase 3 — Costruzione del Dependency Graph</h1>
     <p>Documentazione tecnica esaustiva della trasformazione dell'IR risolta in un grafo di dipendenze architetturali, con spiegazione passo-passo della generazione di nodi, archi, e dell'esportazione in formato Cytoscape.</p>
 
     <div class="toc">

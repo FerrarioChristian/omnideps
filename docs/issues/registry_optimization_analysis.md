@@ -24,8 +24,11 @@ Un percorso come `["root", "core", "utils", "Database"]` richiede:
 - **Progetto Medio (50.000 componenti)**: ~7 MB di chiavi. Assolutamente accettabile per i PC moderni.
 - **Progetto Enorme (Linux Kernel, Chromium - ~5 milioni di componenti)**: ~700 MB solo per le chiavi dell'HashMap (senza contare i valori `RegistryEntry` e il layout di memoria frammentato).
 
-### Il problema occulto: La frammentazione della Cache della CPU
-Il problema reale in Rust non è tanto la RAM totale (avere un analizzatore che consuma 1GB di RAM per un progetto enorme è nella norma per tool come `rust-analyzer`), quanto il **Cache Miss Rate**. Poiché ogni segmento del path vive in un'area di heap diversa, calcolare l'hash di `["root", "core", "utils", "Database"]` costringe la CPU a "saltare" continuamente nella memoria heap per leggere i byte delle stringhe, invalidando la cache L1/L2 e rallentando enormemente i lookup.
+### Il problema occulto: La frammentazione della Cache della CPU e l'Hashing
+Il problema reale in Rust non è tanto la memoria RAM totale assorbita. Avere un analizzatore che consuma 1 GB di RAM per un progetto enorme è ormai nella norma (basti pensare al footprint di `rust-analyzer`). Il collo di bottiglia vero è il **Cache Miss Rate** e il costo delle operazioni di Hashing:
+1. **Hashing Lento:** Ogni volta che si invoca `registry.get(&path)`, la `HashMap` deve calcolare l'hash del vettore e di ogni singola stringa al suo interno. Questo equivale a scansionare centinaia di byte a ogni singola query di risoluzione.
+2. **Dereferenziazione Indiretta (Pointer Chasing):** Poiché ogni segmento del path (la singola `String`) vive in un'allocazione heap separata e arbitraria, leggere i byte della stringa per calcolarne l'hash costringe la CPU a saltare qua e là nella memoria. Questo invalida sistematicamente le veloci cache L1/L2 del processore.
+3. **Clonazione Difensiva:** Dato che la `HashMap` esige l'ownership o reference continue alle chiavi per i lookup, spesso l'analizzatore è costretto a invocare `.clone()` sull'intero path `Vec<String>`, allocando decine di nuovi oggetti sull'heap al solo scopo di fare una interrogazione di lettura.
 
 ### Verdetto
 **Vale la pena risolverlo?** 
@@ -51,9 +54,10 @@ type QualifiedName = Vec<SymbolId>; // Un vettore di interi (contiguo in memoria
 ```
 
 **Vantaggi:**
-- Veloce da implementare (basta usare il crate standard de-facto `ustr` oppure `string_interner`).
-- Drastica riduzione della memoria e abbattimento dei Cache Miss: fare l'hash di `[10, 45, 99, 102]` (4 interi contigui) è pressoché istantaneo per la CPU.
-- Non devi stravolgere la logica dell'Executor, l'algoritmo algebrico rimane identico, si confrontano solo interi invece di stringhe.
+- **Zero Allocazioni a Runtime:** Si sfrutta un crate standard (es. `ustr` o `string_interner`). Una volta che la parola `"utils"` è internata alla lettura dell'AST, il resolver manipola esclusivamente interi (costo copia zero).
+- **Abbattimento dell'Overhead di Cache & Hashing:** Calcolare l'hash o verificare l'uguaglianza di `[10, 45, 99, 102]` (4 interi nativi contigui) costa alla CPU circa un ciclo di clock (SIMD).
+- **Minimo Refactoring Architetturale:** L'algoritmo algebrico e il workflow del Query Engine (`Find`, `Call`, `Extract`) rimangono esattamente identici. Si cambia unicamente il tipo della foglia.
+- **Risoluzione di `TypeRef` Leggerissima:** Tutte le enumerazioni base (es. `TypeRef::Unresolved`) smetteranno di pesare 24+ byte di puntatori per diventare leggeri slice di `u32` (8-16 byte).
 
 ### Soluzione B: Prefix Trie (Albero dei Suffissi/Prefissi)
 Invece di avere una mappa piatta, modelliamo il registro come un albero dei namespace, dove ogni nodo rappresenta una cartella o un modulo:
@@ -78,3 +82,11 @@ Per cercare `["root", "core", "utils"]`, si parte dalla radice, si cerca `"root"
 ## Conclusione
 
 Dal punto di vista dell'ingegneria del software, **lo String Interning è nettamente superiore** come rapporto costo/beneficio. Mantiene l'eleganza algebrica attuale del tuo Query Engine fornendo però prestazioni da compilatore di livello industriale. Il Trie, seppur elegante concettualmente, complicherebbe inutilmente le query algebriche.
+
+---
+
+## Riepilogo
+
+| # | Problema / Area di Ottimizzazione | Gravità | File | Status |
+|---|-----------------------------------|---------|------|--------|
+| 1 | HashMap su `Vec<String>` causa frammentazione e alto overhead di memoria | 🟡 Media | `registry.rs` | **[Aperto]** (Ottimizzazione Futura) |
