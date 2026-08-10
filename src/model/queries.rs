@@ -34,4 +34,7 @@ pub enum TypeRef {
     Failed(QualifiedName),
     /// A composite type representing a union of multiple possible types.
     Union(Vec<TypeRef>),
+    /// Tracks an access to a variable and its resolved type (used for preserving dependency paths).
+    /// First element is the accessed path, second is its resolved type.
+    EvaluatedAccess(Box<TypeRef>, Box<TypeRef>),
 }

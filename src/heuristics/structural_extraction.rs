@@ -7,7 +7,7 @@
 use crate::model::{Field, Function, Parameter, StructuredType, TypeRef};
 use tree_sitter::Node;
 
-use super::text_parsing::{extract_identifier, node_text, split_qualified_name};
+use super::text_parsing::{node_text, split_qualified_name};
 use super::type_extraction::extract_type_ref;
 
 /// Recursively abstracts the extraction of a list of items of a generic type `T`.

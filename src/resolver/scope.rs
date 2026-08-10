@@ -246,7 +246,9 @@ impl ScopeTree {
     ) {
         // Find if the target class scope already exists in parent
         let target_name = match &ib.impl_for {
-            TypeRef::Resolved(qn) | TypeRef::External(qn) => qn.last().cloned().unwrap_or_default(),
+            TypeRef::Resolved(qn) | TypeRef::External(qn) | TypeRef::Unresolved(qn) => {
+                qn.last().cloned().unwrap_or_default()
+            }
             TypeRef::ResolutionQuery(q) => crate::resolver::executor::extract_base_name(q),
             _ => "".to_string(),
         };
@@ -284,6 +286,14 @@ impl ScopeTree {
             id
         };
 
+        if let Some(kw) = &config.get_for(lang).self_type_keyword {
+            self.define_symbol(
+                class_scope,
+                kw.clone(),
+                Symbol::TypeAlias(ib.impl_for.clone()),
+            );
+        }
+
         for method in &ib.methods {
             let m_name = method.name.last().cloned().unwrap_or_default();
             self.define_symbol(
@@ -306,7 +316,6 @@ impl ScopeTree {
                 Symbol::TypeAlias(ta.target.clone()),
             );
 
-            // TODO:
             // Magic support for Rust's `Deref` trait which implies inheritance
             if ta_name == "Target" {
                 if let Some(trait_ref) = &ib.implements_trait {
@@ -324,6 +333,8 @@ impl ScopeTree {
                     }
                 }
             }
+
+
         }
     }
 

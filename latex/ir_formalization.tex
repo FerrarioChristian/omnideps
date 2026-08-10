@@ -22,12 +22,12 @@ seguito) che aggrega ricorsivamente l'intera struttura del software analizzato.
 Per garantire l'agnosticismo rispetto al linguaggio, definiamo il
 sistema dei tipi come un'algebra di tipi somma e prodotti.
 
-\subsection{Identificatori e Percorsi ($\mathcal{QN}$)}
+\subsection{Identificatori e Percorsi ($\pi$)}
 Sia $\mathcal{I}$ l'insieme delle stringhe valide come
 identificatori. Definiamo il tipo \textbf{Qualified Name}
-($\mathcal{QN}$) come l'insieme delle sequenze finite non vuote di
+($\pi$) come l'insieme delle sequenze finite non vuote di
 identificatori:
-$$\mathcal{QN} = \{ \langle i_1, i_2, \dots, i_n \rangle \mid i_j \in
+$$\pi = \{ \langle \iota_1, \iota_2, \dots, \iota_n \rangle \mid \iota_j \in
 \mathcal{I}, n \geq 1 \}$$
 Questo tipo permette di mappare in modo univoco namespaces, package
 di Java, moduli di Rust e scope risolti in C++.
@@ -39,11 +39,12 @@ della scoperta e della risoluzione dei simboli. Per garantire la
 grafo, definiamo $\tau$ come un tipo somma a cinque stati:
 \begin{align*}
   \tau ::=&\ \text{Prim}(\mathcal{T}_{p}) \\
-  &\mid \text{Unresolved}(\mathcal{QN}_{raw}) \\
-  &\mid \text{Resolved}(\mathcal{QN}_{abs}) \\
-  &\mid \text{External}(\mathcal{QN}_{ext}) \\
+  &\mid \text{Unresolved}(\pi_{raw}) \\
+  &\mid \text{ResolutionQuery}(\mathcal{Q}) \\
+  &\mid \text{Resolved}(\pi_{abs}) \\
+  &\mid \text{External}(\pi_{ext}) \\
   &\mid \text{Union}(\vec{\tau}) \\
-  &\mid \text{Failed}
+  &\mid \text{Failed}(\vec{\tau})
 \end{align*}
 Dove:
 \begin{itemize}
@@ -56,12 +57,11 @@ Dove:
   \item \textbf{ResolutionQuery($\mathcal{Q}$)}: Sostituisce il
     vecchio stato \texttt{Unresolved}. Rappresenta un'espressione
     algebrica composta da operazioni \texttt{Find}, \texttt{Extract}
-    e \texttt{Call}. È il prodotto della Fase di Substituzione
-    (Lexical Scoping).
+    e \texttt{Call}. È il prodotto parziale che rimanda la risoluzione alla Fase 2.
   \item \textbf{Resolved}: Rappresenta un tipo definito dall'utente
     (interno al progetto) la cui dichiarazione o definizione è stata
     localizzata e associata con successo nello spazio dei nomi
-    assoluto del progetto. Il percorso $\mathcal{QN}_{abs}$ è
+    assoluto del progetto. Il percorso $\pi_{abs}$ è
     relativo alla radice dell'albero dei moduli.
   \item \textbf{Union($\vec{\tau}$)}: Cattura una disgiunzione di tipi
     (es. in Python \texttt{Union[A, B]} o in TypeScript \texttt{A | B}). 
@@ -70,10 +70,8 @@ Dove:
     localizzato spazialmente, ma appartenente ad un modulo o
     ecosistema al di fuori del codice sorgente fornito in input (es.
     librerie standard, \texttt{java.util.*}, crates esterne).
-  \item \textbf{Failed}: Indica che la fase di risoluzione statica ha
-    fallito. Questo stato è cruciale per permettere calcoli
-    statistici sul \textit{Recall} (copertura e confidenza
-    dell'analizzatore).
+  \item \textbf{Failed($\vec{\tau}$)}: Indica che la fase di risoluzione statica ha
+    fallito. Mantiene traccia di tutte le alternative di fallimento per supportare analisi di fallback. Questo stato è cruciale per permettere calcoli statistici sul \textit{Recall} (copertura e confidenza dell'analizzatore).
 \end{itemize}
 Questa rigorosa separazione permette al type system di imporre che la
 generazione del grafo avvenga esclusivamente a partire da riferimenti
@@ -85,46 +83,43 @@ architetturale. Essi vengono modellati come tipi prodotto le cui
 componenti definiscono lo stato e il comportamento dell'entità.
 
 \subsection{Membri e Firme}
-Definiamo il tipo \textbf{Field} ($F$), che rappresenta un attributo
+Definiamo il tipo \textbf{Field} ($f$), che rappresenta un attributo
 o campo dati, definito come il prodotto tra un identificatore, un
 riferimento a un tipo e un insieme di eventuali annotazioni/decoratori associate:
-$$F = \mathcal{I} \times \tau \times \mathcal{P}(\tau)$$
-Definiamo il tipo \textbf{Parameter} ($P$) per gestire i parametri
+$$f = \iota \times \tau \times \mathcal{P}(\tau)$$
+Definiamo il tipo \textbf{Parameter} ($p$) per gestire i parametri
 passati alle funzioni:
-$$P = \mathcal{I}^? \times \tau \times \mathbb{B}$$ dove
-l'identificatore $\mathcal{I}^?$ è opzionale (per supportare funzioni
+$$p = \iota^? \times \tau \times \mathbb{B}$$ dove
+l'identificatore $\iota^?$ è opzionale (per supportare funzioni
 lambda e parametri anonimi), $\tau$ è il tipo e $\mathbb{B}$ indica
 la proprietà variadica del parametro.
 
 Per astrarre il concetto di "firma" di una funzione dal componente
 che la implementa, introduciamo il tipo \textbf{Signature} ($\sigma$):
-$$\sigma = \vec{P} \times \tau_{ret}$$
-dove $\vec{P}$ è il vettore dei parametri e $\tau_{ret}$ è il tipo di ritorno.
+$$\sigma = \vec{p} \times \tau_{ret}$$
+dove $\vec{p}$ è il vettore dei parametri e $\tau_{ret}$ è il tipo di ritorno.
 
 Su questa base, per modellare il corpo gerarchico di una funzione,
 introduciamo il costrutto \textbf{Block} ($\mathcal{B}$). Un blocco
 lessicale (tipicamente delimitato da parentesi graffe \texttt{\{\}})
 isola uno scope interno in cui possono essere dichiarate variabili
-locali. Sfruttando la medesima struttura dei campi dati ($F =
-\mathcal{I} \times \tau$), le variabili locali sono formalizzate
-elegantemente come un vettore di $F$. Il blocco traccia le proprie
+locali. Sfruttando la medesima struttura dei campi dati ($f =
+\iota \times \tau$), le variabili locali sono formalizzate
+elegantemente come un vettore di $f$. Il blocco traccia le proprie
 dipendenze comportamentali e può annidare ricorsivamente ulteriori
 blocchi (come nei costrutti \texttt{if} o \texttt{while}):
-$$\mathcal{B} = \langle \vec{F}_{local}, \vec{\tau}_{calls},
-\vec{\tau}_{inst}, \vec{\tau}_{accesses}, \vec{\mathcal{B}}_{sub} \rangle$$
+$$\mathcal{B} = \langle \vec{f}_{local}, \vec{\tau}_{calls},
+\vec{\tau}_{inst}, \vec{\tau}_{accesses}, \vec{\tau}_{casts}, \vec{\mathcal{B}}_{sub} \rangle$$
 dove $\vec{\tau}_{calls}$ rappresenta l'insieme dei riferimenti ai
-tipi (classi, moduli o altre funzioni libere) le cui funzioni vengono
-esplicitamente invocate nel blocco, $\vec{\tau}_{inst}$
-rappresenta i tipi strutturati esplicitamente istanziati (es. tramite
-operatori come \texttt{new}), e $\vec{\tau}_{accesses}$ rappresenta i
-riferimenti diretti in lettura o scrittura allo stato di un
-componente (es. accesso a variabili di istanza o campi statici).
+tipi le cui funzioni vengono esplicitamente invocate nel blocco, $\vec{\tau}_{inst}$
+rappresenta i tipi strutturati esplicitamente istanziati (es. tramite \texttt{new}), $\vec{\tau}_{accesses}$ rappresenta i riferimenti diretti in lettura o scrittura allo stato di un
+componente, e $\vec{\tau}_{casts}$ cattura i cast espliciti di tipo (es. conversioni \texttt{as} o cast C-like).
 
 Definiamo infine il tipo universale \textbf{Function}
 ($\mathcal{F}$) come contenitore che lega un nome qualificato a una
-specifica firma, a un opzionale blocco radice che ne modella il corpo, e a un set di annotazioni (es. \texttt{@staticmethod} in Python o direttive in C++):
-$$\mathcal{F} = \langle \text{id} \in \mathcal{QN}, \sigma,
-\mathcal{B}^?, \mathcal{P}(\tau) \rangle$$
+specifica firma, a un opzionale blocco radice che ne modella il corpo, a un flag booleano per i costruttori, e a un set di annotazioni:
+$$\mathcal{F} = \langle \pi, \sigma,
+\mathcal{B}^?, \mathbb{B}_{ctor}, \mathcal{P}(\tau) \rangle$$
 
 Il ruolo architetturale di una $\mathcal{F}$ (se funge da Metodo o da
 Free Function) non è codificato nel suo tipo, ma è determinato
@@ -137,52 +132,44 @@ un'entità può contenere più funzioni con lo stesso $\mathcal{I}$ ma
 diversa firma $\sigma$.
 
 \subsection{Tipi Strutturati ($\mathcal{S}$)}
-Sia $\mathcal{K} = \{ \text{Class, Struct, Interface, Trait} \}$ il
-dominio delle tipologie di tipi struttrati. Un tipo strutturato è
+Sia $\mathcal{K} = \{ \text{Class, Struct, Interface, Trait, Enum, EnumVariant} \}$ il
+dominio delle tipologie di tipi strutturati. Un tipo strutturato è
 definito dalla tupla:
-$$\mathcal{S} = \langle \text{id} \in \mathcal{QN}, k \in
-\mathcal{K}, \vec{F}, \vec{\mathcal{F}}, \vec{\tau}_{sup},
-\vec{\mathcal{S}}_{nest}, \mathcal{P}(\tau) \rangle$$
+$$\mathcal{S} = \langle \pi, k \in \mathcal{K}, \vec{f}, \vec{\mathcal{F}}, \vec{\tau}_{sup}, \vec{\mathcal{S}}_{nest}, \mathcal{P}(\tau) \rangle$$
 dove:
 \begin{itemize}
-  \item \textbf{id}: il nome qualificato univoco che identifica
+  \item $\pi$: il nome univoco che identifica
     l'entità all'interno del sistema.
-  \item \textbf{k}: la categoria strutturale (definita in
+  \item $k$: la categoria strutturale (definita in
     $\mathcal{K}$) che preserva la semantica originale del costrutto.
-  \item $\vec{F}$: l'insieme dei campi (\textit{fields}) che
+  \item $\vec{f}$: l'insieme dei campi (\textit{fields}) che
     compongono lo stato dell'entità.
   \item $\vec{\mathcal{F}}$: l'insieme delle funzioni (che assumono
     ruolo di metodi) che definiscono il comportamento dell'entità.
   \item $\vec{\tau}_{sup}$: l'insieme dei riferimenti ai super-tipi,
-    modellando le relazioni di ereditarietà o di implementazione di
-    interfacce/trait.
-  \item $\vec{\mathcal{S}}_{nest}$: l'insieme dei tipi definiti
-    internamente all'entità, permettendo una modellazione ricorsiva
-    dei tipi annidati (\textit{nested types}).
-  \item $\mathcal{P}(\tau)$: l'insieme delle annotazioni, attributi (es. \texttt{\#[derive(Debug)]} in Rust) o decoratori applicati all'entità.
+    modellando le relazioni di ereditarietà o di implementazione di interfacce/trait.
+  \item $\vec{\mathcal{S}}_{nest}$: l'insieme dei tipi annidati (\textit{nested types}).
+  \item $\mathcal{P}(\tau)$: l'insieme delle annotazioni, attributi o decoratori applicati all'entità.
 \end{itemize}
 
-\subsection{Type Alias ($\mathcal{TA}$)}
+\subsection{Type Alias ($\mathcal{A}$)}
 Un \textbf{Type Alias} permette di definire un nuovo nome per un tipo esistente. È modellato come la tupla:
-$$\mathcal{TA} = \langle \text{id} \in \mathcal{QN}, \text{target} \in \tau \rangle$$
-dove \text{target} è il riferimento al tipo originale. In fase di costruzione del grafo, vengono mantenuti come nodi indipendenti per tracciare accuratamente l'uso semantico dei domini.
+$$\mathcal{A} = \langle \pi, \tau_{target} \rangle$$
+dove $\tau_{target}$ è il riferimento al tipo originale. In fase di costruzione del grafo, vengono mantenuti come nodi indipendenti per tracciare accuratamente l'uso semantico dei domini.
 
-\subsection{Blocchi di Implementazione ($\mathcal{B}_{lk}$)}
+\subsection{Blocchi di Implementazione ($\mathcal{X}$)}
 Per supportare linguaggi come Rust e C++ (separazione tra
 dichiarazione e definizione), in fase di estrazione introduciamo il
-costrutto temporaneo \textbf{ImplBlock}:
-$$\mathcal{B}_{lk} = \langle \text{target} \in \tau, \text{trait}^?
-\in \tau, \vec{\mathcal{F}}, \vec{\mathcal{S}}_{nest} \rangle$$
-dove $\text{target}$ è il tipo a cui si applica l'implementazione,
-$\text{trait}^?$ è un riferimento opzionale al trait o interfaccia
-che si sta implementando, $\vec{\mathcal{F}}$ è il vettore delle
-funzioni (metodi) e $\vec{\mathcal{S}}_{nest}$ è il vettore di
-eventuali tipi strutturati annidati.
-Come vedremo nella fase di Risoluzione, i blocchi di implementazione
-fungono da "zucchero sintattico": i loro metodi, i tipi annidati e i
-trait vengono
+costrutto temporaneo \textbf{ImplBlock} o \textbf{Implementation Extension}:
+$$\mathcal{X} = \langle \pi, \tau_{target}, \tau_{trait}^?, \vec{\mathcal{F}}, \vec{\mathcal{S}}_{nest}, \vec{\mathcal{A}} \rangle$$
+dove $\pi$ è il nome dell'estensione (solitamente derivato dal target), $\tau_{target}$ è il tipo a cui si applica l'implementazione,
+$\tau_{trait}^?$ è un riferimento opzionale al trait o interfaccia
+che si sta implementando, e gli altri campi rappresentano funzioni,
+tipi annidati e alias associati all'estensione.
+Come elaborato nella fase di Risoluzione (Fase 1 e 2), le estensioni
+fungono da "zucchero sintattico": i loro metodi, tipi annidati e trait vengono
 \textit{appiattiti} all'interno del tipo strutturato di riferimento,
-scomparendo di fatto dal modello architetturale finale.
+scomparendo di fatto dal modello architetturale unificato finale.
 
 \section{Architettura dei Componenti}
 L'intero sistema software, una volta analizzato, è rappresentato come
@@ -199,20 +186,19 @@ disgiunta (sum type) dei costrutti strutturali definitivi del
 sistema. Ogni componente rappresenta l'unità logica che può comparire
 come vertice nel grafo delle dipendenze:
 $$\mathcal{C} ::= \text{Mod}(\mathcal{M}) \mid
-\text{StructuredType}(\mathcal{S}) \mid \text{TypeAlias}(\mathcal{TA}) \mid \text{Function}(\mathcal{F})
-\mid \text{Field}(F)$$
+\text{StructuredType}(\mathcal{S}) \mid \text{TypeAlias}(\mathcal{A}) \mid \text{Function}(\mathcal{F})
+\mid \text{Field}(\pi, \tau) \mid \text{Primitive}(str) \mid \text{External}(\pi)$$
 
 \subsection{Modulo ($\mathcal{M}$)}
 L'intera struttura del programma è catturata dal tipo \textbf{Modulo}
 ($\mathcal{M}$), definito ricorsivamente per riflettere la gerarchia
 del file system o dei namespace:
-$$\mathcal{M} = \langle \mathcal{QN}, \mathcal{I}_{imports},
-\vec{\mathcal{M}_{nest}},
-\vec{\mathcal{S}}, \vec{\mathcal{TA}}, \vec{\mathcal{F}}, \vec{F}_{free},
-\vec{\mathcal{B}}_{lk} \rangle$$
-dove $\mathcal{I}_{imports}$ è l'insieme delle dipendenze esplicite
-(import/use/include) definite nel modulo. Ogni elemento in
-$\mathcal{I}_{imports}$ contiene il percorso qualificato, un
+$$\mathcal{M} = \langle \pi, str_{lang}^?, str_{path}^?, \vec{\delta}_{imp}, \vec{\mathcal{M}}_{nest},
+\vec{\mathcal{S}}, \vec{\mathcal{A}}, \vec{\mathcal{F}}, \vec{f}_{free},
+\vec{\mathcal{X}} \rangle$$
+dove $\vec{\delta}_{imp}$ è l'insieme delle dipendenze esplicite
+(import/use/include) definite nel modulo. Ogni elemento $\delta_{imp}$
+contiene il percorso base, un
 eventuale alias, e un flag per indicare l'inclusione \textit{wildcard}.
 Ogni elemento del software è quindi un nodo in un albero di
 componenti $T \in \mathcal{D}_{IR}$.

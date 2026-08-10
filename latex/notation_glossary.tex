@@ -40,8 +40,8 @@ pipeline di analisi.
   \item $\mathcal{I}$ (\textbf{Identifier}): L'insieme di tutte le
     stringhe alfanumeriche valide utilizzate per nominare variabili,
     funzioni o classi.
-  \item $\mathcal{QN}$ (\textbf{Qualified Name}): Una sequenza
-    gerarchica di identificatori ($\langle i_1, \dots, i_n \rangle$)
+  \item $\pi$ (\textbf{Qualified Name}): Una sequenza
+    gerarchica di identificatori ($\langle \iota_1, \dots, \iota_n \rangle \in \mathcal{I}^*$)
     che rappresenta il percorso assoluto e univoco di un'entità (es.
     il namespace o il modulo).
   \item $\tau$ (\textbf{Type Reference}): Un riferimento astratto a
@@ -57,22 +57,21 @@ pipeline di analisi.
 
 \subsection{Membri Strutturali e Firme}
 \begin{itemize}
-  \item $F$ (\textbf{Field}): Un campo dati appartenente a una
+  \item $f$ (\textbf{Field}): Un campo dati appartenente a una
     struttura, definito dalla coppia identificatore e tipo ($\langle
-    \mathcal{I}, \tau \rangle$).
-  \item $P$ (\textbf{Parameter}): Un parametro in ingresso a una
-    funzione, comprendente nome opzionale, tipo e indicatore di variadicità.
+    \iota, \tau \rangle$).
+  \item $p$ (\textbf{Parameter}): Un parametro in ingresso a una
+    funzione, comprendente nome opzionale, tipo e indicatore di variadicità ($\langle \iota^?, \tau, \mathbb{B} \rangle$).
   \item $\sigma$ (\textbf{Signature}): La firma architetturale di una
-    funzione, composta dalla tupla $\langle \vec{P}, \tau_{ret}
-    \rangle$. Astrae i tipi di input e output isolandoli dal
-    componente implementativo.
+    funzione, composta dalla tupla $\langle \vec{p}, \tau_{ret} \rangle$. 
+    Astrae i tipi di input e output isolandoli dal componente implementativo.
   \item $\mathcal{B}$ (\textbf{Block}): Un blocco lessicale (es.
     delimitato da \texttt{\{\}}) che modella uno scope interno.
     Traccia le variabili locali dichiarate, le chiamate, le
     istanziazioni e annida in modo ricorsivo eventuali sotto-blocchi.
   \item $\mathcal{F}$ (\textbf{Function}): Un componente funzionale
-    universale definito dalla tupla $\langle \mathcal{I}, \sigma, \mathcal{B}
-    \rangle$. Il suo ruolo architetturale (metodo o funzione libera)
+    universale definito dalla tupla $\langle \iota, \sigma, \mathcal{B} \rangle$. 
+    Il suo ruolo architetturale (metodo o funzione libera)
     è determinato unicamente dal costrutto in cui è annidato.
 \end{itemize}
 
@@ -81,9 +80,9 @@ pipeline di analisi.
   \item $\mathcal{S}$ (\textbf{Structured Type}): L'astrazione di
     classi, struct, interfacce e trait. Aggrega campi, funzioni,
     gerarchie di ereditarietà e tipi annidati.
-  \item $\mathcal{B}_{lk}$ (\textbf{Implementation Block}): Costrutto
+  \item $\mathcal{X}$ (\textbf{Implementation Extension}): Costrutto
     sintattico di estrazione temporaneo tipico di linguaggi come Rust
-    o C++. Associa un insieme di funzioni a un tipo target. Viene
+    o C++ (i cosiddetti \textit{Impl Block}). Associa un insieme di funzioni e alias a un tipo target. Viene
     appiattito all'interno di $\mathcal{S}$ durante la Fase di
     Risoluzione, scomparendo dal modello finale.
   \item $\mathcal{C}$ (\textbf{Component}): Il tipo somma universale
@@ -99,22 +98,13 @@ pipeline di analisi.
 \begin{itemize}
   \item $\mathcal{Q}$ (\textbf{Query Algebra}): L'insieme delle
     espressioni algebriche costanti ($\text{Find}$, $\text{Extract}$,
-    $\text{Call}$)
-    che modellano l'intento logico di risoluzione di un tipo, rinviandone
+    $\text{Call}$) che modellano l'intento logico di risoluzione di un tipo, rinviandone
     l'esecuzione (valutazione lazy).
-  \item $\rho$ (\textbf{Symbol Stack / Environment}): L'ambiente
-    lessicale effimero modellato come pila di scope ($\langle
-    \Sigma_0, \dots, \Sigma_n \rangle$).
-    Utilizzato nella Fase 2a per proiettare variabili locali nelle
-    rispettive query $\mathcal{Q}$.
-  \item $\mathcal{GR}$ (\textbf{Global Registry}): L'indice piatto e
-    globale del progetto che mappa in tempo costante $\mathcal{O}(1)$
-    ogni $\mathcal{QN}$ ai metadati strutturali essenziali (es. tipo
-    di ritorno).
+  \item $\Sigma$ (\textbf{Scope}): Un singolo ambiente di visibilità lessicale, contenente una mappa di simboli associati a identificatori $\iota$, e i riferimenti ai tipi base (supertipi) da cui eredita.
+  \item $\mathcal{T}$ (\textbf{Scope Tree}): L'albero globale degli scope $\Sigma$. Costituisce l'architettura centrale di Name Resolution del sistema. Sostituisce i classici registri piatti, permettendo la risoluzione gerarchica (lexical climbing) e l'ereditarietà in tempo logaritmico rispetto all'altezza dell'albero.
   \item $\Gamma$ (\textbf{Execution Context}): Il contesto immutabile
-    composto dal prefisso corrente, dalla gerarchia degli import e
-    dal $\mathcal{GR}$,
-    utilizzato dal valutatore per risolvere le query $\mathcal{Q}$.
+    composto dall'albero $\mathcal{T}$, l'ecosistema dei tipi primitivi e il path base corrente,
+    utilizzato dal valutatore per eseguire le query $\mathcal{Q}$.
   \item $\mathcal{G}$ (\textbf{Dependency Graph}): Il grafo orientato
     finale $\langle V, E \rangle$. I vertici $V$ sono i componenti
     estratti dal codice e gli archi $E$ sono le relazioni semantiche
@@ -125,19 +115,17 @@ pipeline di analisi.
 \begin{itemize}
   \item $\Phi$ (\textbf{Full Analysis}): La funzione matematica
     complessiva che definisce la pipeline architetturale
-    ($\Phi = G \circ R_{exec} \circ R_{build} \circ \text{Agg} \circ E$).
-  \item $E$ (\textbf{Extraction}): Fase dipendente dal
+    ($\Phi = \gamma \circ \rho_2 \circ \rho_1 \circ \alpha \circ \varepsilon$).
+  \item $\varepsilon$ (\textbf{Extraction}): Fase dipendente dal
     linguaggio che traduce il CST del singolo file in moduli $\mathcal{M}$.
-  \item $\text{Agg}$ (\textbf{Workspace Aggregation}): Funzione che
+  \item $\alpha$ (\textbf{Aggregation}): Funzione che
     fonde i moduli estratti dai singoli file in un unico ecosistema globale.
-  \item $R_{build}$ (\textbf{Query Building}): La Fase 2a (sostituzione), che
-    attraversa l'IR unificato sostituendo variabili locali tramite
-    l'environment $\rho$
-    per generare i riferimenti $\tau = \text{ResolutionQuery}(\mathcal{Q})$.
-  \item $R_{exec}$ (\textbf{Query Execution}): La Fase 2b (navigazione), che
-    popola il $\mathcal{GR}$ e valuta algebricamente ogni
-    $\mathcal{Q}$ per produrre
+  \item $\rho_1$ (\textbf{Symbol Definition}): La Fase 1 della risoluzione, che
+    attraversa l'IR unificato per costruire l'albero statico degli scope $\mathcal{T}$, registrando tutti i simboli (tipi, moduli, alias) e le relazioni di ereditarietà base (es. trait \texttt{Deref}).
+  \item $\rho_2$ (\textbf{Name Resolution}): La Fase 2 della risoluzione, che
+    sfrutta il contesto $\Gamma$ (basato su $\mathcal{T}$) per valutare algebricamente ogni
+    query $\mathcal{Q}$ e risolvere i riferimenti di tipo $\tau$, producendo
     percorsi assoluti validati.
-  \item $G$ (\textbf{Graphing}): L'ultima fase che converte il
-    modello a oggetti risolto nel grafo delle dipendenze $\mathcal{G}$.
+  \item $\gamma$ (\textbf{Graphing}): L'ultima fase che converte il
+    modello a oggetti unificato e risolto nel grafo delle dipendenze $\mathcal{G}$.
 \end{itemize}

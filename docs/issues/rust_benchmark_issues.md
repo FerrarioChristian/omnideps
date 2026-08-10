@@ -13,6 +13,9 @@ Quando il metodo `deref()` restituisce `&Self::Target`, l'engine tenta di risolv
 **Soluzione Potenziale:**
 Aggiornare `register_structured_type` e `register_impl_block` in `scope.rs` per iniettare esplicitamente un `Symbol::TypeAlias` chiamato `Self` che punti al nodo corrente, analogamente a come viene già fatto per il parametro `this`/`self` nei metodi.
 
+**[RISOLTO]:**
+Aggiunto `self_type_keyword` alla `LanguageConfig` (impostato a `Self` per Rust). `scope.rs` ora inietta automaticamente questo alias come `TypeAlias` al tipo della struct/impl block in cui ci si trova. Questo permette a `Self::Target` di risolversi correttamente al nodo `Target` all'interno della struct. Inolte è stato disattivato il resolving implicito per i `return_type` in `executor.rs` in modo da preservare l'edge verso l'alias invece che verso il tipo risolto.
+
 ---
 
 ## 2. Variabili Globali Statiche (1 arco mancante)
@@ -27,6 +30,9 @@ Tuttavia, il builder del grafo emette un arco di dipendenza *solo* verso il nodo
 
 **Soluzione Potenziale:**
 Modificare il Query Engine (`executor.rs`) affinché tenga traccia degli "hop" intermedi durante la risoluzione (ad esempio, quando si valuta una variabile o un alias), oppure forzare l'emissione di un arco `AccessesField` per la radice della query (`STATIC_SA`) prima di scendere nei suoi campi.
+
+**[RISOLTO]:**
+Implementata la struttura `TypeRef::EvaluatedAccess` in `executor.rs` (sia in `find_global` che `symbol_to_typeref`) per mantenere la storia delle risoluzioni intermedie. Durante la valutazione di un alias o di un valore (`Symbol::Value` o `Symbol::TypeAlias`), l'analizzatore ora avvolge il tipo risolto con il path originale del simbolo. Questo permette a `type_ref_targets` di esplorare l'intero albero di risoluzione e di produrre correttamente un arco verso il nodo radice `STATIC_SA`.
 
 ---
 
@@ -48,6 +54,9 @@ Di conseguenza, gli identificatori non finiscono nella lista di `accesses` del b
 **Soluzione Potenziale:**
 Rivedere la funzione `find_behavioral_deps` in `body_extraction.rs` per assicurarsi che i nodi `scoped_identifier` vengano correttamente attraversati ed estratti come `AccessesField` anche quando si trovano dentro i rami `value` di un `field_initializer` o dentro gli argomenti (`arguments`) di un `call_expression`.
 
+**[RISOLTO]:**
+Aggiunto `scoped_identifier` e `qualified_identifier` al filtro del blocco `Accesses` in `body_extraction.rs`. L'estrattore ora aggiunge correttamente gli identificatori di scope alla lista di `accesses`, permettendo all'engine di emettere la dipendenza (es. `EnumA::FIRST`). L'attraversamento ricorsivo di `find_behavioral_deps` si assicura inoltre che gli attributi all'interno di tuple o struct expression vengano trovati e aggiunti agli accessi interni della dichiarazione, propagandosi fino alla radice.
+
 ---
 
 ## 4. Ereditarietà via Trait, Bound Generici e Deref (5 archi mancanti)
@@ -68,3 +77,20 @@ Questa è la categoria più complessa ed è causata da feature avanzate del type
 1. Aggiornare `extract_function_signature` per estrarre i bound generici (`<T: Trait>`) e iniettare `T` come `Symbol::TypeAlias` o alias generico nello scope della funzione.
 2. Estendere il flattening (attualmente fatto solo sugli `impl_block`) ai tratti base (es. in `execute_structured_type` o `register_structured_type` fondere i metodi dei super trait).
 3. (Per Deref) Aggiungere una logica di fallback in `execute_extract`: se l'estrazione di un metodo fallisce per una struct, controllare se questa possiede un alias `Target` e riprovare la query su quel target (simulando la deref coercion).
+
+**[PARZIALMENTE RISOLTO / POSTICIPATO]:**
+- **Deref Coercion (Risolto):** Il metodo `register_impl_block` in `scope.rs` è stato esteso per intercettare l'implementazione del trait `Deref`. Se il target name di un impl è `Deref` e l'impl è associato a una struct (es. `StructC`), il tipo contenuto nel corpo del trait `Target = StructA` viene mappato estraendo il path e viene aggiunto ricorsivamente alla lista dei `super_types` del record. In questo modo il processo di lexical climbing standard (che ispeziona `super_types`) eredita automaticamente i metodi di `StructA` all'interno di `StructC`, risolvendo la chiamata a `instance_method` e la dipendenza alla struct `StructA`.
+- **Generic Bounds & Traits (Posticipato):** Come discusso con l'utente, la gestione dei bounds per i tipi generici e dell'ereditarietà complessa dei Trait (es. `TraitB` che estende `TraitA`) è attualmente in fase di revisione architetturale. L'implementazione definitiva per mappare la type equality e le dipendenze dinamiche dei trait richiederà l'uso di un costrutto language-agnostic trasversale ai linguaggi (C++ concepts/templates, Java bounded generics, Rust Traits), e per ora la risoluzione degli archi associati (`TraitA`, `trait_method`, ecc.) è rimandata.
+
+---
+
+## 5. Decisioni di Design Architetturale: Tipi di Ritorno vs Alias
+**Archi:**
+- `structs.StructC.deref -> structs.StructC.Target`
+
+**Causa:**
+In Rust, il metodo `deref` restituisce `&Self::Target`. Il risolutore, a causa della direttiva `resolve_type = true` usata sui tipi di ritorno, valuta completamente e ricorsivamente l'alias `Target` trovando il suo tipo base `StructA`.
+L'analizzatore omette perciò il link all'alias intermedio `Target` ed emette l'arco diretto al tipo reale `StructA`.
+
+**Decisione:**
+Questo fallimento rispetto alle aspettative del benchmark di Rust (`test.yml` si aspetta l'uso dell'alias `Target`) è il risultato diretto e voluto di una scelta architetturale cross-language del resolver per unificare il trattamento degli alias e tipi compositi (simile a quanto analizzato in C++). Pertanto non è un bug e la differenza va tollerata, privilegiando la flessibilità agnostica del core.

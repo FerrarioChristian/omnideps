@@ -257,6 +257,8 @@ fn find_behavioral_deps(
             | "property_identifier"
             | "member_access"
             | "identifier"
+            | "scoped_identifier"
+            | "qualified_identifier"
             | "field_expression"
             | "attribute"
     ) {

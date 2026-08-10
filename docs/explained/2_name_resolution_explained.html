@@ -571,8 +571,8 @@
 ctx.stack.borrow_mut().define_symbol("self".to_string(), self_query.clone());
 ctx.stack.borrow_mut().define_symbol("this".to_string(), self_query);</code></pre>
     <p><strong>Perché <code>st.name.last()</code>?</strong> Perché il nome del tipo strutturato nell'IR prima della Fase 2b è un nome <em>relativo</em> (es. <code>["Veicolo"]</code>), non assoluto (che diventerà <code>["root","core","Veicolo"]</code> solo nell'Executor). <code>.last()</code> estrae <code>"Veicolo"</code>.</p>
-    <p><strong>Perché si inietta <code>self_keyword</code>?</strong> Per supportare l'accesso ai membri d'istanza. A seconda della configurazione del linguaggio (<code>self_keyword</code>), il Builder inietta dinamicamente la keyword corretta (es. <code>self</code> per Rust, <code>this</code> per Java/C#). Python, invece, non utilizza una keyword hardcoded a livello di classe, ma si affida all'euristica <code>implicit_first_param_as_self</code> che mappa dinamicamente il primo parametro dei metodi all'istanza della classe.</p>
-    <p><strong>Cosa succede per gli ImplBlock?</strong> Stessa logica, ma la keyword punta alla query del <code>impl_for</code> (cioè il tipo per cui l'impl è definito), non al nome dell'impl block stesso.</p>
+    <p><strong>Perché si inietta <code>self_keyword</code> e <code>self_type_keyword</code>?</strong> Per supportare l'accesso ai membri d'istanza e di tipo. A seconda della configurazione del linguaggio (<code>self_keyword</code> e <code>self_type_keyword</code>), il framework inietta dinamicamente la keyword corretta. Ad esempio, per Rust viene iniettato <code>self</code> come parametro implicito e <code>Self</code> come TypeAlias per riferirsi al tipo corrente, mentre per Java/C# si inietta <code>this</code>. Python, invece, non utilizza una keyword hardcoded a livello di classe per le istanze, ma si affida all'euristica <code>implicit_first_param_as_self</code> che mappa dinamicamente il primo parametro dei metodi all'istanza della classe.</p>
+    <p><strong>Cosa succede per gli ImplBlock?</strong> Stessa logica, ma la keyword (es. <code>Self</code>) punta alla query del <code>impl_for</code> (cioè il tipo per cui l'impl è definito), non al nome dell'impl block stesso. Ad esempio in Rust, se abbiamo <code>impl Deref for StructC</code>, l'analizzatore inietterà automaticamente un alias <code>Self</code> che punta a <code>StructC</code>.</p>
 
     <h3>5.3 Registrazione dei Parametri — Perché Solo <code>ResolutionQuery</code></h3>
     <pre><code>ff.signature.parameters = ff.signature.parameters.into_iter().map(|mut p| {
@@ -1275,5 +1275,45 @@ struct User { name: String }</code></pre>
         <li>Il generatore di grafo (Fase 3, <code>graph.rs</code>) scorre le annotazioni di tutti i nodi e, tramite la funzione <code>type_ref_targets</code>, emette archi di tipo <code>AnnotatedWith</code> per catturare queste dipendenze.</li>
     </ul>
 
+    <h2 id="evaluated-access">15. Tracciamento Preciso delle Dipendenze (EvaluatedAccess)</h2>
+    <p>
+        Durante la risoluzione di query complesse o accessi annidati, è frequente che un identificatore si risolva in
+        un'entità intermedia (ad esempio, un alias di tipo o una variabile globale) prima di accedere al suo membro.
+        Nelle prime iterazioni dell'analizzatore, la funzione <code>symbol_to_typeref</code> e l'operatore di extraction
+        restituivano unicamente il tipo finale (il "target"), perdendo informazione sull'identificatore originariamente referenziato.
+    </p>
+    <p>
+        Per risolvere questo problema, è stata introdotta la variante <code>TypeRef::EvaluatedAccess</code>.
+        Questa struttura agisce come un wrapper trasparente che accoppia il percorso originale valutato (il "base path")
+        con il tipo finale risolto (il "resolved type"). Il Query Engine ora, quando valuta costrutti come alias
+        (<code>Symbol::TypeAlias</code>) o riferimenti a variabili (<code>Symbol::Value</code>), incapsula il risultato 
+        in un <code>EvaluatedAccess</code>.
+    </p>
+    <p>
+        Nella Fase 3 (Dependency Graph Generation), il sistema riconosce la struttura <code>EvaluatedAccess</code>
+        e genera correttamente gli archi di dipendenza per <b>entrambi</b> gli estremi (base e target finale),
+        mantenendo una fedeltà perfetta della catena di accesso del codice (ad es. per l'accesso <code>STATIC_SA.x</code>, 
+        vengono generati archi sia verso <code>STATIC_SA</code> che verso <code>StructA.x</code>).
+    </p>
+
 </body>
 </html>
+    <h2 id="evaluated-access">15. Tracciamento Preciso delle Dipendenze (EvaluatedAccess)</h2>
+    <p>
+        Durante la risoluzione di query complesse o accessi annidati, è frequente che un identificatore si risolva in
+        un'entità intermedia (ad esempio, un alias di tipo o una variabile globale) prima di accedere al suo membro.
+        Nelle prime iterazioni dell'analizzatore, la funzione <code>symbol_to_typeref</code> e l'operatore di extraction
+        restituivano unicamente il tipo finale (il "target"), perdendo informazione sull'identificatore originariamente referenziato.
+    </p>
+    <p>
+        Per risolvere questo problema, è stata introdotta la variante <code>TypeRef::EvaluatedAccess</code>.
+        Questa struttura agisce come un wrapper trasparente che accoppia il percorso originale valutato (il "base path")
+        con il tipo finale risolto (il "resolved type"). Il Query Engine ora, quando valuta costrutti come alias
+        (<code>Symbol::TypeAlias</code>) o riferimenti a variabili (<code>Symbol::Value</code>), incapsula il risultato 
+        in un <code>EvaluatedAccess</code>.
+    </p>
+    <p>
+        Nella Fase 3 (Dependency Graph Generation), il sistema riconosce la struttura <code>EvaluatedAccess</code>
+        e genera correttamente gli archi di dipendenza per <b>entrambi</b> gli estremi (base e target finale),
+        mantenendo una fedeltà perfetta della catena di accesso del codice (ad es. per l'accesso <code>STATIC_SA.x</code>, 
+        vengono generati archi sia verso <code>STATIC_SA</code> che verso <code>StructA.x</code>).

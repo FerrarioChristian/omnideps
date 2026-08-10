@@ -541,9 +541,18 @@ fn evaluate_query_extract(
     visited: &mut std::collections::HashSet<String>,
 ) -> Option<TypeRef> {
     let parent_ty = evaluate_query(ctx, parent_q, scope_id, true, visited)?;
-
-    // First resolve the parent type if it's Unresolved, to ensure find_scope_for_type works
     let mut resolved_parent_ty = parent_ty.clone();
+
+    // If it's an EvaluatedAccess, unwrap the resolved type for further lookup,
+    // but keep the base access to reconstruct the full EvaluatedAccess later.
+    let base_access = if let TypeRef::EvaluatedAccess(base, ty) = &parent_ty {
+        resolved_parent_ty = ty.as_ref().clone();
+        Some(base.clone())
+    } else {
+        None
+    };
+    
+    // If it's Unresolved, to ensure find_scope_for_type works
     if let TypeRef::Unresolved(_) | TypeRef::ResolutionQuery(_) = resolved_parent_ty {
         resolved_parent_ty = evaluate_typeref(ctx, resolved_parent_ty, scope_id, true);
     }
@@ -552,9 +561,13 @@ fn evaluate_query_extract(
         if let Some(res) =
             find_symbol_in_scope_and_supers(ctx, target_scope, member, resolve_type, visited)
         {
-            return Some(res);
+            if let Some(base) = base_access {
+                return Some(TypeRef::EvaluatedAccess(base, Box::new(res)));
+            } else {
+                return Some(TypeRef::EvaluatedAccess(Box::new(parent_ty.clone()), Box::new(res)));
+            }
         }
-
+        
         // Transitive imports check
         if let Some(res) = resolve_via_transitive_imports(ctx, target_scope, member) {
             return Some(res);
@@ -564,16 +577,36 @@ fn evaluate_query_extract(
     // Fallback: append member to the resolved parent type
     match resolved_parent_ty {
         TypeRef::Resolved(mut path) => {
+            let base = path.clone();
             path.push(member.to_string());
-            Some(TypeRef::Resolved(path))
+            Some(TypeRef::EvaluatedAccess(
+                Box::new(TypeRef::Resolved(base)),
+                Box::new(TypeRef::Resolved(path)),
+            ))
         }
         TypeRef::External(mut path) => {
+            let base = path.clone();
             path.push(member.to_string());
-            Some(TypeRef::External(path))
+            Some(TypeRef::EvaluatedAccess(
+                Box::new(TypeRef::External(base)),
+                Box::new(TypeRef::External(path)),
+            ))
         }
         TypeRef::Unresolved(mut path) => {
+            let base = path.clone();
             path.push(member.to_string());
-            Some(TypeRef::Unresolved(path))
+            Some(TypeRef::EvaluatedAccess(
+                Box::new(TypeRef::Unresolved(base)),
+                Box::new(TypeRef::Unresolved(path)),
+            ))
+        }
+        TypeRef::EvaluatedAccess(base, inner) => {
+            if let TypeRef::Resolved(mut path) = *inner {
+                path.push(member.to_string());
+                Some(TypeRef::EvaluatedAccess(base, Box::new(TypeRef::Resolved(path))))
+            } else {
+                None
+            }
         }
         _ => None,
     }
@@ -591,20 +624,29 @@ fn symbol_to_typeref(
     match sym {
         Symbol::Module(id) | Symbol::Type(id) => {
             let path = build_path_from_scope(ctx.tree, *id);
-            TypeRef::Resolved(path)
+            if resolve_type {
+                TypeRef::EvaluatedAccess(
+                    Box::new(TypeRef::Resolved(path.clone())),
+                    Box::new(TypeRef::Resolved(path)),
+                )
+            } else {
+                TypeRef::Resolved(path)
+            }
         }
         Symbol::Value(ty) | Symbol::TypeAlias(ty) => {
+            let mut path = build_path_from_scope(ctx.tree, scope_id);
+            path.push(name.to_string());
+            let base_path = TypeRef::Resolved(path.clone());
             if resolve_type {
-                match ty {
+                let resolved_ty = match ty {
                     TypeRef::ResolutionQuery(q) => evaluate_query(ctx, q, scope_id, true, visited)
                         .unwrap_or_else(|| ty.clone()),
                     TypeRef::Unresolved(_) => evaluate_typeref(ctx, ty.clone(), scope_id, true),
                     _ => ty.clone(),
-                }
+                };
+                TypeRef::EvaluatedAccess(Box::new(base_path), Box::new(resolved_ty))
             } else {
-                let mut path = build_path_from_scope(ctx.tree, scope_id);
-                path.push(name.to_string());
-                TypeRef::Resolved(path)
+                base_path
             }
         }
     }
@@ -627,6 +669,7 @@ pub fn find_scope_for_type(tree: &ScopeTree, ty: &TypeRef) -> Option<ScopeId> {
             }
             Some(curr)
         }
+        TypeRef::EvaluatedAccess(_, inner) => find_scope_for_type(tree, inner),
         _ => None,
     }
 }
@@ -673,8 +716,12 @@ pub fn find_global(ctx: &ExecutorContext, path: &[String]) -> Option<TypeRef> {
     }
 
     let final_path = build_path_from_scope(ctx.tree, curr);
-    Some(TypeRef::Resolved(final_path))
+    Some(TypeRef::EvaluatedAccess(
+        Box::new(TypeRef::Resolved(final_path.clone())),
+        Box::new(TypeRef::Resolved(final_path)),
+    ))
 }
+
 
 /// Checks if the target scope is a module with `transitive_imports` enabled,
 /// and attempts to resolve the member through its exported imports.

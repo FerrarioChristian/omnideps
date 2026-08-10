@@ -17,8 +17,10 @@ pub struct LanguageConfig {
     pub support_impl_blocks: bool,
     pub forward_declarations: bool,
     pub self_keyword: Option<String>,
+    pub self_type_keyword: Option<String>,
     pub implicit_first_param_as_self: bool,
     pub extract_dynamic_fields: bool,
+    pub deref_coercion_target_name: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -53,8 +55,10 @@ impl AnalyzerConfig {
                 support_impl_blocks: false,
                 forward_declarations: false,
                 self_keyword: None,
+                self_type_keyword: None,
                 implicit_first_param_as_self: true,
                 extract_dynamic_fields: true,
+                deref_coercion_target_name: None,
             },
         );
 
@@ -73,8 +77,10 @@ impl AnalyzerConfig {
                 support_impl_blocks: true,
                 forward_declarations: false,
                 self_keyword: Some("self".to_string()),
+                self_type_keyword: Some("Self".to_string()),
                 implicit_first_param_as_self: false,
                 extract_dynamic_fields: false,
+                deref_coercion_target_name: Some("Target".to_string()),
             },
         );
 
@@ -93,8 +99,10 @@ impl AnalyzerConfig {
                 support_impl_blocks: false,
                 forward_declarations: false,
                 self_keyword: Some("this".to_string()),
+                self_type_keyword: None,
                 implicit_first_param_as_self: false,
                 extract_dynamic_fields: false,
+                deref_coercion_target_name: None,
             },
         );
 
@@ -113,8 +121,10 @@ impl AnalyzerConfig {
                 support_impl_blocks: true,
                 forward_declarations: true,
                 self_keyword: Some("this".to_string()),
+                self_type_keyword: None,
                 implicit_first_param_as_self: false,
                 extract_dynamic_fields: false,
+                deref_coercion_target_name: None,
             },
         );
 
@@ -133,8 +143,10 @@ impl AnalyzerConfig {
                 support_impl_blocks: false,
                 forward_declarations: true,
                 self_keyword: None,
+                self_type_keyword: None,
                 implicit_first_param_as_self: false,
                 extract_dynamic_fields: false,
+                deref_coercion_target_name: None,
             },
         );
 
@@ -151,8 +163,10 @@ impl AnalyzerConfig {
                 support_impl_blocks: false,
                 forward_declarations: false,
                 self_keyword: Some("this".to_string()),
+                self_type_keyword: None,
                 implicit_first_param_as_self: false,
                 extract_dynamic_fields: false,
+                deref_coercion_target_name: None,
             },
             languages,
         }
