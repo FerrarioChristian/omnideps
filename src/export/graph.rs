@@ -268,6 +268,11 @@ fn type_ref_targets(tr: &TypeRef) -> Vec<QualifiedName> {
             }
         }
         TypeRef::Union(types) => types.iter().flat_map(type_ref_targets).collect(),
+        TypeRef::EvaluatedAccess(acc, ty) => {
+            let mut targets = type_ref_targets(acc);
+            targets.extend(type_ref_targets(ty));
+            targets
+        }
         _ => vec![],
     }
 }

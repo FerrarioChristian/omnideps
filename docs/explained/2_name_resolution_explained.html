@@ -1298,22 +1298,3 @@ struct User { name: String }</code></pre>
 
 </body>
 </html>
-    <h2 id="evaluated-access">15. Tracciamento Preciso delle Dipendenze (EvaluatedAccess)</h2>
-    <p>
-        Durante la risoluzione di query complesse o accessi annidati, è frequente che un identificatore si risolva in
-        un'entità intermedia (ad esempio, un alias di tipo o una variabile globale) prima di accedere al suo membro.
-        Nelle prime iterazioni dell'analizzatore, la funzione <code>symbol_to_typeref</code> e l'operatore di extraction
-        restituivano unicamente il tipo finale (il "target"), perdendo informazione sull'identificatore originariamente referenziato.
-    </p>
-    <p>
-        Per risolvere questo problema, è stata introdotta la variante <code>TypeRef::EvaluatedAccess</code>.
-        Questa struttura agisce come un wrapper trasparente che accoppia il percorso originale valutato (il "base path")
-        con il tipo finale risolto (il "resolved type"). Il Query Engine ora, quando valuta costrutti come alias
-        (<code>Symbol::TypeAlias</code>) o riferimenti a variabili (<code>Symbol::Value</code>), incapsula il risultato 
-        in un <code>EvaluatedAccess</code>.
-    </p>
-    <p>
-        Nella Fase 3 (Dependency Graph Generation), il sistema riconosce la struttura <code>EvaluatedAccess</code>
-        e genera correttamente gli archi di dipendenza per <b>entrambi</b> gli estremi (base e target finale),
-        mantenendo una fedeltà perfetta della catena di accesso del codice (ad es. per l'accesso <code>STATIC_SA.x</code>, 
-        vengono generati archi sia verso <code>STATIC_SA</code> che verso <code>StructA.x</code>).

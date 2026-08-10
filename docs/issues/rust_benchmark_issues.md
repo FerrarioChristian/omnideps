@@ -88,9 +88,24 @@ Questa è la categoria più complessa ed è causata da feature avanzate del type
 **Archi:**
 - `structs.StructC.deref -> structs.StructC.Target`
 
-**Causa:**
-In Rust, il metodo `deref` restituisce `&Self::Target`. Il risolutore, a causa della direttiva `resolve_type = true` usata sui tipi di ritorno, valuta completamente e ricorsivamente l'alias `Target` trovando il suo tipo base `StructA`.
-L'analizzatore omette perciò il link all'alias intermedio `Target` ed emette l'arco diretto al tipo reale `StructA`.
+**Causa originale:**
+In Rust, il metodo `deref` restituisce `&Self::Target`. In passato il risolutore, a causa della direttiva `resolve_type = true`, valutava completamente l'alias `Target` trovando il suo tipo base `StructA`, omettendo l'arco all'alias intermedio.
 
-**Decisione:**
-Questo fallimento rispetto alle aspettative del benchmark di Rust (`test.yml` si aspetta l'uso dell'alias `Target`) è il risultato diretto e voluto di una scelta architetturale cross-language del resolver per unificare il trattamento degli alias e tipi compositi (simile a quanto analizzato in C++). Pertanto non è un bug e la differenza va tollerata, privilegiando la flessibilità agnostica del core.
+**[RISOLTO]:**
+Grazie all'introduzione di `TypeRef::EvaluatedAccess` in `executor.rs` (che mantiene l'intera catena di risoluzione), il graph exporter ora emette archi sia verso l'alias intermedio (`Target`) sia verso il tipo base (`StructA`). Questa soluzione elegante permette di soddisfare le aspettative specifiche del benchmark di Rust (che traccia l'uso dell'alias) senza compromettere la flessibilità agnostica del core, che continua a tracciare anche il tipo reale sottostante.
+
+---
+
+## Riepilogo Attuale (71/75 Archi Trovati)
+Allo stato attuale dello sviluppo, tutte le discrepanze strutturali e architetturali del benchmark Rust sono state risolte. I **4 archi rimanenti** (su un totale di 75) appartengono esclusivamente alla categoria **Generic Bounds & Traits** (Punto 4), che è stata formalmente posticipata in attesa di un design language-agnostic per i vincoli di tipo. L'infrastruttura di analisi per C++, Python, Java e Rust risulta stabile e allineata.
+
+### Tabella di Riepilogo
+
+| # | Causa Radice | Archi Coinvolti | Componente | Stato |
+|---|--------------|-----------------|------------|-------|
+| 1 | Manca l'alias `Self` per la keyword | 1 | `scope.rs` / Config | **Risolto** |
+| 2 | Hop intermedi persi (Variabili globali statiche) | 1 | `executor.rs` | **Risolto** (con `EvaluatedAccess`) |
+| 3 | `scoped_identifier` ignorati (Enum variants) | 4 | `body_extraction.rs` | **Risolto** |
+| 4a | Ereditarietà Deref Coercion mancante | 1 | `scope.rs` | **Risolto** (tramite super_types) |
+| 4b | Generic Bounds e Trait Inheritance | 4 | `executor.rs` / `scope.rs` | **Posticipato** |
+| 5 | Design Architetturale (Tipi Ritorno vs Alias) | 1 | `executor.rs` / `graph.rs` | **Risolto** (con `EvaluatedAccess`) |

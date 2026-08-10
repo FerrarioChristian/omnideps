@@ -155,6 +155,14 @@ fn execute_impl_block(
     let target_name = match &ib.impl_for {
         TypeRef::Resolved(qn) | TypeRef::External(qn) => qn.last().cloned().unwrap_or_default(),
         TypeRef::ResolutionQuery(q) => extract_base_name(q),
+        TypeRef::Failed(qn) => qn.last().cloned().unwrap_or_default(),
+        TypeRef::EvaluatedAccess(_, inner) => {
+            if let TypeRef::Resolved(qn) | TypeRef::External(qn) = &**inner {
+                qn.last().cloned().unwrap_or_default()
+            } else {
+                "".to_string()
+            }
+        }
         _ => "".to_string(),
     };
 
@@ -281,18 +289,26 @@ fn execute_block(
 }
 
 fn redirect_to_constructor(ctx: &ExecutorContext, tr: TypeRef) -> TypeRef {
-    if let TypeRef::Resolved(ref path) = tr {
-        if let Some(scope_id) = find_scope_for_type(ctx.tree, &tr) {
-            // Check if it's a class/type scope by verifying if there are any constructors.
-            let ctor_names = ["__init__", "constructor", path.last().unwrap().as_str()];
-            for cname in ctor_names {
-                if ctx.tree.arena[scope_id].symbols.contains_key(cname) {
-                    let mut new_path = path.clone();
-                    new_path.push(cname.to_string());
-                    return TypeRef::Resolved(new_path);
+    match &tr {
+        TypeRef::Resolved(path) => {
+            if let Some(scope_id) = find_scope_for_type(ctx.tree, &tr) {
+                let ctor_names = ["__init__", "constructor", path.last().unwrap().as_str()];
+                for cname in ctor_names {
+                    if ctx.tree.arena[scope_id].symbols.contains_key(cname) {
+                        let mut new_path = path.clone();
+                        new_path.push(cname.to_string());
+                        return TypeRef::Resolved(new_path);
+                    }
                 }
             }
         }
+        TypeRef::EvaluatedAccess(base, inner) => {
+            let inner_redirected = redirect_to_constructor(ctx, inner.as_ref().clone());
+            if inner_redirected != **inner {
+                return TypeRef::EvaluatedAccess(base.clone(), Box::new(inner_redirected));
+            }
+        }
+        _ => {}
     }
     tr
 }
