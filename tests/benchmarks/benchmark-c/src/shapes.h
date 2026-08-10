@@ -6,12 +6,16 @@ typedef union {
     float area;
 } ShapeData;
 
-typedef struct {
+struct Rectangle {
     int width;
     int height;
     ShapeData data;
-} Rectangle;
+};
 
-int calculate_area(Rectangle* rect);
+typedef struct {
+    int radius;
+} Circle;
+
+int calculate_area(struct Rectangle* rect);
 
 #endif

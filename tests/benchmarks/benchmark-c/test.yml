@@ -8,6 +8,16 @@ files:
 - src/pointers.c
 - src/nested_structs.h
 - src/nested_structs.c
+- src/forward_decl.h
+- src/forward_decl.c
+- src/callbacks.h
+- src/callbacks.c
+- src/globals.h
+- src/globals.c
+- src/enums.h
+- src/enums.c
+- src/macros.h
+- src/macros.c
 nodes:
 - name: add
   kind: function
@@ -48,6 +58,36 @@ nodes:
 - name: ShapeData.area
   kind: field
 - name: Rectangle.data
+  kind: field
+- name: Node
+  kind: struct
+- name: Node.value
+  kind: field
+- name: Node.next
+  kind: field
+- name: process_node
+  kind: function
+- name: ActionCallback
+  kind: typealias
+- name: register_callback
+  kind: function
+- name: trigger_callback
+  kind: function
+- name: system_state
+  kind: field
+- name: update_state
+  kind: function
+- name: Color
+  kind: typealias
+- name: color_to_int
+  kind: function
+- name: MAX_BUFFER
+  kind: field
+- name: print_macro_usage
+  kind: function
+- name: Circle
+  kind: struct
+- name: Circle.radius
   kind: field
 edges:
 - testid: UNION-DECL
@@ -142,3 +182,43 @@ edges:
   source: divide
   sink: float
   kind: casts_to
+- testid: C-USE-FWD-DECL
+  source: process_node
+  sink: Node
+  kind: uses_param_type
+- testid: C-CALL-PTR
+  source: trigger_callback
+  sink: ActionCallback
+  kind: calls
+- testid: C-USE-CB-TYPE
+  source: register_callback
+  sink: ActionCallback
+  kind: uses_param_type
+- testid: C-ACC-GLOBAL
+  source: main
+  sink: system_state
+  kind: accesses_field
+- testid: C-MUT-GLOBAL
+  source: update_state
+  sink: system_state
+  kind: accesses_field
+- testid: C-USE-ENUM
+  source: color_to_int
+  sink: Color
+  kind: uses_param_type
+- testid: C-CALL-MACRO
+  source: print_macro_usage
+  sink: SQUARE
+  kind: calls
+- testid: C-ACC-MACRO
+  source: print_macro_usage
+  sink: MAX_BUFFER
+  kind: accesses_field
+- testid: C-USE-TYPEDEF
+  source: main
+  sink: Circle
+  kind: uses_local_type
+- testid: C-ACC-TYPEDEF
+  source: main
+  sink: Circle.radius
+  kind: accesses_field
