@@ -363,7 +363,7 @@ pub fn analyze_project(
     (resolved, graph, summary)
 }
 
-fn link_out_of_line_methods(modules: &mut Vec<Module>, config: &crate::config::AnalyzerConfig) {
+pub fn link_out_of_line_methods(modules: &mut Vec<Module>, config: &crate::config::AnalyzerConfig) {
     for module in modules.iter_mut() {
         let lang = module.language.as_deref().unwrap_or("root");
         if config.get_for(lang).forward_declarations {

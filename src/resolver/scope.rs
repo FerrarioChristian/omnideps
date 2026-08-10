@@ -260,6 +260,17 @@ impl ScopeTree {
         if let Some(Symbol::Type(id)) = self.arena[parent_id].symbols.get(&target_name) {
             target_scope_id = Some(*id);
         }
+        
+        // If not found in parent, try to find the class globally (common for out-of-line C++ methods)
+        if target_scope_id.is_none() {
+            for (id, scope) in self.arena.iter().enumerate() {
+                // If the scope itself is named like the target class, and it's not a block
+                if scope.name == target_name && !scope.name.starts_with("block") {
+                    target_scope_id = Some(id);
+                    break;
+                }
+            }
+        }
 
         println!(
             "register_impl_block target_name: {} resolved to: {:?}",

@@ -410,6 +410,7 @@ fn extract_call_dependency(
             if let Some(obj) = f.child_by_field_name("object")
                 .or_else(|| f.child_by_field_name("value"))
                 .or_else(|| f.child_by_field_name("left"))
+                .or_else(|| f.child_by_field_name("argument")) // C++ field_expression uses "argument"
             {
                 accesses.push(extract_type_ref(obj, source));
             }
