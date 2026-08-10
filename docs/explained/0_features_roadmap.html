@@ -60,7 +60,6 @@
 <body>
 
     <h1>Language-Agnostic Analyzer: Features & Roadmap</h1>
-    <p>Questo documento funge da piano di lavoro, report di stato e vetrina delle potenzialità del nostro analizzatore architetturale multi-linguaggio. Traccia i costrutti del linguaggio supportati, come vengono modellati nell'Intermediate Representation (IR), e quali euristiche se ne occupano.</p>
 
     <h2>1. Dipendenze di tipo (Type-Level)</h2>
     <table>
@@ -128,7 +127,7 @@ vector&lt;int&gt; vec; // C++</pre>
 typedef int length_t; // C</pre>
             </td>
             <td>
-                Supportato nativamente. Gli alias vengono parsati in <code>Component::TypeAlias</code>,
+                Gli alias vengono parsati in <code>Component::TypeAlias</code>,
                 registrati nel <code>ScopeTree</code> e risolti trasparentemente dal <code>Executor</code>
                 generando nodi e archi grafici dedicati.
             </td>
@@ -212,7 +211,7 @@ auto repo = new Repository(); // C++</pre>
 User.create(); // OK
 myVar.run(); // OK
 self.get_id(); // OK</pre>
-                <div class="notes">Supporto completo grazie al <strong>Lexical Scoping Comportamentale</strong>. Le variabili locali (incluse le elisioni inferite tramite <code>infer_variable_type</code>) vengono estratte in un albero di blocchi e registrate nel <code>SymbolStack</code> per risolvere infallibilmente l'oggetto chiamante. Inclusa l'auto-registrazione in scope per <code>self</code> e <code>this</code>.</div>
+                <div class="notes">Supporto completo grazie al <strong>Lexical Scoping Comportamentale</strong>. Le variabili locali (incluse le elisioni inferite tramite <code>infer_variable_type</code>) vengono estratte in un albero di blocchi e registrate nel <code>SymbolStack</code> per risolvere l'oggetto chiamante. Inclusa l'auto-registrazione in scope per <code>self</code> e <code>this</code>.</div>
             </td>
             <td>Gerarchia di <code>Block</code> dentro <code>Function</code><br>Archi: <code>Calls</code>, <code>UsesLocalType</code></td>
             <td><span class="function-ref">extract_block</span>, <span class="function-ref">resolve_block</span></td>
@@ -262,36 +261,34 @@ User() // Python</pre>
         </tr>
         <tr>
             <td>Accesso a Proprietà/Campi d'Istanza</td>
-            <td><span class="status-no">No</span></td>
+            <td><span class="status-yes">Sì</span></td>
             <td>
                 <pre>user.name = "Mario";</pre>
             </td>
             <td>
-                <div class="implementation-idea"><strong>Perché Non Sì:</strong> L'estrattore popola l'array <code>accesses</code> (es. <code>user.name</code>), ma poiché <code>user</code> è una variabile locale, il Resolver non può inferirne staticamente la classe proprietaria senza eseguire il codice. Generare archi alla cieca comporterebbe gravi imprecisioni, quindi questo tracciamento è volutamente evitato nell'analisi statica pura.</div>
+                Il costrutto V3 risolve perfettamente questo caso tramite la sostituzione lessicale: <code>user.name</code> diventa <code>Extract(Find("user"), "name")</code>. Il Resolver trova la variabile locale <code>user</code>, ne estrae il tipo, cerca lo Scope della classe e valida l'esistenza del campo <code>name</code>. Viene generato un arco <code>AccessesField</code> con destinazione precisa.
             </td>
-            <td>-</td>
+            <td><span class="function-ref">evaluate_query_extract</span></td>
         </tr>
         <tr>
             <td>Accesso Statico / Variabili Globali</td>
-            <td><span class="status-partial">Parz</span></td>
+            <td><span class="status-yes">Sì</span></td>
             <td>
                 <pre>Math.PI;</pre>
             </td>
             <td>
-                L'astrazione base <code>accesses</code> cattura correttamente le espressioni come <code>Math.PI</code>. Tuttavia, il Resolver esporta queste dipendenze come archi generici <code>AccessesField</code>. 
-                <div class="implementation-idea"><strong>Manca validazione a 2 step:</strong> Il Resolver dovrebbe prima dedurre che <code>Math</code> è un Tipo Strutturato nel Global Registry, e poi validare che <code>PI</code> è un suo membro statico, emettendo un arco specifico <code>AccessesStatic</code>.</div>
+                Il Query Engine bifase divide `Math.PI` in <code>Extract(Find("Math"), "PI")</code>, validando prima l'esistenza di `Math` (nel file o tramite import) e poi verificando che possieda un membro statico `PI`. Emette un arco <code>AccessesField</code>.
             </td>
-            <td><span class="function-ref">find_behavioral_deps</span>, <span class="function-ref">extract_free_variables</span></td>
+            <td><span class="function-ref">evaluate_query_extract</span></td>
         </tr>
         <tr>
             <td>Enum Usage</td>
-            <td><span class="status-partial">Parz</span></td>
+            <td><span class="status-yes">Sì</span></td>
             <td><pre>Status.ACTIVE</pre></td>
             <td>
-                Come per l'Accesso Statico, l'estrattore raccoglie il token <code>Status.ACTIVE</code> nell'array <code>accesses</code>. 
-                <div class="implementation-idea"><strong>Manca validazione a 2 step:</strong> È necessaria la stessa logica del Resolver per confermare che <code>Status</code> sia un <code>Enum</code> globale e che <code>ACTIVE</code> sia una sua variante, per poi generare l'arco dedicato <code>UsesEnum</code> anziché il generico <code>AccessesField</code>.</div>
+                Stessa identica logica dell'Accesso Statico. L'albero degli scope naviga <code>Extract(Find("Status"), "ACTIVE")</code>, restituendo il percorso assoluto alla variante dell'enum. L'arco emesso è <code>AccessesField</code>.
             </td>
-            <td><span class="function-ref">find_behavioral_deps</span></td>
+            <td><span class="function-ref">evaluate_query_extract</span></td>
         </tr>
     </table>
 
@@ -325,7 +322,7 @@ User() // Python</pre>
             <td>
                 <pre>new Service(repo);</pre>
             </td>
-            <td>Il tipo del parametro è riconosciuto strutturalmente (<code>UsesParamType</code>). Il "wiring" dinamico di framework è volutamente ignorato per mantenere l'astrazione estatica.</td>
+            <td>Il tipo del parametro è riconosciuto strutturalmente (<code>UsesParamType</code>). Il "wiring" dinamico di framework è ignorato in quanto non riconoscibile staticamente</td>
             <td>-</td>
         </tr>
         <tr>
@@ -515,13 +512,13 @@ void run();</pre> <div class="notes">Permette la dichiarazione disaccoppiata dal
         </tr>
     </table>
 
-    <h2>9. Casi Limite e Costrutti Complessi (Risolti)</h2>
+        <!--<h2>9. Casi Limite e Costrutti Complessi (Risolti)</h2>
     <ul>
         <li><strong>Type Inference Avanzata:</strong> Implementata tramite Query Engine Algebrico. Supporta catene complesse (es. <code>user.get_db().query()</code>) con risalita dello scope (<em>Lexical Scope Climbing</em>) per risolvere dinamicamente i tipi. L'analizzatore esplora i jump points degli import per trovare i tipi non locali.</li>
         <li><strong>Riconoscimento di self e this:</strong> L'architettura a scope concentrici (SymbolStack) inietta nativamente sia <code>self</code> che <code>this</code> (Fase 2a di Query Building). I parametri formali espliciti dei metodi (es. in Python/Rust) sovrascrivono automaticamente quelli impliciti di classe.</li>
         <li><strong>Appiattimento ImplBlock e Tipi Locali:</strong> I blocchi di implementazione Rust e i metodi fuori-dichiarazione C++ vengono appiattiti nel tipo bersaglio finale (grazie a un fix nell'esplorazione del <code>declarator</code>). I tipi locali dichiarati nei metodi sono correttamente mappati nel Global Registry.</li>
         <li><strong>Funzioni Anonime e Interazioni Comportamentali:</strong> Scansione best-effort del corpo per estrarre <code>Calls</code> e <code>Instantiates</code>. Le chiamate non risolvibili (variabili locali dinamiche) falliscono elegantemente senza impedire l'estrazione degli altri archi.</li>
         <li><strong>Fallback dei Tipi di Ritorno:</strong> I costruttori (Python/C++) senza un <code>return_type</code> esplicito vengono assegnati correttamente a <code>Void</code>, prevenendo che l'analizzatore utilizzi erroneamente il nome della funzione stessa. L'ereditarietà in Java/Python (nodi specifici <code>superclass</code>, <code>interfaces</code>) ora mappa correttamente ad archi <code>IsA</code>.</li>
-    </ul>
+</ul>-->
 </body>
 </html>

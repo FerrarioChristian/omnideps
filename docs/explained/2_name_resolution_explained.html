@@ -1032,17 +1032,25 @@ m.impl_blocks = unfused_impls;</code></pre>
         }
     });
 
-    // 2. Ricolloca i metodi all'interno della rispettiva classe
+    // 2. Ricolloca i metodi all'interno della rispettiva classe (se nello stesso modulo)
+    // oppure crea un ImplBlock per gestire il ricollegamento in fase di esecuzione dello ScopeTree
     for method in methods_to_move {
         let class_name = &method.name[..method.name.len() - 1]; // "MyClass"
         let method_name = method.name.last().unwrap().clone();  // "my_method"
         
-        // Cerca la classe nel modulo e inietta il metodo (aggiornando o sostituendo la dichiarazione)
-        // ...
+        let mut found = false;
+        // ... cerca la classe nello stesso modulo ...
+        if !found {
+            // Se la classe non è locale (es. è in un .h mentre siamo nel .cpp), 
+            // genera un ImplBlock dinamico.
+            module.impl_blocks.push(ImplBlock { name: class_name, ... });
+        }
     }
 }</code></pre>
 
-    <p><strong>Perché è importante?</strong> Senza questa fusione, il Query Engine non potrebbe iniettare la keyword <code>this</code> all'interno del corpo del metodo out-of-line (poiché verrebbe trattato come una funzione libera). Questo farebbe fallire la risoluzione di tutti gli accessi ai membri della classe (es. <code>this->field</code>) scritti all'interno del metodo.</p>
+    <p><strong>Risoluzione Globale:</strong> Quando questi <code>ImplBlock</code> vengono eseguiti durante la costruzione dello <strong>ScopeTree</strong> (in <code>scope.rs</code>), l'engine cerca la classe target (es. <code>MyClass</code>) non solo nel parent scope immediato (il modulo del <code>.cpp</code>), ma effettua un <strong>lookup globale</strong> all'interno dell'intera Arena per intercettare lo scope originario della classe (creato valutando il file <code>.h</code>). In questo modo, lo scope del metodo out-of-line viene direttamente <em>innescato</em> come figlio della classe reale, ereditando la corretta visibilità su tutti i campi e metodi dichiarati nell'header.</p>
+
+    <p><strong>Perché è importante?</strong> Senza questa fusione, il Query Engine non potrebbe iniettare il parent class scope (es. <code>this</code> o la visibilità implicita) all'interno del corpo del metodo out-of-line. Questo farebbe fallire la risoluzione di tutti gli accessi ai membri della classe (es. <code>this->field</code> o anche l'uso implicito di <code>field</code>) scritti all'interno del metodo.</p>
 
     <!-- ============================================================ -->
     <!-- SEZIONE 11 -->

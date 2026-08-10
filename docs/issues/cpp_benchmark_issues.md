@@ -20,16 +20,21 @@ Ecco il riepilogo dei bug identificati e delle soluzioni generali adottate:
 **Problema:** In cicli iterativi range-based (es. `for (auto& car : cars)`), la variabile a sinistra (`car`) veniva correttamente estratta come variabile locale, ma non si stava analizzando la collezione di destinazione (`cars`) alla sua destra per trovare le dipendenze comportamentali (accessi ai campi/collezioni). Inoltre, si ignorava il corpo del ciclo per la ricerca di blocchi nidificati.
 **Soluzione (Generale):** La funzione `extract_block` è stata estesa per considerare `for_range_loop` e `for_in_statement` come definizioni di variabili, assicurando l'ispezione della variabile iterata (nell'attributo `right`) e l'attraversamento ricorsivo del blocco `body`. 
 
+### 5. Definizione di Metodi Out-of-Line (C++)
+**Problema:** In C++ è prassi dichiarare una classe in un file header (`.h`) e definirne i metodi in un file sorgente (`.cpp`) usando l'operatore di risoluzione di scope (es. `void Fleet::addCar() { ... }`). L'AST estrae queste definizioni come funzioni libere scollegate dalla classe originale, e gli accessi ai membri (come la lista `cars`) fallivano (mancava l'arco `Fleet.addCar -> Fleet.cars`). Inoltre, le chiamate a metodi (es. `cars.push_back()`) non estraevano l'oggetto ricevitore perché in C++ il nodo AST `field_expression` usa la chiave `argument` invece che `object`.
+**Soluzione (Generale):** 
+1. In `src/resolver/scope.rs`, quando l'engine processa un `ImplBlock` per un metodo out-of-line, ora esegue un **lookup globale** nello `ScopeTree` per trovare la classe originale (che risiede nel modulo dell'header) e innesca il metodo direttamente all'interno dello scope di quella classe, ereditandone così tutta la visibilità.
+2. In `src/heuristics/body_extraction.rs`, l'estrazione del "receiver" delle chiamate di metodo è stata estesa per leggere anche il campo `argument` dai `field_expression`.
+
 ---
 
-### Archi Attualmente Mancanti e Motivi (2 rimasti su 17)
+### Archi Attualmente Mancanti e Motivi (1 rimasto su 32)
 
-Attualmente, il benchmark riporta il ritrovamento di 30 archi su 32, fallendo su soli due:
+Dopo l'implementazione dei fix, il benchmark riporta il ritrovamento di **31 archi su 32**. 
+L'arco inizialmente indicato come mancante `Fleet.startAll -> Transport.Car.displayInfo` è stato **pienamente risolto** grazie alla corretta associazione dei generics (punto 3). L'arco `Fleet.addCar -> Fleet.cars` è stato parimenti **risolto** (punto 5).
 
-1. **`Fleet.startAll -> Transport.Car.displayInfo` (Calls)**
-   * **Motivo Reale:** Nel codice sorgente `for (auto& car : cars) { car.displayInfo(); }`, il tipo della variabile `car` è esplicitamente `auto`. Il nostro resolver si basa fortemente sui tipi statici espliciti per la risoluzione (Name Resolution base).
-   * **Cosa Manca:** Per dedurre che `car` ha tipo `Car`, l'analizzatore dovrebbe essere in grado di implementare algoritmi di *Data-Flow Analysis / Type Inference Avanzata*, andando a vedere il tipo che popola l'array `cars` (ovvero `std::vector<Car>`) e deducendone l'identità per `auto&`. Questo eccede le capacità attuali delle euristiche stateless, per questo l'arco non può essere ricavato se non introducendo un level of analysis decisamente più complesso e dispendioso, o con un framework dedicato al typing di quel linguaggio (oltrepassando il concetto di "agnostic").
+L'unico arco che rimane fallito è:
    
-2. **`main -> Transport.Vehicle` (UsesType)**
-   * **Motivo Reale:** Il codice della funzione `main()` instanzia un oggetto `Car`, ma non fa alcun riferimento diretto a `Vehicle`. C++ richiama internamente i costruttori della classe madre in fase di allocazione o inclusione, e il file di test sembra aspettarsi questo legame indiretto come "dipendenza di tipo" di `main`.
-   * **Cosa Manca:** Trattandosi di un legame del tutto invisibile nell'AST del file `main.cpp` (essendo implicito all'architettura dei costruttori della libreria o indotto dagli header C++), l'analizzatore basato su AST generici non ha modo di desumerlo senza esplorare il file di header della classe `Car` ed emulare le regole C++ di istanziazione degli oggetti polimorfici, il che contrasterebbe con l'approccio *language-agnostic*. Probabilmente l'aspettativa del benchmark va rivista.
+1. **`main -> Transport.Vehicle` (UsesType)**
+   * **Motivo Reale:** Il codice della funzione `main()` istanzia un oggetto `Car`, ma non fa alcun riferimento diretto a `Vehicle`. In C++ i costruttori della superclasse vengono invocati implicitamente durante l'allocazione, e il benchmark si aspetta questo legame indiretto come "dipendenza di tipo" del `main`.
+   * **Perché non possiamo risolverlo staticamente:** Essendo questo legame del tutto invisibile nell'AST del file `main.cpp` (poiché dipendente dall'albero di ereditarietà definito nell'header di `Car`), un analizzatore AST agnostico non può dedurlo senza un motore di inferenza profondo che emuli le regole C++ di costruzione polimorfica. Questa funzionalità è out-of-scope per le euristiche attuali, quindi l'arco è strutturalmente impossibile da risolvere staticamente senza snaturare l'approccio agnostico del tool.
