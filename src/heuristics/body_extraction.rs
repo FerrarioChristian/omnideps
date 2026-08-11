@@ -295,7 +295,7 @@ fn find_behavioral_deps(
     // Do not recurse into compound identifiers or types to avoid spurious accesses for their parts
     if matches!(
         kind,
-        "scoped_identifier" | "qualified_identifier" | "field_access" | "member_expression"
+        "scoped_identifier" | "qualified_identifier" | "field_access" | "member_expression" | "attribute"
     ) {
         return;
     }
