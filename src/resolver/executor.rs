@@ -491,6 +491,34 @@ fn resolve_super_keyword(
     None
 }
 
+/// Helper function to resolve the "Self" keyword dynamically.
+/// It climbs the scope tree to find the nearest enclosing structured type (class, struct, etc.)
+/// and returns a resolved reference to it.
+fn resolve_self_keyword(
+    ctx: &ExecutorContext,
+    scope_id: ScopeId,
+) -> Option<TypeRef> {
+    let mut curr = Some(scope_id);
+    while let Some(id) = curr {
+        let scope = &ctx.tree.arena[id];
+        
+        // Check if this scope is a StructuredType by looking at its parent's symbols
+        if let Some(parent_id) = scope.parent {
+            let parent_scope = &ctx.tree.arena[parent_id];
+            for symbol in parent_scope.symbols.values() {
+                if let crate::resolver::scope::Symbol::Type(type_id) = symbol {
+                    if *type_id == id {
+                        let path = build_path_from_scope(&ctx.tree, id);
+                        return Some(TypeRef::Resolved(path));
+                    }
+                }
+            }
+        }
+        curr = scope.parent;
+    }
+    None
+}
+
 /// Helper function to evaluate `Query::Find`. Performs lexical climbing up the scope tree.
 fn evaluate_query_find(
     ctx: &ExecutorContext,
@@ -501,6 +529,11 @@ fn evaluate_query_find(
 ) -> Option<TypeRef> {
     if name == "super()" || name == "super" {
         return resolve_super_keyword(ctx, scope_id, resolve_type, visited);
+    }
+    if name == "Self" {
+        if let Some(resolved_self) = resolve_self_keyword(ctx, scope_id) {
+            return Some(resolved_self);
+        }
     }
 
     let mut curr = Some(scope_id);

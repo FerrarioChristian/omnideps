@@ -980,12 +980,18 @@ where F: Fn(Node, &amp;str) -&gt; Option&lt;T&gt; + Copy
         <pre><code>for child in node.children(...) {
     if matches!(child_kind, "type_identifier" | "primitive_type" | "identifier" | "type") {
         let text = node_text(child, source);
-        if !text.is_empty() &amp;&amp; !text.contains(" ") {
-            return TypeRef::Unresolved(split_qualified_name(&amp;text));
+        if !text.is_empty() && !text.contains(" ") {
+            return TypeRef::Unresolved(split_qualified_name(&text));
         }
     }
 }</code></pre>
         <p>Se i named fields non hanno prodotto risultati, scorre tutti i figli del nodo cercando nodi di tipo identificatore. Il check <code>!text.contains(" ")</code> evita di catturare espressioni complesse scambiate per nomi di tipo.</p>
+        
+        <div class="warn-box">
+            <strong>Problema dei parametri senza tipo (es. Python <code>self</code>):</strong> Questo approccio molto permissivo causava un bug per i parametri non tipizzati (es. in Python). L'estrattore non trovava un tipo esplicito, scendeva nei figli e trovava l'<code>identifier</code> che rappresentava il <em>nome</em> del parametro (es. <code>self</code>), restituendolo come se fosse il tipo del parametro!
+            <br><br>
+            Per evitare questo errore comune, <code>try_extract_params</code> applica una funzione di sanitizzazione (<code>sanitize_parameter_type</code>) che confronta il tipo estratto con il nome del parametro. Se coincidono perfettamente, l'estrattore capisce che il fallback ha "catturato" il nome anziché il tipo, scarta il risultato e restituisce correttamente <code>TypeRef::Failed</code>.
+        </div>
     </div>
 
     <div class="step step-warning">

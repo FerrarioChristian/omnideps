@@ -215,6 +215,18 @@ pub fn extract_nested_types(
     })
 }
 
+fn sanitize_parameter_type(ty: crate::model::TypeRef, param_name: &str) -> crate::model::TypeRef {
+    // Se il tipo estratto corrisponde esattamente al nome del parametro,
+    // significa che è stato erroneamente estratto dal fallback per identificatori.
+    // I parametri senza tipo (come `self` in Python) ricadono in questo caso.
+    if let crate::model::TypeRef::Unresolved(ref path) = ty {
+        if path.len() == 1 && path[0] == param_name {
+            return crate::model::TypeRef::Failed(vec![]);
+        }
+    }
+    ty
+}
+
 /// Extracts formal parameters from a function or method signature.
 pub fn extract_parameters(node: Node, source: &str) -> Vec<Parameter> {
     let mut params = vec![];
@@ -239,7 +251,8 @@ pub fn extract_parameters(node: Node, source: &str) -> Vec<Parameter> {
             let p_kind = p.kind();
             if p_kind.contains("parameter") || p_kind == "identifier" {
                 let name = super::text_parsing::extract_identifier(p, source);
-                let ty = super::type_extraction::extract_type_ref(p, source);
+                let raw_ty = super::type_extraction::extract_type_ref(p, source);
+                let ty = sanitize_parameter_type(raw_ty, name.as_deref().unwrap_or(""));
                 let text = super::text_parsing::node_text(p, source);
                 let is_variadic = text.contains("...") || text.contains("*args");
                 params.push(Parameter {
