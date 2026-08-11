@@ -26,8 +26,11 @@ pub fn node_text(node: Node, source: &str) -> String {
 pub fn split_qualified_name(text: &str) -> QualifiedName {
     // Remove generic parameters for basic name resolution
     let text = text.split('<').next().unwrap_or(text);
+    
+    // Normalize C/C++ pointer access to dot notation for uniform splitting
+    let text_norm = text.replace("->", ".");
 
-    text.split(&[':', '.'][..])
+    text_norm.split(&[':', '.'][..])
         .filter(|s| !s.trim().is_empty())
         .map(|s| s.trim().to_string())
         .collect()
@@ -67,9 +70,13 @@ pub fn extract_identifier(node: Node, source: &str) -> Option<String> {
         }
     }
 
-    if let Some(decl) = node.child_by_field_name("declarator") {
-        if let Some(n) = decl.child_by_field_name("declarator") {
-            let text = node_text(n, source).trim().to_string();
+    if let Some(mut decl) = node.child_by_field_name("declarator") {
+        while let Some(next) = decl.child_by_field_name("declarator") {
+            decl = next;
+        }
+
+        if decl.kind() == "scoped_identifier" || decl.kind() == "qualified_identifier" {
+            let text = node_text(decl, source).trim().to_string();
             if !text.is_empty() {
                 return Some(text);
             }
@@ -83,6 +90,12 @@ pub fn extract_identifier(node: Node, source: &str) -> Option<String> {
         }
 
         let text = node_text(decl, source).trim().to_string();
+        if decl.kind() == "identifier" || decl.kind() == "type_identifier" || decl.kind() == "pattern" || decl.kind() == "field_identifier" || decl.kind() == "destructor_name" {
+            if !text.is_empty() {
+                return Some(text);
+            }
+        }
+
         // Take just the name before '(' or '='
         let name_part = text
             .split('(')

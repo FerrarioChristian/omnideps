@@ -65,13 +65,33 @@ pub fn is_function(node: Node) -> bool {
         return false;
     }
     let kind = node.kind();
-    (kind.contains("function")
+
+    // In C/C++, function declarations are "declaration" nodes containing a "function_declarator"
+    if kind == "declaration" && has_nested_function_declarator(node) {
+        return true;
+    }
+
+    let is_func_kind = kind.contains("function")
         || kind.contains("method")
         || kind.contains("fn_item")
         || kind.contains("func")
         || kind.contains("constructor")
-        || kind == "decorated_definition")
-        && !kind.contains("class")
+        || kind == "decorated_definition";
+
+    is_func_kind && !kind.contains("class")
+}
+
+/// Helper function to traverse deeply nested declarators (typical of C/C++)
+/// and check if any of them is a "function_declarator".
+fn has_nested_function_declarator(node: Node) -> bool {
+    let mut curr = node.child_by_field_name("declarator");
+    while let Some(decl) = curr {
+        if decl.kind() == "function_declarator" {
+            return true;
+        }
+        curr = decl.child_by_field_name("declarator");
+    }
+    false
 }
 
 /// Identifies implementation blocks commonly found in Rust.
@@ -104,7 +124,26 @@ pub fn is_free_variable(node: Node) -> bool {
         return false;
     }
     let kind = node.kind();
-    kind == "static_item" || kind == "const_item" || kind == "global_variable_declaration"
+    
+    let mut is_decl = false;
+    if kind == "declaration" || kind == "variable_declaration" {
+        // In C/C++, exclude function declarations (they contain a function_declarator)
+        if has_nested_function_declarator(node) {
+            return false;
+        }
+        // Exclude local variables by ensuring no parent is a function or method body
+        let mut parent = node.parent();
+        while let Some(p) = parent {
+            let pk = p.kind();
+            if pk.contains("function") || pk.contains("method") || pk.contains("body") || pk == "compound_statement" || pk == "block" {
+                return false;
+            }
+            parent = p.parent();
+        }
+        is_decl = true;
+    }
+
+    kind == "static_item" || kind == "const_item" || kind == "global_variable_declaration" || is_decl
 }
 
 /// Identifies type aliases (e.g. typedef, using, type = ...).

@@ -188,8 +188,12 @@ edges:
   kind: uses_param_type
 - testid: C-CALL-PTR
   source: trigger_callback
-  sink: ActionCallback
+  sink: active_callback
   kind: calls
+- testid: C-USE-ACTIVE-CB
+  source: active_callback
+  sink: ActionCallback
+  kind: uses_field_type
 - testid: C-USE-CB-TYPE
   source: register_callback
   sink: ActionCallback
