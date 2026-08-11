@@ -1,72 +1,78 @@
-# Gestione Moduli e Namespace: Analisi e Proposta
+# Gestione Moduli e Namespace: Architettura `ModuleConfig`
 
-Il relatore ha fatto un'osservazione eccellente. Il concetto di "Modulo" o "Package" non è un'opzione mutuamente esclusiva (`DirectoryBased` o `PackageBased`), ma piuttosto un insieme di **meccanismi ortogonali** che i linguaggi possono combinare o omettere del tutto.
+Il concetto di "Modulo" o "Package" nell'ingegneria del software non costituisce un paradigma mutualmente esclusivo (es. *DirectoryBased* vs *PackageBased*), ma rappresenta un insieme di **meccanismi ortogonali** che i vari linguaggi possono combinare, sovrapporre o omettere del tutto.
 
-## Analisi dei Meccanismi per Linguaggio
+Questo documento illustra come l'analizzatore astrae e uniforma queste logiche attraverso l'architettura `ModuleConfig`.
 
-Ecco una lista delle modalità di definizione dei moduli/package nei vari ecosistemi supportati:
+---
+
+## 1. Analisi dei Meccanismi per Linguaggio
+
+Di seguito l'elenco delle modalità di definizione dei moduli e package nei principali ecosistemi supportati dall'analizzatore:
 
 1. **C**
-   - **Meccanismo:** Nessuno. Non esistono namespace o moduli. Tutte le dichiarazioni vivono in un unico *global scope* (salvo visibilità `static` limitata alla translation unit, che l'analizzatore in genere appiattisce).
-   - **Comportamento atteso:** Tutto viene iniettato nel modulo `root`.
+   - **Meccanismo:** Nessuno. Non esistono namespace testuali o moduli. Tutte le dichiarazioni vivono in un unico *global scope*.
+   - **Comportamento Atteso:** L'analizzatore inietta tutte le entità estratte direttamente nel modulo base `root`.
 
 2. **C++**
-   - **Meccanismo:** `namespace x { ... }` (Dichiarazioni di blocchi inline).
-   - **Nota:** I namespace possono essere annidati e distribuiti su più file. Il file system non ha alcun impatto sull'FQN (Fully Qualified Name). (Esistono anche i moduli C++20, ma il namespace è il costrutto dominante per lo scope).
-   - **Comportamento atteso:** Si estrae la gerarchia esclusivamente scorrendo i blocchi `namespace` nell'AST.
+   - **Meccanismo:** Dichiarazioni di blocchi AST inline tramite `namespace x { ... }`.
+   - **Nota:** I namespace possono essere annidati e distribuiti liberamente su più file. Il file system non ha alcun impatto sul FQN (Fully Qualified Name).
+   - **Comportamento Atteso:** L'estrattore ricostruisce la gerarchia esclusivamente scorrendo i blocchi `namespace` all'interno dell'AST.
 
 3. **Java**
-   - **Meccanismo:** `package x.y.z;` (Dichiarazione a livello di file).
-   - **Nota:** Il package è definito tramite uno statement a inizio file. Anche se la convenzione impone che la struttura delle directory rifletta il package, il compilatore (e il nostro analizzatore) si affida all'intestazione. Non esistono package dichiarati "inline" con le parentesi graffe.
-   - **Comportamento atteso:** Tutti i nodi estratti dal file finiscono in `root::x::y::z`.
+   - **Meccanismo:** Dichiarazione a livello di file tramite `package x.y.z;`.
+   - **Nota:** Il package è definito tramite un'intestazione statica. Sebbene la convenzione Java imponga una struttura delle directory corrispondente, l'analizzatore si affida unicamente alla direttiva testuale.
+   - **Comportamento Atteso:** Tutti i nodi estratti dal file convergono nel namespace `root::x::y::z`.
 
 4. **Python**
-   - **Meccanismo:** `Directory / File Hierarchy` (Moduli impliciti basati sul file system).
-   - **Nota:** Ogni file `.py` è un modulo. Ogni cartella con `__init__.py` è un package. La struttura delle directory e dei file *è* la struttura dei moduli.
-   - **Comportamento atteso:** Il path del file determina automaticamente la posizione nell'albero dei moduli.
+   - **Meccanismo:** Gerarchia basata su file system (`Directory / File Hierarchy`).
+   - **Nota:** Ogni file `.py` costituisce un modulo; ogni cartella con `__init__.py` è un package. La struttura delle directory e dei file *è* la struttura logica del programma.
+   - **Comportamento Atteso:** Il path relativo del file sorgente determina automaticamente la posizione nell'albero dei moduli.
 
 5. **Rust**
-   - **Meccanismo Ibrido:** Usa sia il File System che blocchi Inline.
-   - **Nota:** Rust permette sia di montare file come moduli (`mod x;` caricherà `x.rs`), facendo corrispondere file system e FQN, sia di dichiarare sottomoduli inline (`mod x { ... }`).
-   - **Comportamento atteso:** Il file determina il modulo base, ma all'interno del file si possono creare ulteriori sottomoduli tramite blocchi AST.
+   - **Meccanismo Ibrido:** Combina file system e blocchi inline.
+   - **Nota:** Rust permette di montare file come moduli (`mod x;` caricherà il file `x.rs`), ancorando l'FQN al file system, e parallelamente di dichiarare sottomoduli in-memory (`mod x { ... }`).
+   - **Comportamento Atteso:** Il file determina il modulo base genitore, ma all'interno del file è consentito espandere l'albero tramite blocchi AST inline.
 
-## Refactoring Implementato: `ModuleConfig`
+---
 
-Come concordato, l'Enum monolitico `ModuleStrategy` è stato definitivamente sostituito con una struct di flag booleani (`ModuleConfig`), in cui ogni campo attiva o disattiva un meccanismo specifico in modo ortogonale. Questo rende l'architettura estremamente più flessibile e formalmente corretta.
+## 2. L'Architettura `ModuleConfig`
 
-L'implementazione attuale in `src/config.rs` definisce i seguenti 5 assi ortogonali:
+Per riflettere la natura ibrida descritta, il sistema adotta una struct di configurazione formata da flag booleani indipendenti, denominata `ModuleConfig`. Ogni asse attiva o disattiva un meccanismo specifico in maniera puramente ortogonale.
+
+L'implementazione (presente in `src/config.rs`) definisce i seguenti 5 assi comportamentali:
 
 ```rust
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ModuleConfig {
-    /// Se true, ogni file crea implicitamente un modulo con il suo nome (es. Python, Rust)
+    /// Se true, ogni file crea implicitamente un modulo omonimo (es. Python, Rust)
     pub file_based: bool,
     
-    /// Se true, l'albero delle directory modella la gerarchia dei moduli (es. Python, Rust)
+    /// Se true, l'albero delle directory modella attivamente la gerarchia (es. Python, Rust)
     pub directory_based: bool,
     
-    /// Se true, il linguaggio usa intestazioni a livello di file come `package x.y;` (es. Java)
+    /// Se true, il linguaggio usa intestazioni dichiarative `package x.y;` (es. Java)
     pub package_decl_based: bool,
     
-    /// Se true, il linguaggio usa blocchi AST interni al file del tipo `namespace x { ... }` (es. C++)
+    /// Se true, il linguaggio usa blocchi AST sintattici `namespace x { ... }` (es. C++)
     pub namespace_based: bool,
     
-    /// Se true, il linguaggio usa blocchi AST interni al file del tipo `mod x { ... }` (es. Rust)
+    /// Se true, il linguaggio usa blocchi AST sintattici per sottomoduli `mod x { ... }` (es. Rust)
     pub inline_mod_based: bool,
 }
 ```
 
-### Come mappano i linguaggi in questa nuova struttura
+### Configurazione per Linguaggio
 
-| Linguaggio | `file` | `directory` | `package_decl` | `namespace` | `inline_mod` |
-|------------|--------|-------------|----------------|-------------|--------------|
-| **C**      | False  | False       | False          | False       | False        |
-| **C++**    | False  | False       | False          | True        | False        |
-| **Java**   | False  | False       | True           | False       | False        |
-| **Python** | True   | True        | False          | False       | False        |
-| **Rust**   | True   | True        | False          | False       | True         |
+| Linguaggio | `file_based` | `directory_based` | `package_decl_based` | `namespace_based` | `inline_mod_based` |
+|------------|--------------|-------------------|----------------------|-------------------|--------------------|
+| **C**      | False        | False             | False                | False             | False              |
+| **C++**    | False        | False             | False                | True              | False              |
+| **Java**   | False        | False             | True                 | False             | False              |
+| **Python** | True         | True              | False                | False             | False              |
+| **Rust**   | True         | True              | False                | False             | True               |
 
-### Vantaggi Ottenuti
-1. **Semantica Corretta per il C:** Avendo tutti i flag a `false`, il C inserisce semplicemente tutte le dichiarazioni in `root`, il global scope atteso. Non è stato necessario introdurre alcun valore "None" speciale.
-2. **Supporto Ibrido (Rust):** Supportare Rust è diventato naturale, potendo attivare sia l'estrazione implicita dai file/directory (`file_based`, `directory_based`) sia l'intercettazione dei blocchi inline (`inline_mod_based`), senza che un paradigma escluda l'altro come accadeva con il vecchio Enum.
-3. **Formalizzazione Matematica (Tesi):** Nel documento LaTeX, questo set di assi di funzionalità booleane è molto più elegante e rigoroso da esprimere e schematizzare rispetto a un enumeratore arbitrario ed esclusivo. L'estrattore CST ora può semplicemente applicare le regole attivate componendole in sequenza.
+### Vantaggi dell'Astrazione Ortogonale
+
+1. **Semantica Naturale per il Global Scope:** Avendo tutti i flag impostati a `false`, il linguaggio C inietta correttamente le dichiarazioni nel *global scope* (il nodo `root`), senza necessitare di eccezioni o workaround logici.
+2. **Supporto Ibrido Trasparente:** Il supporto a linguaggi complessi come Rust diviene naturale. È possibile attivare simultaneamente l'estrazione implicita dai percorsi file/directory e l'intercettazione dei blocchi inline, combinando gli effetti anziché costringerli in un enumeratore esclusivo (come una classica enum `ModuleStrategy`).
+3. **Formalizzazione Teorica:** Nel contesto accademico e architetturale, questo set di assi di funzionalità booleane offre un approccio formale ed elegante, permettendo all'estrattore CST (Concrete Syntax Tree) di comporre le regole di analisi iterativamente e deterministicamente.

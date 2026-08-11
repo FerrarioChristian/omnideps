@@ -1,73 +1,56 @@
 # Problemi Identificati nella Fase 3 — Costruzione del Dependency Graph
 
-Analisi dei file `src/export/graph.rs`, `src/export/cytoscape.rs`, `src/export/summary.rs`.
+Questo documento analizza e riepiloga le soluzioni storiche apportate alla fase di generazione, deduplicazione ed esportazione del Dependency Graph (moduli `src/export/graph.rs`, `src/export/cytoscape.rs`, `src/export/summary.rs`).
 
-## Riepilogo Finale
+Allo stato attuale, i problemi riportati di seguito sono stati **completamente risolti**.
 
-| # | Problema | Gravità | File | Status e Spiegazione Soluzione |
+## Riepilogo
+
+| # | Sintomo | Gravità | File Coinvolti | Status e Spiegazione Soluzione |
 | --- | ---------- | --------- | ------ | -------------------------------- |
 | 1 | Archi duplicati non deduplicati | 🟢 Risolto | `cytoscape.rs` | Standardizzazione del `DependencyGraph` con Deduplicazione hash-based pre-export. |
 | 2 | `Inherits` vs `Implements` incoerente | 🟢 Risolto | `graph.rs` | Adozione del macro-arco universale `IsA` (Design Choice language-agnostic). |
 | 3 | Summary non conta metriche di risoluzione | 🟢 Risolto | `summary.rs` | Implementata Tree-Traversal esaustiva su tutti gli strati dell'IR. |
-| 4 | Nodi Cytoscape External troppo generici | 🟢 Risolto | `cytoscape.rs` | Scelta voluta per contenimento visual cluttering UI; dati esatti in JSON. |
+| 4 | Nodi Cytoscape External troppo generici | 🟢 Risolto | `cytoscape.rs` | Raggruppamento voluto per contenere il visual cluttering nell'interfaccia UI. |
 
-*Nota: I problemi legati alla vecchia architettura basata sul flattening (es. ImplBlock orfani, funzioni libere, type_ref matches, UsesLocalType) sono stati definitivamente eliminati con l'adozione della V4 (ScopeTree e Name Resolution su Query).*
+*Nota: I problemi legati all'architettura originaria basata sul flattening (es. ImplBlock orfani, funzioni libere, type_ref matches) sono stati superati e deprecati definitivamente con l'adozione del Query Engine.*
 
 ---
 
 ## 🟢 Problema 1: Possibili archi duplicati nella generazione
 
-**Gravità: Media** — Archi ridondanti nel grafo.
+### Sintomo
+Se una classe accedeva a multipli attributi dello stesso tipo, o se una funzione invocava reiteratamente lo stesso metodo di un'altra classe, il costruttore del grafo emetteva un arco distinto per ciascuna occorrenza. Ciò inflazionava le metriche architetturali e comprometteva la leggibilità nei tool di visualizzazione a causa di archi sovrapposti.
 
-### Descrizione Storica
-
-Se una classe aveva più attributi dello stesso tipo, o se una funzione invocava lo stesso metodo di un'altra classe multipli volte, il costruttore del grafo emetteva un nuovo arco per ciascuna occorrenza, inflazionando le metriche architetturali e intasando i tool di visualizzazione con linee sovrapposte.
-
-### Soluzione Implementata (Attuale)
-
-Il problema è stato **Risolto** implementando i tratti di equivalenza e ordinamento sull'entità arco all'interno del sistema di export. 
-Immediatamente prima che il grafo venga restituito e serializzato per Cytoscape, viene applicata una pipeline di deduplicazione (eliminazione dei duplicati logici). Questo garantisce che l'Output rappresenti un grafo semplice, essenziale per calcolare accoppiamenti (Coupling) reali tra componenti indipendenti dalle ripetizioni locali del codice.
+### Soluzione Implementata
+È stata implementata una logica formale di equivalenza e ordinamento per le entità arco all'interno del sistema di esportazione. Prima che il grafo venga serializzato per l'output, i risultati attraversano una pipeline logica di deduplicazione. Questo assicura che il Grafo delle Dipendenze sia topologicamente semplice (senza archi multipli tra la stessa coppia direzionale), risultando fondamentale per misurare il Coupling reale tra componenti.
 
 ---
 
 ## 🟢 Problema 2: `Inherits` vs `Implements` — semantica incoerente
 
-**Gravità: Media** — Confusione semantica nell'output.
+### Sintomo
+I linguaggi a singola ereditarietà ma con interfacce (come Java) impiegano keyword differenti (`implements` vs `extends`). Inizialmente, il sistema tentava di distinguere le due semantiche nell'IR, per poi fonderle indiscriminatamente come archi `Inherits`, perdendone la specificità originaria.
 
-### Descrizione Storica
-
-Linguaggi a singola ereditarietà ma con interfacce (come Java e C#) usano keyword diverse (`implements` vs `extends`). Inizialmente, il sistema tentava di mantenere questa distinzione in `super_types`, ma poi emetteva indiscriminatamente archi `Inherits` per tutti, perdendo la semantica.
-
-### Soluzione Implementata (Attuale / Design Choice)
-
-Il dilemma è stato risolto tramite una precisa **Design Choice** teorica. Per mantenere l'analizzatore *language-agnostic*, i costrutti specifici dei linguaggi a oggetti sono stati astratti. È stato introdotto un singolo arco universale, denominato **`IsA`** (o `inherits` a livello base), che rappresenta indistintamente sia l'ereditarietà di classe sia l'implementazione di interfacce o trait.
-Sotto il profilo del design architetturale a grana grossa, sapere che un modulo dipende da un'astrazione tramite ereditarietà o contratto comporta la medesima dipendenza polimorfica.
+### Soluzione Implementata (Design Choice)
+Il sistema è stato standardizzato per aderire a una logica *language-agnostic*. I costrutti polimorfici specifici dei linguaggi OO sono stati astratti introducendo un singolo arco universale, denominato **`IsA`** (o `inherits` a livello base). A fini macro-architetturali, tale astrazione modella in modo equivalente l'accoppiamento polimorfico derivante sia dall'ereditarietà di classe che dall'implementazione di contratti.
 
 ---
 
-## 🟢 Problema 3: Il summary non conta metodi né archi risolti/falliti
+## 🟢 Problema 3: Metriche di risoluzione incomplete nel Summary
 
-**Gravità: Media** — Informazione incompleta per analisi di qualità.
+### Sintomo
+Il modulo di sommario statistico (`summary.rs`) includeva metriche per i riferimenti risolti e falliti (`resolved_refs`, `unknown_refs`), ma queste restituivano sistematicamente valori pari a zero. La procedura di aggregazione contava esclusivamente i nodi primari senza ispezionare analiticamente i campi dipendenti.
 
-### Descrizione Storica
-
-Il file di sommario statistico (`summary.rs`) dichiarava contatori per i referimenti risolti e falliti (`resolved_refs`, `unknown_refs`), ma questi rimanevano inesorabilmente a 0 poiché la procedura contava solo il numero di nodi primari senza ispezionare le dichiarazioni di tipo dei loro attributi.
-
-### Soluzione Implementata (Attuale)
-
-Il problema è stato **Risolto** in modo completo in `src/export/summary.rs`. È stata scritta una logica di attraversamento (tree traversal) esaustiva (`count_refs_in_st` e `count_refs_in_func`). Tali procedure scendono ricorsivamente all'interno di tutti i componenti estratti (`super_types`, `fields`, `methods`, `nested_types`, `parameters`, `return_type`, `calls` e `instantiates`). 
-Questa logica estrae statistiche accurate anche nella V4 post-ScopeTree Resolution, contando ogni `TypeRef::Resolved` contro quelli falliti, rendendo affidabile il benchmarking della tesi.
+### Soluzione Implementata
+È stata introdotta una logica di attraversamento esaustivo (tree traversal) tramite le procedure `count_refs_in_st` e `count_refs_in_func`. Tali funzioni esplorano ricorsivamente l'intera IR post-risoluzione, ispezionando nel dettaglio `super_types`, `fields`, `methods`, `nested_types`, `parameters`, `return_type`, `calls` e `instantiates`. Questa metrica è ora accurata e utilizzabile per validare il tasso di successo del benchmark.
 
 ---
 
-## 🟢 Problema 4: L'esportazione Cytoscape crea nodi "External" senza distinguere il tipo reale
+## 🟢 Problema 4: Raggruppamento Nodi "External" in Cytoscape
 
-**Gravità: Bassa** — Informazione persa nella visualizzazione.
+### Sintomo
+Durante la risoluzione di dipendenze verso classi o pacchetti esterni al progetto (es. librerie standard), il plug-in di esportazione Cytoscape generava sistematicamente un nodo aggregatore denominato `"External"`, nascondendo nell'interfaccia grafica l'identità formale del bersaglio (es. `"String"`, `"ArrayList"`).
 
-### Descrizione Storica
-
-Se l'analizzatore incontrava una dipendenza verso una classe esterna o sconosciuta (non presente nel progetto, es. librerie standard), il plug-in di esportazione Cytoscape disegnava un nodo nominandolo sempre e solo `"External"`, perdendo l'identità del target (es. `"String"`, `"ArrayList"`).
-
-### Soluzione Implementata (Attuale / Design Choice)
-
-Classificata come **Design Choice**. Cytoscape funge unicamente da visualizzatore macro-strutturale interattivo. Raggruppare tutte le innumerevoli classi delle librerie esterne sotto un singolo nodo di escape (`External`) è fondamentale per prevenire il *visual cluttering* (esplosione dei nodi sullo schermo che rende invisibile la topologia reale del progetto locale in esame). L'identità formale esatta della dipendenza esterna è comunque preservata al 100% all'interno dell'esportazione testuale/JSON, che resta il vero artefatto dell'analisi.
+### Soluzione Implementata (Design Choice)
+La scelta architetturale è stata riconfermata. Raggruppare le classi di libreria non analizzate sotto un singolo hub (`External`) è una misura necessaria per prevenire il *visual cluttering* sulla UI interattiva. L'identità logica esatta della dipendenza esterna è comunque preservata integralmente nell'artefatto principale (il JSON raw), permettendo analisi programmatiche e data-mining approfonditi.
