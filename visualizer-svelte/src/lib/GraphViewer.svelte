@@ -15,6 +15,9 @@
 
     let selectedNode = $state(null);
     let sidebarActive = $state(false);
+    
+    let inDegreeExpanded = $state(false);
+    let outDegreeExpanded = $state(false);
 
     // Filters
     let structChecked = $state(true);
@@ -92,13 +95,36 @@
             cy.elements().addClass('dimmed');
             context.removeClass('dimmed');
 
+            let inEdges = [];
+            node.incomers('edge').forEach(e => {
+                inEdges.push({
+                    label: e.data('label'),
+                    sourceId: e.source().data('id'),
+                    sourceLabel: e.source().data('label') || e.source().data('id').split('::').pop()
+                });
+            });
+            
+            let outEdges = [];
+            node.outgoers('edge').forEach(e => {
+                outEdges.push({
+                    label: e.data('label'),
+                    targetId: e.target().data('id'),
+                    targetLabel: e.target().data('label') || e.target().data('id').split('::').pop()
+                });
+            });
+
+            inDegreeExpanded = false;
+            outDegreeExpanded = false;
+
             selectedNode = {
                 name: node.data('label') || node.data('id').split('::').pop(),
                 type: node.data('type') || 'Module',
                 indegree: node.indegree(false),
                 outdegree: node.outdegree(false),
                 id: node.data('id'),
-                parent: node.data('parent')
+                parent: node.data('parent'),
+                inEdges,
+                outEdges
             };
             sidebarActive = true;
         });
@@ -334,6 +360,35 @@
     .filter-section .filter-content {
         padding: 10px;
     }
+
+    .edge-list {
+        background: rgba(0, 0, 0, 0.2);
+        padding: 10px;
+        border-radius: 6px;
+        margin-bottom: 15px;
+        margin-top: 5px;
+        font-size: 12px;
+        max-height: 200px;
+        overflow-y: auto;
+    }
+    .edge-item {
+        margin-bottom: 8px;
+        padding-bottom: 8px;
+        border-bottom: 1px solid rgba(255,255,255,0.1);
+        word-break: break-all;
+    }
+    .edge-item:last-child {
+        margin-bottom: 0;
+        padding-bottom: 0;
+        border-bottom: none;
+    }
+    .edge-label {
+        color: #e74c3c;
+        font-weight: bold;
+    }
+    .edge-node {
+        color: #3498db;
+    }
 </style>
 
 <!-- Content -->
@@ -435,8 +490,53 @@
     {#if selectedNode}
         <h3 id="sb-type">{selectedNode.type}</h3>
         <h2 id="sb-name">{selectedNode.name}</h2>
-        <div class="sidebar-stat" style="margin-top: 15px;"><span>In-Degree (Riceve da)</span><strong id="sb-indegree">{selectedNode.indegree}</strong></div>
-        <div class="sidebar-stat"><span>Out-Degree (Punta a)</span><strong id="sb-outdegree">{selectedNode.outdegree}</strong></div>
+        <!-- svelte-ignore a11y_click_events_have_key_events, a11y_interactive_supports_focus -->
+        <div class="sidebar-stat" style="margin-top: 15px; cursor: pointer; display: flex; align-items: center;" onclick={() => inDegreeExpanded = !inDegreeExpanded} role="button">
+            <span style="display: flex; align-items: center; gap: 5px;">In-Degree (Riceve da) 
+                <span style="display: flex;">
+                    {#if inDegreeExpanded}
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                    {:else}
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                    {/if}
+                </span>
+            </span>
+            <strong id="sb-indegree">{selectedNode.indegree}</strong>
+        </div>
+        {#if inDegreeExpanded && selectedNode.inEdges.length > 0}
+            <div class="edge-list">
+                {#each selectedNode.inEdges as edge}
+                    <div class="edge-item">
+                        <span class="edge-label">{edge.label}</span> da 
+                        <span class="edge-node" title={edge.sourceId}>{edge.sourceLabel}</span>
+                    </div>
+                {/each}
+            </div>
+        {/if}
+
+        <!-- svelte-ignore a11y_click_events_have_key_events, a11y_interactive_supports_focus -->
+        <div class="sidebar-stat" style="cursor: pointer; display: flex; align-items: center;" onclick={() => outDegreeExpanded = !outDegreeExpanded} role="button">
+            <span style="display: flex; align-items: center; gap: 5px;">Out-Degree (Punta a) 
+                <span style="display: flex;">
+                    {#if outDegreeExpanded}
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                    {:else}
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                    {/if}
+                </span>
+            </span>
+            <strong id="sb-outdegree">{selectedNode.outdegree}</strong>
+        </div>
+        {#if outDegreeExpanded && selectedNode.outEdges.length > 0}
+            <div class="edge-list">
+                {#each selectedNode.outEdges as edge}
+                    <div class="edge-item">
+                        <span class="edge-label">{edge.label}</span> verso 
+                        <span class="edge-node" title={edge.targetId}>{edge.targetLabel}</span>
+                    </div>
+                {/each}
+            </div>
+        {/if}
         <div id="sb-extra">
             <strong>Percorso Assoluto:</strong><br/>{selectedNode.id}
             {#if selectedNode.parent}

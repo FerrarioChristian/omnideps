@@ -69,12 +69,12 @@
 
 <style>
     .reports-container {
-        padding: 20px;
+        padding: 20px 20px 80px 20px;
         max-width: 95vw;
         margin: 0 auto;
         color: #ecf0f1;
         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-        height: calc(100vh - 60px); /* Adjust for navbar */
+        height: 100vh;
         overflow-y: auto;
         box-sizing: border-box;
     }

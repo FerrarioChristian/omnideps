@@ -28,7 +28,12 @@ export async function GET() {
         files = files.concat(walkDir(benchGenerics));
     }
     if (fs.existsSync(benchSuites)) {
-        files = files.concat(walkDir(benchSuites));
+        const items = fs.readdirSync(benchSuites, { withFileTypes: true });
+        for (const item of items) {
+            if (item.isDirectory() && item.name.startsWith('benchmark-')) {
+                files.push(path.join(benchSuites, item.name));
+            }
+        }
     }
     
     // Make paths relative to project root for nicer display

@@ -9,6 +9,39 @@
     let isLoading = $state(true);
     let isContentLoading = $state(false);
     let openDirs = $state({});
+    let isSidebarOpen = $state(true);
+    let sidebarWidth = $state(300);
+    let isResizing = $state(false);
+
+    function toggleSidebar() {
+        isSidebarOpen = !isSidebarOpen;
+    }
+
+    function startResize(e) {
+        isResizing = true;
+        if (typeof document !== 'undefined') {
+            document.body.style.cursor = 'ew-resize';
+            document.body.style.userSelect = 'none';
+        }
+    }
+
+    function doResize(e) {
+        if (!isResizing) return;
+        let newWidth = e.clientX;
+        if (newWidth < 200) newWidth = 200;
+        if (newWidth > window.innerWidth * 0.5) newWidth = window.innerWidth * 0.5;
+        sidebarWidth = newWidth;
+    }
+
+    function stopResize() {
+        if (isResizing) {
+            isResizing = false;
+            if (typeof document !== 'undefined') {
+                document.body.style.cursor = '';
+                document.body.style.userSelect = '';
+            }
+        }
+    }
 
     onMount(async () => {
         try {
@@ -57,22 +90,37 @@
     });
 </script>
 
+<svelte:window onmousemove={doResize} onmouseup={stopResize} />
+
 <style>
     .docs-container {
         display: flex;
-        height: calc(100vh - 60px);
+        height: 100vh;
         background-color: #121212;
         color: #ecf0f1;
     }
     
     .sidebar {
-        width: 300px;
-        min-width: 250px;
+        min-width: 200px;
+        max-width: 50vw;
         background: rgba(30, 30, 30, 0.5);
         border-right: 1px solid #333;
         overflow-y: auto;
-        padding: 10px 5px;
+        overflow-x: hidden;
+        padding: 10px 5px 80px 5px;
         box-sizing: border-box;
+    }
+    
+    .resizer {
+        width: 4px;
+        background: transparent;
+        cursor: ew-resize;
+        transition: background 0.2s;
+        z-index: 10;
+        flex-shrink: 0;
+    }
+    .resizer:hover, .resizer.active {
+        background: #0969da;
     }
     
     .content-area {
@@ -90,12 +138,28 @@
         font-weight: bold;
         font-size: 18px;
         color: #3498db;
+        display: flex;
+        align-items: center;
+    }
+    
+    .toggle-btn {
+        background: transparent;
+        border: none;
+        color: #ecf0f1;
+        cursor: pointer;
+        font-size: 16px;
+        margin-right: 15px;
+        padding: 5px;
+        transition: color 0.2s;
+    }
+    .toggle-btn:hover {
+        color: #3498db;
     }
     
     .viewer {
         flex-grow: 1;
         overflow-y: auto;
-        padding: 30px;
+        padding: 30px 30px 80px 30px;
         box-sizing: border-box;
     }
 
@@ -241,20 +305,31 @@
     </ul>
 {/snippet}
 
-<div class="docs-container">
-    <div class="sidebar">
-        {#if isLoading}
-            <div style="text-align: center; margin-top: 20px; color: #888;">Caricamento...</div>
-        {:else if tree.length === 0}
-            <div style="text-align: center; margin-top: 20px; color: #888;">Nessun file trovato.</div>
-        {:else}
-            {@render renderTree(tree)}
-        {/if}
-    </div>
+<div class="docs-container" class:resizing={isResizing}>
+    {#if isSidebarOpen}
+        <div class="sidebar" style="width: {sidebarWidth}px;">
+            {#if isLoading}
+                <div style="text-align: center; margin-top: 20px; color: #888;">Caricamento...</div>
+            {:else if tree.length === 0}
+                <div style="text-align: center; margin-top: 20px; color: #888;">Nessun file trovato.</div>
+            {:else}
+                {@render renderTree(tree)}
+            {/if}
+        </div>
+        <!-- svelte-ignore a11y_no_static_element_interactions -->
+        <div class="resizer" class:active={isResizing} onmousedown={startResize}></div>
+    {/if}
     
     <div class="content-area">
         {#if selectedFile}
             <div class="header">
+                <button class="toggle-btn" onclick={toggleSidebar} title="Toggle Sidebar">
+                    {#if isSidebarOpen}
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                    {:else}
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                    {/if}
+                </button>
                 {selectedFile.path}
             </div>
             <div class="viewer">
@@ -277,6 +352,16 @@
                 {/if}
             </div>
         {:else}
+            <div class="header">
+                <button class="toggle-btn" onclick={toggleSidebar} title="Toggle Sidebar">
+                    {#if isSidebarOpen}
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                    {:else}
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                    {/if}
+                </button>
+                Documentazione
+            </div>
             <div class="loading-center" style="font-size: 1.2em;">
                 Seleziona un documento dalla barra laterale per visualizzarlo.
             </div>
