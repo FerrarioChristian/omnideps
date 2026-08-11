@@ -244,6 +244,13 @@ fn apply_directory_strategy(
         })
         .collect();
 
+    // Remove common source roots from the beginning of the path
+    if let Some(first) = path_components.first() {
+        if matches!(first.as_str(), "src" | "lib" | "include") {
+            path_components.remove(0);
+        }
+    }
+
     if let Some(last) = path_components.last_mut()
         && let Some(stem) = std::path::Path::new(last).file_stem()
     {

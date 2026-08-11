@@ -187,12 +187,26 @@ pub fn try_parse_impl_block(
     })
 }
 
+fn sanitize_import_path(raw_text: &str) -> Vec<String> {
+    let mut txt = raw_text.replace("\"", "").replace("<", "").replace(">", "");
+    if txt.starts_with("crate::") {
+        txt = txt.replace("crate::", "");
+    }
+    for ext in [".hpp", ".cpp", ".h", ".c", ".ts", ".js"] { // Added common JS/TS extensions too as bonus for language agnostic
+        if txt.ends_with(ext) {
+            txt = txt[..txt.len() - ext.len()].to_string();
+            break;
+        }
+    }
+    txt = txt.replace("/", "::");
+    split_qualified_name(&txt)
+}
+
 pub fn try_parse_imports(node: Node, source: &str) -> Option<Vec<Import>> {
     let kind = node.kind();
     if !kind.contains("import")
         && !kind.contains("use")
         && kind != "using_declaration"
-        && kind != "preproc_include"
     {
         return None;
     }
@@ -251,11 +265,8 @@ pub fn try_parse_imports(node: Node, source: &str) -> Option<Vec<Import>> {
             .or_else(|| node.child_by_field_name("name"))
             .or_else(|| node.child_by_field_name("path"))
         {
-            let mut p_text = node_text(p_node, source);
-            if p_text.starts_with("crate::") {
-                p_text = p_text.replace("crate::", "");
-            }
-            split_qualified_name(&p_text)
+            let p_text = node_text(p_node, source);
+            sanitize_import_path(&p_text)
         } else {
             // Fallback for preproc_include or generic imports
             let mut p = vec![];
@@ -270,11 +281,8 @@ pub fn try_parse_imports(node: Node, source: &str) -> Option<Vec<Import>> {
                         | "system_lib_string"
                         | "string_literal"
                 ) {
-                    let txt = node_text(child, source)
-                        .replace("\"", "")
-                        .replace("<", "")
-                        .replace(">", "");
-                    p = split_qualified_name(&txt);
+                    let txt = node_text(child, source);
+                    p = sanitize_import_path(&txt);
                     // For using_declaration we DO want to break here since the identifier is the path
                     break;
                 }
