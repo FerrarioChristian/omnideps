@@ -1338,5 +1338,23 @@ struct User {
     
     <p>Questo meccanismo permette di astrarre i dettagli fisici del filesystem mantenendo coerente il lexical scoping a livello di <em>Workspace Globale</em>. Nel momento in cui i moduli unificati passano alla Fase 2 (Name Resolution), i resolver navigheranno tra i moduli indipendentemente dal fatto che provenissero o meno dallo stesso file, rendendo il <em>Query Engine</em> interamente agnostico.</p>
 
+    <h2>7. Euristiche Strutturali Agnostiche (Focus: C/C++)</h2>
+    <p>Le iterazioni recenti dell'analizzatore hanno esteso il supporto a pattern sintattici complessi, particolarmente frequenti in C e C++, senza introdurre logiche hardcoded basate sul nome del linguaggio (<code class="language-rust">lang_name</code>), ma affidandosi unicamente all'ispezione della struttura dell'albero sintattico (CST).</p>
+    
+    <div class="card">
+        <h3>A. Discesa Ricorsiva dei Declarator</h3>
+        <p>In C/C++, le dichiarazioni di funzioni e variabili sono modellate come nodi generici <code>declaration</code> contenenti costrutti annidati (es. <code>function_declarator</code>, <code>pointer_declarator</code>). L'estrattore non assume che l'identificatore si trovi al primo livello; al contrario, esegue una ricerca ricorsiva scendendo nell'albero finché non individua l'identificatore base o l'elenco dei parametri, consentendo l'estrazione robusta di <strong>funzioni che ritornano puntatori</strong> o di <strong>alias (typedef) complessi</strong>.</p>
+    </div>
+
+    <div class="card">
+        <h3>B. Classificazione Contestuale Globale vs Locale</h3>
+        <p>Per distinguere una variabile globale da una locale (che in C generano entrambe il nodo <code>declaration</code>), l'euristica risale la catena dei nodi padri (parent chain). Se la dichiarazione è annidata all'interno di un <code>compound_statement</code> o di una <code>function_definition</code>, viene classificata come variabile locale; se il genitore è un <code>translation_unit</code> o un <code>declaration_list</code>, viene estratta come variabile globale. Questo approccio garantisce l'astrazione rispetto al linguaggio.</p>
+    </div>
+    
+    <div class="card">
+        <h3>C. Estrazione del Ricevitore in Field Expressions</h3>
+        <p>Nei linguaggi orientati agli oggetti come C++, gli accessi ai membri (es. <code>obj.method()</code> o <code>obj->method()</code>) generano nodi <code>field_expression</code>. Per tracciare correttamente la dipendenza verso il tipo del ricevitore (es. il tipo di <code>obj</code>), l'estrattore intercetta esplicitamente il campo <code>argument</code> (oltre al tradizionale <code>object</code> tipico di Java) che ospita la variabile di partenza nell'AST C/C++.</p>
+    </div>
+
 </body>
 </html>

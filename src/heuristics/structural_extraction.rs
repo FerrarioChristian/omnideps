@@ -218,7 +218,22 @@ pub fn extract_nested_types(
 /// Extracts formal parameters from a function or method signature.
 pub fn extract_parameters(node: Node, source: &str) -> Vec<Parameter> {
     let mut params = vec![];
-    if let Some(params_node) = node.child_by_field_name("parameters") {
+    let mut params_node_opt = node.child_by_field_name("parameters");
+    
+    // If not found, look inside the declarator (for C/C++)
+    if params_node_opt.is_none() {
+        if let Some(declarator) = node.child_by_field_name("declarator") {
+            params_node_opt = declarator.child_by_field_name("parameters");
+            // Sometimes it's nested even deeper (e.g., pointer_declarator -> function_declarator)
+            if params_node_opt.is_none() {
+                if let Some(inner) = declarator.child_by_field_name("declarator") {
+                    params_node_opt = inner.child_by_field_name("parameters");
+                }
+            }
+        }
+    }
+
+    if let Some(params_node) = params_node_opt {
         let mut cursor = params_node.walk();
         for p in params_node.children(&mut cursor) {
             let p_kind = p.kind();

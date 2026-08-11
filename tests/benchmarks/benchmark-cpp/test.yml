@@ -9,6 +9,8 @@ files:
 - src/Fleet.h
 - src/Fleet.cpp
 - src/annotations.cpp
+- src/untested_features.hpp
+- src/untested_features.cpp
 nodes:
 - name: Transport
   kind: namespace
@@ -78,6 +80,22 @@ nodes:
   kind: external
 - name: maybe_unused
   kind: external
+- name: Box
+  kind: class
+- name: Box.value
+  kind: field
+- name: Box.getValue
+  kind: method
+- name: MathLib.Calculator
+  kind: class
+- name: MathLib.Calculator.add
+  kind: method
+- name: MULTIPLY
+  kind: macro
+- name: use_box
+  kind: function
+- name: use_math
+  kind: function
 edges:
 - testid: UNION-DECL
   source: Transport.Vehicle.spec
@@ -208,3 +226,19 @@ edges:
   source: "MyStruct.field"
   sink: "maybe_unused"
   kind: "annotated_with"
+- testid: CPP-USE-BOX
+  source: use_box
+  sink: Box
+  kind: uses_param_type
+- testid: CPP-USE-MATHLIB
+  source: use_math
+  sink: MathLib.Calculator
+  kind: uses_local_type
+- testid: CPP-CALL-ADD
+  source: use_math
+  sink: MathLib.Calculator.add
+  kind: calls
+- testid: CPP-CALL-MULTIPLY
+  source: use_math
+  sink: MULTIPLY
+  kind: calls

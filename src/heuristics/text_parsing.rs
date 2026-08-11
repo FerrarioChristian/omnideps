@@ -45,6 +45,49 @@ pub fn extract_name_from_text(text: &str) -> Option<QualifiedName> {
     Some(split_qualified_name(trimmed))
 }
 
+/// Helper to extract an identifier from a declarator node, unwrapping nested declarators (typical of C/C++).
+fn extract_identifier_from_declarator(mut decl: Node, source: &str) -> Option<String> {
+    while let Some(next) = decl.child_by_field_name("declarator") {
+        decl = next;
+    }
+
+    if decl.kind() == "scoped_identifier" || decl.kind() == "qualified_identifier" {
+        let text = node_text(decl, source).trim().to_string();
+        if !text.is_empty() {
+            return Some(text);
+        }
+    }
+
+    if let Some(n) = decl.child_by_field_name("name") {
+        let text = node_text(n, source).trim().to_string();
+        if !text.is_empty() {
+            return Some(text);
+        }
+    }
+
+    let text = node_text(decl, source).trim().to_string();
+    if decl.kind() == "identifier" || decl.kind() == "type_identifier" || decl.kind() == "pattern" || decl.kind() == "field_identifier" || decl.kind() == "destructor_name" {
+        if !text.is_empty() {
+            return Some(text);
+        }
+    }
+
+    // Take just the name before '(' or '='
+    let name_part = text
+        .split('(')
+        .next()
+        .unwrap_or(text.as_str())
+        .split('=')
+        .next()
+        .unwrap_or("")
+        .trim()
+        .to_string();
+    if !name_part.is_empty() {
+        return Some(name_part);
+    }
+    None
+}
+
 /// Tries to extract a simple identifier (string) from common child field names.
 pub fn extract_identifier(node: Node, source: &str) -> Option<String> {
     if matches!(
@@ -54,6 +97,13 @@ pub fn extract_identifier(node: Node, source: &str) -> Option<String> {
         let text = node_text(node, source).trim().to_string();
         if !text.is_empty() {
             return Some(text);
+        }
+    }
+
+    // For C/C++ style declarations with nested declarators
+    if let Some(decl) = node.child_by_field_name("declarator") {
+        if let Some(ident) = extract_identifier_from_declarator(decl, source) {
+            return Some(ident);
         }
     }
 
@@ -67,47 +117,6 @@ pub fn extract_identifier(node: Node, source: &str) -> Option<String> {
         let text = node_text(n, source).trim().to_string();
         if !text.is_empty() {
             return Some(text);
-        }
-    }
-
-    if let Some(mut decl) = node.child_by_field_name("declarator") {
-        while let Some(next) = decl.child_by_field_name("declarator") {
-            decl = next;
-        }
-
-        if decl.kind() == "scoped_identifier" || decl.kind() == "qualified_identifier" {
-            let text = node_text(decl, source).trim().to_string();
-            if !text.is_empty() {
-                return Some(text);
-            }
-        }
-
-        if let Some(n) = decl.child_by_field_name("name") {
-            let text = node_text(n, source).trim().to_string();
-            if !text.is_empty() {
-                return Some(text);
-            }
-        }
-
-        let text = node_text(decl, source).trim().to_string();
-        if decl.kind() == "identifier" || decl.kind() == "type_identifier" || decl.kind() == "pattern" || decl.kind() == "field_identifier" || decl.kind() == "destructor_name" {
-            if !text.is_empty() {
-                return Some(text);
-            }
-        }
-
-        // Take just the name before '(' or '='
-        let name_part = text
-            .split('(')
-            .next()
-            .unwrap_or(text.as_str())
-            .split('=')
-            .next()
-            .unwrap_or("")
-            .trim()
-            .to_string();
-        if !name_part.is_empty() {
-            return Some(name_part);
         }
     }
 

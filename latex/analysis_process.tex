@@ -84,11 +84,17 @@ costruzione dei componenti dell'IR:
     \mathcal{S}_{code} \to \vec{P}$ \\
     Estrae la lista dei parametri di una funzione, preservando
     ordine, tipi e variadicità.
-  \item $\text{extract\_super\_types} : \mathcal{N} \times
+    \item $\text{extract\_super\_types} : \mathcal{N} \times
     \mathcal{S}_{code} \to \vec{\tau}$ \\
     Estrae i riferimenti alle gerarchie di ereditarietà o
     implementazione di trait (gestendo anche sintassi specifiche come
     i Trait Bounds in Rust).
+\end{itemize}
+
+L'astrazione di queste funzioni è supportata da euristiche puramente \textit{strutturali}, prive di regole cablate per linguaggio. Ad esempio:
+\begin{itemize}
+    \item \textbf{Discesa Strutturale dei Declarator:} In linguaggi complessi come C e C++, l'identificatore base o l'elenco parametri possono trovarsi annidati all'interno di molteplici nodi (es. \texttt{pointer\_declarator}, \texttt{function\_declarator}). Gli estrattori discendono ricorsivamente l'AST fino a identificare le foglie semantiche, garantendo flessibilità per alias o puntatori a funzione.
+    \item \textbf{Classificazione Contestuale:} L'analizzatore identifica variabili globali e locali non dal tipo del nodo (spesso identico, es. \texttt{declaration}), ma ispezionando l'ambiente parentale (es. escludendo dichiarazioni interne a blocchi di codice \texttt{compound\_statement}).
 \end{itemize}
 
 \section{Fase 2: Risoluzione dei Nomi e Motore a Query ($R$)}

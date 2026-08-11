@@ -207,7 +207,10 @@ casi peculiari, il motore implementa funzionalità guidate da
     functions} la cui firma indica un'appartenenza a una classe (es.
     \texttt{Class::method()}) e le ricolloca chirurgicamente nello
     scope della rispettiva classe, risolvendo la scissione tra header
-    e implementazione.
+    e implementazione. A tale scopo, la risoluzione dello scope 
+    di destinazione supporta un \textit{Global Scope Fallback},
+    permettendo di localizzare correttamente la classe genitrice 
+    anche quando definita in file differenti (es. \texttt{.h} vs \texttt{.cpp}).
   \item \textbf{Implicit First Parameter as Self}: Per linguaggi come
     Python, il primo parametro di un metodo d'istanza viene
     automaticamente registrato nello Scope della funzione come

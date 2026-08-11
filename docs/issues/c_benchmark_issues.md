@@ -60,3 +60,31 @@ Il modulo `body_extraction.rs` rileva correttamente `active_callback(1)` come `c
 
 **Possibile Soluzione:**
 In `executor.rs`, durante l'esecuzione di una query con intento `Call`, se il bersaglio risolto è una variabile o un campo (quindi un puntatore a funzione in C), l'esecutore dovrebbe automaticamente risalire al *tipo* di quella variabile (il typedef associato) e redirigere l'arco verso di esso.
+
+---
+
+## Problemi risolti successivamente 
+
+## 5. Parametri mancanti nelle dichiarazioni di funzioni (Scope resolution fallita)
+**Sintomo:** Le query `Find("rect")` all'interno di `calculate_area` fallivano. Di conseguenza, l'analizzatore non riusciva a tracciare l'accesso ai campi `rect->width` e `rect->height`.
+**Causa:** In C, le dichiarazioni di funzioni nei file header (es. `shapes.h`) vengono parsate dall'AST come nodi `declaration`, in cui i parametri si trovano annidati all'interno di un `declarator` (nello specifico `function_declarator`). La funzione `extract_parameters` cercava i parametri solo al primo livello del nodo. Questo portava alla creazione di uno scope senza parametri per le dichiarazioni. L'`executor` successivamente, trovando per primo lo scope della dichiarazione (dal file `.h`), falliva la risoluzione del parametro usato nel body (nel file `.c`).
+**Soluzione:** Modificata la funzione `extract_parameters` in `src/heuristics/structural_extraction.rs` per cercare ricorsivamente il campo `parameters` all'interno dei nodi `declarator` annidati.
+
+## 6. Classificazione errata di variabili libere e funzioni in C
+**Sintomo:** Le variabili globali (come `global_counter` e `active_callback`) non venivano rilevate, e le dichiarazioni di funzioni (come `create_point` in `pointers.h`) causavano conflitti essendo classificate erroneamente o non classificate.
+**Causa:** 
+1. La funzione `is_free_variable` non gestiva i nodi `declaration` o `variable_declaration` per il C, saltando l'estrazione delle variabili globali.
+2. La funzione `is_function` non riconosceva i nodi `declaration` contenenti un `function_declarator` annidato come dichiarazioni di funzioni in C/C++.
+3. La funzione `extract_identifier` restituiva l'intera signature al posto del solo identificatore nel caso in cui il `function_declarator` fosse annidato all'interno di un `pointer_declarator`.
+**Soluzione:** 
+- Aggiornata `is_function` in `src/heuristics/classifiers.rs` per riconoscere le dichiarazioni di funzioni cercando ricorsivamente `function_declarator` nei nodi `declaration`.
+- Aggiornata `is_free_variable` per includere `declaration` e `variable_declaration`, avendo cura di escludere esplicitamente le dichiarazioni di funzioni gestite sopra esplorando ricorsivamente l'esistenza di `function_declarator`.
+- Aggiornata `extract_identifier` in `src/heuristics/text_parsing.rs` in modo da scendere ricorsivamente in tutti i `declarator` annidati fino a trovare l'identificatore base della funzione/variabile, e fare comunque lo split sul carattere `(` per maggiore sicurezza nel processare le raw string di C.
+
+## 7. Errori nel codice e nelle aspettative del benchmark (`main.c` e `test.yml`)
+**Sintomo:** Mancavano gli archi per `Circle.radius`, `Rectangle.width`, `Rectangle.height` in `main.c`, e la chiamata a puntatore a funzione `trigger_callback -> ActionCallback`.
+**Causa & Soluzioni:**
+1. **Shadowing variabile:** Nel file `main.c`, la variabile `c` di tipo `Circle` veniva sovrascritta (re-dichiarata) da `int c = color_to_int(BLUE);` nello stesso blocco. Questo causava la risoluzione di `c` come `int` anziché `Circle`. Rinominata la seconda variabile in `color_val`.
+2. **Accessi impliciti non estratti:** L'inizializzazione posizionale di struct `struct Rectangle rect = {10, 5};` non produce accessi ai campi nell'AST. Aggiunti gli accessi espliciti (`rect.width = 10;`) in `main.c` per permetterne la validazione.
+3. **Modellazione puntatori a funzione:** Il benchmark si aspettava `trigger_callback -> ActionCallback (Calls)`. Il comportamento corretto dell'analizzatore modella questo flusso come `trigger_callback -> active_callback (Calls)` e `active_callback -> ActionCallback (UsesFieldType)`. Aggiornate le aspettative in `test.yml` per rispecchiare questa corretta modellazione.
+

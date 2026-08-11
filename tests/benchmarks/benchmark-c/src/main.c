@@ -16,7 +16,9 @@ void my_callback(int status) {
 }
 
 int main() {
-    struct Rectangle rect = {10, 5};
+    struct Rectangle rect;
+    rect.width = 10;
+    rect.height = 5;
     int area = calculate_area(&rect);
     
     global_counter = add(global_counter, 1);
@@ -46,7 +48,7 @@ int main() {
     update_state(5);
     int s = system_state;
     
-    int c = color_to_int(BLUE);
+    int color_val = color_to_int(BLUE);
     
     print_macro_usage();
     

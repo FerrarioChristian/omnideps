@@ -1296,5 +1296,18 @@ struct User { name: String }</code></pre>
         vengono generati archi sia verso <code>STATIC_SA</code> che verso <code>StructA.x</code>).
     </p>
 
+    <h2>8. Euristiche Avanzate: C/C++ Out-Of-Line Methods</h2>
+    <p>Nei linguaggi che incoraggiano la separazione logica e fisica tra dichiarazione e definizione (come il C++ tramite file <code>.h</code> e <code>.cpp</code>), le definizioni delle funzioni membro vengono spesso dichiarate come funzioni libere al livello superiore, precedute dal nome della classe e dall'operatore di risoluzione di visibilità (es. <code>Fleet::addCar()</code>). Questo approccio porta alla costruzione di un <strong>ImplBlock</strong> temporaneo durante la Fase 1.</p>
+    
+    <div class="card">
+        <h3>Global Scope Fallback nell'Appiattimento</h3>
+        <p>Durante il caricamento e l'appiattimento degli ImplBlock nello <strong>Scope Tree</strong>, l'esecutore tenta di ricollocare chirurgicamente i metodi contenuti nell'ImplBlock all'interno della classe target (<code>Fleet</code>). Se la classe target non viene trovata nello scope lessicale corrente (poiché potrebbe essere stata dichiarata in un altro file incluso nel Workspace), l'algoritmo effettua un <strong>Global Scope Fallback</strong>: la ricerca della classe viene rilanciata a partire dal namespace root dell'intero albero. Una volta identificata l'entità target altrove nell'ambiente globale, il metodo out-of-line (es. <code>addCar</code>) viene spostato definitivamente all'interno dello scope della classe <code>Fleet</code>.</p>
+    </div>
+
+    <div class="card">
+        <h3>Eredità Lessicale</h3>
+        <p>La ricollocazione garantisce che il metodo out-of-line erediti automaticamente tutti i simboli, membri e metodi definiti dalla classe, indipendentemente da dove il metodo fosse originariamente implementato testualmente, risolvendo i problemi di visibilità degli scope.</p>
+    </div>
+
 </body>
 </html>

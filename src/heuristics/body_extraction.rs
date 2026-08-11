@@ -54,6 +54,12 @@ pub fn extract_block(node: Node, source: &str) -> crate::model::Block {
                 | "declaration"
                 | "for_range_loop"
                 | "for_in_statement"
+                | "for_statement"
+                | "while_statement"
+                | "do_statement"
+                | "if_statement"
+                | "else_clause"
+                | "switch_statement"
                 | "catch_clause"
         );
 
@@ -148,9 +154,15 @@ pub fn extract_block(node: Node, source: &str) -> crate::model::Block {
             accesses.extend(inner_accesses);
             type_casts.extend(inner_casts);
 
-            // Recurse into body/block if it's a loop or catch clause
+            // Recurse into body/block if it's a loop, conditional or catch clause
             if child.kind() == "for_range_loop"
                 || child.kind() == "for_in_statement"
+                || child.kind() == "for_statement"
+                || child.kind() == "while_statement"
+                || child.kind() == "do_statement"
+                || child.kind() == "if_statement"
+                || child.kind() == "else_clause"
+                || child.kind() == "switch_statement"
                 || child.kind() == "catch_clause"
             {
                 let mut gcursor = child.walk();
@@ -252,14 +264,15 @@ fn find_behavioral_deps(
     // --- Accesses ---
     if matches!(
         kind,
-        "field_access"
-            | "member_expression"
-            | "property_identifier"
-            | "member_access"
-            | "identifier"
+        "identifier"
             | "scoped_identifier"
             | "qualified_identifier"
+            | "field_identifier"
+            | "property_identifier"
+            | "member_expression"
             | "field_expression"
+            | "field_access"
+            | "member_access"
             | "attribute"
     ) {
         accesses.push(extract_type_ref(node, source));

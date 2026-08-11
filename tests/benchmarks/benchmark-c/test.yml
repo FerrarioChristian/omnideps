@@ -4,6 +4,8 @@ files:
 - src/math_utils.c
 - src/shapes.h
 - src/shapes.c
+- src/advanced.h
+- src/advanced.c
 - src/pointers.h
 - src/pointers.c
 - src/nested_structs.h
@@ -18,6 +20,8 @@ files:
 - src/enums.c
 - src/macros.h
 - src/macros.c
+- src/untested_features.h
+- src/untested_features.c
 nodes:
 - name: add
   kind: function
@@ -89,6 +93,34 @@ nodes:
   kind: struct
 - name: Circle.radius
   kind: field
+- name: Point3D
+  kind: struct
+- name: ConfigData
+  kind: struct
+- name: NodeData
+  kind: struct
+- name: LOG_NODE
+  kind: macro
+- name: use_point3d
+  kind: function
+- name: use_config
+  kind: function
+- name: use_node_data
+  kind: function
+- name: Point3D.x
+  kind: field
+- name: ConfigData.weight
+  kind: field
+- name: NodeData.id
+  kind: field
+- name: ComputeFunc
+  kind: typealias
+- name: execute_compute
+  kind: function
+- name: OpaqueStruct
+  kind: struct
+- name: get_opaque
+  kind: function
 edges:
 - testid: UNION-DECL
   source: Rectangle.data
@@ -226,3 +258,39 @@ edges:
   source: main
   sink: Circle.radius
   kind: accesses_field
+- testid: C-USE-POINT3D
+  source: use_point3d
+  sink: Point3D
+  kind: uses_param_type
+- testid: C-USE-CONFIG
+  source: use_config
+  sink: ConfigData
+  kind: uses_param_type
+- testid: C-USE-NODE-DATA
+  source: use_node_data
+  sink: NodeData
+  kind: uses_param_type
+- testid: C-CALL-MACRO-NODE
+  source: use_node_data
+  sink: LOG_NODE
+  kind: calls
+- testid: C-NEW-2
+  source: use_point3d
+  sink: Point3D.x
+  kind: accesses_field
+- testid: C-NEW-4
+  source: use_config
+  sink: ConfigData.weight
+  kind: accesses_field
+- testid: C-NEW-6
+  source: use_node_data
+  sink: NodeData.id
+  kind: accesses_field
+- testid: C-NEW-8
+  source: execute_compute
+  sink: ComputeFunc
+  kind: uses_param_type
+- testid: C-NEW-9
+  source: get_opaque
+  sink: OpaqueStruct
+  kind: uses_return_type
