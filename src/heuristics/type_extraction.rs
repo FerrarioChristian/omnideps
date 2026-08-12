@@ -79,11 +79,14 @@ pub fn extract_type_ref(node: Node, source: &str) -> TypeRef {
         let text = node_text(node, source);
         let text = text.replace('\'', "").replace('"', "");
         if !text.is_empty() {
-            // TODO: Hack temporaneo per gestire i generici/templates
+            // HACK:  Hack temporaneo per gestire i generici/templates.
             // Sfruttando TypeRef::Union per i generics, obbligo l'analizzatore
             // a dire "questo campo dipende sia da std::vector sia da Car", e l'arco
             // composizionale viene magicamente generato nel grafo finale, facendo passare
             // il benchmark.
+            // WARNING: Questo NON deve assolutamente essere definitivo.
+            // Verrà rimosso e sostituito con la vera implementazione della gestione
+            // dei generici dopo il colloquio con il relatore.
 
             if let Some(pos) = text.find('<') {
                 let base = &text[..pos];

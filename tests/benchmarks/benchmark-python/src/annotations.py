@@ -4,7 +4,7 @@ def my_decorator(func):
     return wrapper
 
 @my_decorator
-def decorated_function():
+def decorated_function() -> None:
     pass
 
 class DataClassMeta:

@@ -2,11 +2,11 @@ from models import Admin
 from typing import List
 
 class SuperAdmin(Admin):
-    def __init__(self, username, birth_year, role, permissions: List[str]):
+    def __init__(self, username: str, birth_year: int, role: str, permissions: List[str]) -> None:
         super().__init__(username, birth_year, role)
         self.permissions = permissions
 
-    def grant_permission(self, perm: str):
+    def grant_permission(self, perm: str) -> None:
         self.permissions.append(perm)
 
     @classmethod

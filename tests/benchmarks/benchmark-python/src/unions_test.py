@@ -6,8 +6,8 @@ class Dog:
 class Cat:
     pass
 
-def handle_animal(animal: Dog | Cat):
+def handle_animal(animal: Dog | Cat) -> None:
     pass
 
-def process_legacy(animal: Union[Dog, Cat]):
+def process_legacy(animal: Union[Dog, Cat]) -> None:
     pass

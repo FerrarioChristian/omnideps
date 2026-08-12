@@ -2,7 +2,7 @@ from models import User, Admin
 import utils
 import services
 
-def main():
+def main() -> None:
     admin = Admin("alice", 1990, "Moderator")
     
     admin.elevate_privileges()
