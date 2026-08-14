@@ -6,7 +6,8 @@ pub fn is_module(node: Node) -> bool {
         return false;
     }
     let kind = node.kind();
-    kind.contains("mod_item") || kind.contains("module") || kind.contains("namespace")
+    (kind.contains("mod_item") || kind.contains("module") || kind.contains("namespace"))
+        && !kind.contains("identifier")
 }
 
 /// Heuristically determines if a node is a file-level package declaration.

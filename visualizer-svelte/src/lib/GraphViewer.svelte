@@ -42,7 +42,7 @@
         'AccessesField': true
     });
 
-    let allNodesChecked = $state(true);
+    let allNodesChecked = $state(false);
     let nodeFilters = $state({
         'Module': true,
         'Class': true,
@@ -56,7 +56,7 @@
         'StructField': true,
         'ClassField': true,
         'Field': true,
-        'Primitive': true,
+        'Primitive': false,
         'External': true
     });
 
@@ -151,13 +151,15 @@
             uniformNodeDimensions: false,
             packComponents: true,
             step: "all",
-            idealEdgeLength: () => 50,
+            idealEdgeLength: () => 80,
             edgeElasticity: () => 0.45,
-            nodeRepulsion: () => 4500,
+            nodeRepulsion: () => 3000,
             gravity: 0.25,
             gravityRange: 3.8,
-            gravityCompound: 1.0,
+            gravityCompound: 25,
             gravityRangeCompound: 1.5,
+            numIter:4000,
+            nestingFactor: 0.05,
         }).run();
     }
 

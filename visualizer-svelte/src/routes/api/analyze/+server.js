@@ -40,7 +40,7 @@ export async function POST({ request }) {
         // We use cargo run from the project root
         const cmd = `cargo run --release --bin language-agnostic-analyzer -- "${targetPath}" --output "${outJson}"`;
         
-        await execAsync(cmd, { cwd: projectRoot });
+        await execAsync(cmd, { cwd: projectRoot, maxBuffer: 1024 * 1024 * 50 });
 
         // The CLI also generates cyto_output.json automatically alongside output.json
         const cytoOutJson = path.join(outDir, 'cyto_output.json');

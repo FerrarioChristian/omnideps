@@ -77,7 +77,18 @@ pub fn try_parse_structured_type(
 
     let methods = extract_methods(node, source);
     let super_types = extract_super_types(node, source);
-    let nested_types = extract_nested_types(node, source, lang_name, config);
+    let mut nested_types = extract_nested_types(node, source, lang_name, config);
+
+    // Remove unnamed nested types. These are usually the inner specifiers of a typedef
+    // (e.g., typedef struct { ... } Name) which we already hoisted the fields for above,
+    // or unreferenceable anonymous structs that shouldn't clutter the graph.
+    // Also remove the inner specifier if it has the exact same name as the typedef
+    // (e.g., typedef struct Point { ... } Point).
+    if node.kind() == "type_definition" {
+        nested_types.retain(|nt| nt.name != vec!["unnamed_type".to_string()] && nt.name != name);
+    } else {
+        nested_types.retain(|nt| nt.name != vec!["unnamed_type".to_string()]);
+    }
 
     let annotations = super::annotation_extraction::extract_annotations(node, source);
     println!("Type {:?} annotations: {:?}", name, annotations);
@@ -192,7 +203,8 @@ fn sanitize_import_path(raw_text: &str) -> Vec<String> {
     if txt.starts_with("crate::") {
         txt = txt.replace("crate::", "");
     }
-    for ext in [".hpp", ".cpp", ".h", ".c", ".ts", ".js"] { // Added common JS/TS extensions too as bonus for language agnostic
+    for ext in [".hpp", ".cpp", ".h", ".c", ".ts", ".js"] {
+        // Added common JS/TS extensions too as bonus for language agnostic
         if txt.ends_with(ext) {
             txt = txt[..txt.len() - ext.len()].to_string();
             break;
@@ -204,10 +216,7 @@ fn sanitize_import_path(raw_text: &str) -> Vec<String> {
 
 pub fn try_parse_imports(node: Node, source: &str) -> Option<Vec<Import>> {
     let kind = node.kind();
-    if !kind.contains("import")
-        && !kind.contains("use")
-        && kind != "using_declaration"
-    {
+    if !kind.contains("import") && !kind.contains("use") && kind != "using_declaration" {
         return None;
     }
 
