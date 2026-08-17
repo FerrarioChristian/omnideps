@@ -1,0 +1,455 @@
+\chapter{Background}
+\label{ch:background}
+
+This chapter introduces the fundamental concepts and technologies
+that form the basis of the architectural analysis process developed
+in this thesis. It begins by defining \textbf{software dependencies}
+and their representation through \textbf{graphs}, then examines
+traditional \textbf{static analysis} approaches, and finally details
+the parsing mechanisms and the \textbf{Tree-sitter} framework
+utilized in this work.
+
+\section{Software Dependencies}
+\label{sec:software_dependencies}
+
+In software engineering, a \textbf{dependency} exists when a
+component requires the presence or functionality of another component
+to perform its task or to compile correctly
+\cite{TODO:martin_clean_architecture}. Managing these dependencies is
+arguably one of the most critical aspects of software design. It is
+directly related to the concepts of \textbf{coupling} (the degree of
+interdependence between software modules) and \textbf{cohesion} (the
+degree to which elements inside a module belong together). A
+well-architected system typically aims for \textit{high cohesion} and
+\textit{low coupling}, ensuring that components can be maintained,
+tested, and extended in isolation without triggering cascading
+changes across the entire codebase.
+
+Dependencies in modern programming languages can manifest in several
+distinct forms, each carrying a different weight and architectural
+implication. They can be broadly categorized as shown in Table
+\ref{tab:dependency_types}.
+
+\begin{table}[h]
+  \centering
+  \renewcommand{\arraystretch}{1.5}
+  \begin{tabular}{|p{0.25\linewidth}|p{0.7\linewidth}|}
+    \hline
+    \textbf{Category} & \textbf{Examples and Architectural Implications} \\
+    \hline
+    \textbf{Structural / Compositional} & \textbf{Aggregation \&
+    Composition:} A type declares a field/property of another type
+    (e.g., \texttt{Car} has an \texttt{Engine}).\newline
+    \textbf{Type Aliases:} Defining a new name for an existing type
+    (\texttt{typedef}, \texttt{using}).\newline
+    \textbf{Generic Bounds:} Restricting a generic type parameter
+    (e.g., \texttt{T extends B}).\newline
+    \textit{Implication:} Alters the physical memory layout and
+    fundamentally ties the data structures together. \\
+    \hline
+    \textbf{Inheritance / Realization} & \textbf{Class Extension:} A
+    class derives from a base class.\newline
+    \textbf{Interface Implementation:} A class fulfills an interface
+    contract.\newline
+    \textbf{Trait Mixins:} Including behavior from traits (e.g., in
+    Rust or Scala).\newline
+    \textit{Implication:} The strongest form of coupling
+    (\textit{IS-A} relationship). The child is inextricably tied to
+    the parent's lifecycle and public contract. \\
+    \hline
+    \textbf{Behavioral / Control Flow} & \textbf{Method Invocations:}
+    Calling a function or method.\newline
+    \textbf{Instantiations:} Creating a new object (\texttt{new B()}).\newline
+    \textbf{Field Access:} Reading or writing to another class's
+    properties.\newline
+    \textbf{Signature Types:} Using a type as a formal parameter or
+    return type.\newline
+    \textbf{Exception Handling:} Catching a specific exception type.\newline
+    \textit{Implication:} Dictates runtime behavior and creates
+    strict compile-time bonds, without altering structural memory layouts. \\
+    \hline
+  \end{tabular}
+  \caption{Taxonomy of software dependencies extracted via static analysis.}
+  \label{tab:dependency_types}
+\end{table}
+
+Furthermore, dependency tracking must distinguish between
+\textbf{static} and \textbf{dynamic} analysis. \textbf{Static
+analysis} examines the source code strictly at rest, extracting only
+the explicit relationships defined by the syntax and the type system.
+Conversely, \textbf{dynamic dependencies}, such as those introduced
+by reflection, dependency injection containers, late binding
+(polymorphism), or features like Python's \texttt{eval()},manifest
+their true target only during program execution
+\cite{TODO:binkley_static_analysis}. Because static analysis cannot
+reliably predict the runtime state, it focuses exclusively on the
+declared, compile-time architecture. This thesis is strictly scoped
+to the extraction and modeling of \textit{static} dependencies.
+
+\section{Software Quality and Code Smells}
+\label{sec:smells}
+
+The concept of a "smell" was popularized by Martin Fowler in the
+context of software engineering \cite{TODO:fowler_refactoring} to
+indicate a symptom of possible deterioration in software quality. A
+smell is not necessarily a bug; rather, it is a surface indication
+that usually corresponds to a deeper problem in the system's design
+or maintainability. Left unaddressed, smells accumulate and manifest
+as Technical Debt \cite{TODO:cunningham_technical_debt}---a metaphor
+describing the implied cost of additional rework caused by choosing
+an easy (often flawed) solution now instead of using a better
+approach that would take longer.
+
+Smells are generally categorized by their scope and impact:
+\begin{itemize}
+  \item \textbf{Code Smells:} These are localized indicators of poor
+    programming practices, usually confined to a single method or
+    class. Examples include \textit{Long Method}, \textit{Large
+    Class}, or \textit{Long Parameter List}. Because they are local,
+    they can often be detected through simple syntactic analysis and
+    resolved through standard refactoring techniques without
+    affecting the rest of the system.
+  \item \textbf{Architectural Smells:} Unlike code smells,
+    architectural smells \cite{TODO:garcia_architectural_smells} are
+    global issues that affect the high-level structure of the
+    software, such as the organization of modules, the interactions
+    between packages, and the overall dependency graph. They are
+    significantly more difficult to identify and correct because they
+    require a holistic understanding of the entire system's
+    architecture. Correcting an architectural smell often involves
+    deep, cross-cutting modifications that can impact multiple
+    components simultaneously.
+\end{itemize}
+
+\section{Dependency Graphs and Architectural Representation}
+\label{sec:dependency_graphs}
+
+To systematically analyze, navigate, and reason about software
+architecture and its associated smells, the extracted dependencies
+are typically modeled using \textbf{Graph Theory}. The analysis
+process often relies on distinguishing between a \textit{Component
+Graph} and a \textit{Dependency Graph}.
+
+\subsection{Component and Dependency Graphs}
+A \textbf{Component Graph} represents the hierarchical containment
+and physical organization of the source code. It can be defined as a
+directed graph $G_c = (V, E_c)$, where each node $v \in V$ represents
+a software component (e.g., a package, a class, or a method), and
+each edge $(u, v) \in E_c$ represents a strict containment
+relationship (e.g., a method is defined inside a class).
+
+A \textbf{Dependency Graph}, conversely, extends the component graph
+by modeling the semantic interactions between these components. It is
+defined as a multigraph $G = (V, E)$, where $E = E_c \cup E_d$. The
+set $E_d$ encompasses all the logical dependencies extracted from the
+code. A dependency fundamentally exists whenever a piece of code
+(Component A) cannot function, compile, or execute without the
+presence of another (Component B).
+
+In the context of source code, the \textbf{granularity} of these
+vertices can vary. They can represent high-level architectural
+boundaries (like microservices or packages), file-level modules, or
+fine-grained code constructs (such as classes, interfaces, or
+individual functions). The edges are intrinsically \textbf{directed}:
+if class \texttt{A} calls a method of class \texttt{B}, the edge
+points from \texttt{A} to \texttt{B}, establishing a dependency
+vector that indicates \texttt{A} is vulnerable to changes in
+\texttt{B}, but not necessarily vice versa. An illustrative example
+of a real-world software dependency graph is provided in Figure
+\ref{fig:example_dependency_graph}, visually demonstrating how
+components interlock.
+
+\begin{figure}[htpb]
+  \centering
+  \includegraphics[width=\textwidth]{images/example_dependency_graph.png}
+  \caption{Example of an architectural Dependency Graph extracted
+    from a software repository. Nodes represent structural components,
+    while edges denote semantic dependencies such as usages,
+  inheritances, or aggregations.}
+  \label{fig:example_dependency_graph}
+\end{figure}
+
+\subsection{Dependency Smells}
+Mapping source code to a graph structure provides a powerful
+mathematical foundation to evaluate the system's health and
+automatically detect specific Architectural Smells---often referred
+to as \textbf{Dependency Smells}. The presence of these
+configurations in the graph usually indicates a violation of core
+design principles (such as SOLID, high cohesion, or loose coupling).
+Notable dependency smells include \cite{TODO:arcan_documentation}:
+
+\begin{itemize}
+  \item \textbf{Cyclic Dependency:} The most notorious anomaly occurs
+    when two or more components are linked by circular dependency
+    relationships, forming a cycle in the graph. This violates the
+    Acyclic Dependencies Principle, rendering the involved components
+    inseparable, impossible to test in isolation, and prone to
+    infinite recursion. A healthy architectural dependency graph is
+    generally expected to form a \textbf{Directed Acyclic Graph (DAG)}.
+  \item \textbf{Unstable Dependency:} This occurs when a stable, core
+    component depends on one or more highly unstable, frequently
+    changing components. This configuration violates the Stable
+    Dependencies Principle \cite{TODO:martin_clean_architecture},
+    exposing central components to frequent variations and increasing
+    the risk of cascading failures.
+  \item \textbf{Hub-Like Dependency:} A component assumes a role of
+    excessive centrality, exhibiting a very high number of both
+    incoming and outgoing dependencies. Such "hub" components become
+    critical bottlenecks, concentrating heterogeneous
+    responsibilities and severely limiting the modularity and
+    independent evolution of the system.
+  \item \textbf{Deep Hierarchy:} An inheritance hierarchy that is
+    excessively deep, where components at the bottom depend on a long
+    chain of supertypes. This increases system complexity and makes
+    the behavior of child classes difficult to predict.
+  \item \textbf{Wide Hierarchy:} An inheritance hierarchy that is
+    excessively broad, with a single parent class having an unusually
+    large number of direct subclasses. This often indicates poor
+    intermediate abstraction or an incomplete decomposition of responsibilities.
+  \item \textbf{Cyclic Hierarchy:} A critical structural error where
+    an inheritance hierarchy forms a cycle (e.g., a supertype
+    directly or indirectly inheriting from its own subtype). This
+    breaks the fundamental \textit{IS-A} relationship paradigm and
+    can lead to severe compilation or runtime errors.
+\end{itemize}
+
+It is important to distinguish these architectural graphs from
+\textbf{tree structures} (like the Abstract Syntax Trees used by
+compilers); while a tree strictly enforces a single parent per node,
+a dependency graph allows nodes to be reused and referenced by
+multiple dependents, accurately reflecting real-world software reuse.
+
+\section{Traditional Static Analysis and Tooling}
+\label{sec:traditional_static_analysis}
+
+Extracting structural information from source code requires robust
+static analysis tools. Traditionally, this process relies heavily on
+\textbf{compiler front-ends}, such as Clang for C/C++ or Roslyn for
+C\# \cite{TODO:llvm_clang_paper}. A compiler front-end typically performs:
+\begin{enumerate}
+  \item \textbf{Lexical Analysis (Tokenization):} Converting text
+    into a stream of tokens.
+  \item \textbf{Syntactic Analysis (Parsing):} Grouping tokens into
+    grammatical structures.
+  \item \textbf{Semantic Analysis:} Type checking and symbol resolution.
+\end{enumerate}
+
+Because these tools must generate executable code, they possess a
+mathematically sound and exhaustive understanding of the language's
+semantics. However, this deep integration is also their primary
+\textit{limitation} for architectural analysis: they are inherently
+\textbf{coupled to a single programming language}, its specific
+version, and its build ecosystem.
+
+\subsection{Intermediate Representations (IR) and the $M \times N$ Problem}
+Developing a cross-language analysis system using language-specific
+tools forces engineers to integrate dozens of disparate compiler
+front-ends, each with its own specific output format, terminology,
+and execution environment. This creates an unmaintainable \textbf{$M
+\times N$ complexity problem}, where $M$ target languages must be
+independently mapped and translated to $N$ analysis tools.
+
+Modern compiler architectures, such as LLVM \cite{TODO:llvm_paper},
+mitigate this combinatorial explosion by introducing an
+\textbf{Intermediate Representation (IR)}. An IR is a standardized,
+language-agnostic data structure that sits between the front-end
+(which parses the source code) and the back-end (which generates
+machine code). By normalizing the input from various languages into a
+unified IR, compilers reduce the architectural complexity from $M
+\times N$ to $M + N$.
+
+While LLVM uses a low-level IR focused on executable instructions,
+architectural analysis requires a high-level, structural
+representation. Designing a universal IR that captures the
+architectural semantics of heterogeneous languages---without getting
+bogged down in low-level memory layouts---is the core theoretical
+foundation required to build a truly scalable, language-agnostic
+dependency extractor.
+
+In recent years, protocols like the \textbf{Language Server Protocol
+(LSP)} have attempted to standardize how development environments
+interact with language-specific analyzers \cite{TODO:microsoft_lsp}.
+By standardizing the communication JSON-RPC interface, an IDE can
+interact with any language server to request symbol definitions or
+references. However, LSP is fundamentally designed for
+\textbf{interactive, query-based use cases} (e.g., hovering over a
+  variable to see its type, or requesting "find references" for a
+specific symbol within an open file). Constructing a global
+dependency graph of an entire repository requires a
+\textbf{batch-processing approach}. Attempting to use LSP for this
+purpose would involve artificially spoofing thousands of "find
+references" queries across every symbol in every file, a process that
+is highly stateful, incredibly slow, and simply suboptimal for
+full-scale architectural extraction.
+
+\section{Parsing Technologies and Tree-sitter}
+\label{sec:parsing_and_treesitter}
+
+The foundation of any static analysis tool is the \textbf{parser},
+which translates raw source text into a structured tree
+representation. Early or naive code analysis tools often relied on
+pattern matching and \textbf{regular expressions}. However, according
+to the Chomsky hierarchy, regular expressions are mathematically
+incapable of correctly parsing context-free languages, which
+encompass all modern programming languages. They cannot reliably
+track nested structures, such as matched parentheses or nested code
+blocks \cite{TODO:aho_compilers}, leading to brittle tools that break
+on complex formatting or edge cases.
+
+When analyzing source code properly, parsers generally produce one of
+two tree variants:
+\begin{itemize}
+  \item \textbf{Abstract Syntax Tree (AST):} Abstracts away the
+    syntactical details that do not affect the program's logic, such
+    as punctuation, whitespace, and comments, focusing only on the
+    semantics (e.g., a "binary operation" node instead of explicitly
+    storing the '+' token). This makes it highly suitable for
+    compiler back-ends.
+  \item \textbf{Concrete Syntax Tree (CST):} Represents the exact,
+    unaltered syntactic structure of the source text, maintaining a
+    strict one-to-one mapping with the original file. It includes all
+    tokens, whitespace, and formatting, making it ideal for tooling
+    that requires exact code correspondence, such as linters,
+    formatters, and architectural analyzers.
+\end{itemize}
+
+\subsection{The Tree-sitter Framework}
+To achieve high-performance, language-agnostic parsing, this project
+utilizes \textbf{Tree-sitter} \cite{TODO:brunsfeld_treesitter}.
+Tree-sitter is a modern, generic parser generator that builds fast,
+robust CSTs. It generates parsers from grammars written in a Domain
+Specific Language (DSL) based on JavaScript.
+
+Under the hood, the generated parsers are implemented in C to
+guarantee maximum performance and portability. Because they adhere to
+the standard C Application Binary Interface (ABI), Tree-sitter
+exposes a uniform API and provides native bindings for numerous
+high-level languages, including Rust, Go, Java, and Python.
+
+\subsubsection{Parsing and Navigation}
+Using Tree-sitter in a Rust ecosystem involves initializing a
+\texttt{Parser} instance and assigning it a specific language
+definition (e.g., \texttt{tree-sitter-rust} or
+\texttt{tree-sitter-java}). Once the parser consumes the source text,
+it produces a CST.
+
+Navigating this tree efficiently is a critical requirement for static
+analysis. Rather than relying on heavy, memory-intensive recursive
+object visits, Tree-sitter provides a \textbf{TreeCursor}. The cursor
+allows stateful, allocation-free traversal of the syntax tree using
+imperative movements such as \texttt{goto\_first\_child()},
+\texttt{goto\_next\_sibling()}, and \texttt{goto\_parent()}. At any
+position, the cursor can yield the current \texttt{Node}, from which
+the analyzer can extract the syntactic type (\texttt{node.kind()})
+and the raw string content (\texttt{node.utf8\_text()}). This uniform
+access mechanism is completely agnostic to the underlying programming language.
+
+\subsubsection{Advantages over Traditional Generators}
+Tree-sitter was selected over traditional parser generators (like
+ANTLR, Bison, or Yacc) \cite{TODO:ortin_antlr_yacc} for several
+architectural reasons:
+
+\begin{itemize}
+  \item \textbf{Performance and Algorithm:} Tree-sitter uses a
+    \textbf{Generalized LR (GLR)} parsing algorithm. Being a
+    bottom-up parser (specifically LR(1)), it is generally faster and
+    more efficient than top-down parsers like ANTLR's Adaptive LL(*).
+    The time complexity for parsing is primarily bounded to $O(n)$,
+    making it highly suitable for analyzing massive codebases.
+  \item \textbf{Advanced Error Recovery:} When encountering a syntax
+    error, Tree-sitter does not halt. Instead, it utilizes
+    \texttt{ERROR} or \texttt{MISSING} nodes to bypass the anomaly
+    and successfully parse the remainder of the file. This makes it
+    incredibly robust for analyzing code under development.
+  \item \textbf{Decoupling of Grammar and Code:} Tools like Bison and
+    Yacc often require developers to mix executable C/C++ code
+    directly into the grammar definitions (Syntax-Directed
+    Translation). While powerful for compiling, this makes the
+    grammar practically impossible to port to other languages.
+    Conversely, Tree-sitter enforces a strict separation: the grammar
+    only defines syntax, while the application (in our case, the Rust
+    analyzer) queries the resulting tree.
+  \item \textbf{Eliminating Visitor Coupling:} ANTLR provides a
+    manipulatable AST but typically forces the developer to implement
+    the \textit{Visitor} pattern \cite{TODO:gamma_design_patterns}.
+    This strongly couples the analysis code to the specific grammar
+    rules (e.g., requiring a \texttt{visitFunctionDeclaration}
+    method). Tree-sitter's generic cursor approach allows us to write
+    highly dynamic, language-agnostic extraction heuristics that do
+    not depend on auto-generated visitor interfaces.
+\end{itemize}
+
+\section{Name Resolution and Lexical Scoping}
+\label{sec:name_resolution}
+
+Extracting the syntax tree is only the first step in constructing a
+dependency graph. The subsequent, and often significantly more
+complex challenge, is \textbf{name resolution} (or symbol
+resolution). Knowing syntactically that a class uses an identifier
+named \texttt{B} is insufficient; the analyzer must determine
+\textit{exactly which concrete type} \texttt{B} refers to within the
+global project scope, distinguishing it from other types that might
+share the same name in different modules.
+
+This resolution process depends heavily on \textbf{lexical scoping}
+rules, which dictate the visibility and lifetime of identifiers based
+on their physical placement within the source code blocks
+\cite{TODO:scott_programming_pragmatics}. Scopes are typically
+hierarchical: an inner scope (like a method body) can access
+identifiers from its outer scope (like the class body or the global
+namespace). Complicating matters is the concept of
+\textbf{shadowing}, where a local variable might mask a global type
+with the same name.
+
+Furthermore, different programming languages handle namespaces,
+imports, and symbol resolution in drastically different ways. Because
+types can reference each other cyclically or be referenced before
+they are declared (forward declarations), resolving symbols in a
+\textbf{single linear pass} over the code is generally impossible.
+
+Consequently, structural extraction must be strictly
+\textbf{decoupled} from semantic resolution. The syntactic phase
+(Extraction) must first traverse the CST to catalog all available
+declarations and record unresolved identifiers along with the exact
+context and scope in which they appear. Only afterward can a
+dedicated, \textbf{multi-pass resolution phase} traverse the
+hierarchical scope boundaries to semantically link these identifiers
+to their concrete definitions. This separation of concerns is a
+central architectural decision in designing a scalable,
+language-agnostic analyzer.
+
+\subsection{Type Systems, Dynamic Typing, and Type Hints}
+The complexity of name resolution is heavily influenced by the
+\textbf{Type System} of the underlying language
+\cite{TODO:pierce_types}. In statically typed languages (such as
+Java, C++, and Rust), the type of every variable, field, and method
+return is explicitly declared (or rigorously inferred at compile
+time). This makes static resolution deterministic: if a variable
+\texttt{v} is declared as type \texttt{A}, any method call
+\texttt{v.foo()} can be reliably resolved by looking up the
+definition of \texttt{foo} within class \texttt{A}.
+
+Conversely, dynamically typed languages (such as Python) utilize
+\textbf{duck typing}, where variables do not possess inherent types,
+and their types can change freely at runtime based on the assigned
+values. In such environments, determining the target of
+\texttt{v.foo()} using only static text analysis is fundamentally
+ambiguous without executing the code.
+
+To bridge this gap and enable robust static analysis in dynamically
+typed environments, modern ecosystems have introduced optional static
+typing mechanisms, such as \textbf{Type Hints} (e.g., Python's PEP
+484 \cite{TODO:pep_484}). Type hints allow developers to annotate
+variables and function signatures with expected types without
+altering the runtime behavior.
+
+For the purposes of this thesis, extracting architectural
+dependencies from dynamically typed languages relies on a crucial
+\textbf{assumption}: we assume that the source code is adequately
+decorated with Type Hints. When these annotations are present, the
+analyzer can treat them as pseudo-static declarations, mapping them
+to the internal IR and performing deterministic name resolution
+identically to statically typed languages. Without these hints,
+static resolution falls back to heuristics or yields unresolved
+edges, highlighting the inherent limits of analyzing dynamic
+languages statically.
