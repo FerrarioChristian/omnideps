@@ -1,42 +1,43 @@
-\chapter{Modello di Rappresentazione Intermedia (IR)}
-\section{Introduzione}
-Il processo di analisi proposto si configura come una pipeline di
-trasformazioni funzionali. Dato un codice sorgente $S$ appartenente a
-un linguaggio $L \in \{C, C++, Java, Python, Rust\}$, il sistema
-genera un Component Tree astratto attraverso una funzione di
-estrazione $E: CST_L \to IR$. L'obiettivo dell'IR è fornire un
-dominio $\mathcal{D}_{IR}$ che sia
-un'\href{https://en.wikipedia.org/wiki/Conservative_extension}{estensione
-conservativa} dei costrutti sintattici di alto livello, garantendo la
-Type Safety nella successiva fase di risoluzione delle dipendenze $R:
-IR \to \mathcal{G}$, dove $\mathcal{G}$ è il grafo delle dipendenze.
+\chapter{Intermediate Representation (IR) Model}
+\label{ch:ir_formalization}
 
-Formalmente, definiamo il \textbf{Dominio della Rappresentazione
-Intermedia} $\mathcal{D}_{IR}$ come lo spazio di tutti i possibili
-\textit{Component Trees} validi. Ogni istanza $T \in
-\mathcal{D}_{IR}$ corrisponde alla radice di una gerarchia di
-componenti (rappresentata dal tipo Modulo $\mathcal{M}$, definito in
-seguito) che aggrega ricorsivamente l'intera struttura del software analizzato.
+\section{Introduction}
+The proposed analysis process is configured as a pipeline of
+functional transformations. Given a source code $S$ belonging to a
+language $L \in \{C, C++, Java, Python, Rust\}$, the system generates
+an abstract Component Tree through an extraction function $E: CST_L
+\to IR$. The goal of the IR is to provide a domain $\mathcal{D}_{IR}$
+that is a \textit{conservative extension}
+\cite{TODO:conservative_extension} of the high-level syntactic
+constructs, guaranteeing Type
+Safety in the subsequent dependency resolution phase $R: IR \to
+\mathcal{G}$, where $\mathcal{G}$ is the dependency graph.
 
-\section{Il Sistema dei Tipi $\mathcal{T}$}
-Per garantire l'agnosticismo rispetto al linguaggio, definiamo il
-sistema dei tipi come un'algebra di tipi somma e prodotti.
+Formally, we define the \textbf{Intermediate Representation Domain}
+$\mathcal{D}_{IR}$ as the space of all possible valid
+\textit{Component Trees}. Each instance $T \in \mathcal{D}_{IR}$
+corresponds to the root of a hierarchy of components (represented by
+the Module type $\mathcal{M}$, defined below) that recursively
+aggregates the entire structure of the analyzed software.
 
-\subsection{Identificatori e Percorsi ($\pi$)}
-Sia $\mathcal{I}$ l'insieme delle stringhe valide come
-identificatori. Definiamo il tipo \textbf{Qualified Name}
-($\pi$) come l'insieme delle sequenze finite non vuote di
-identificatori:
-$$\pi = \{ \langle \iota_1, \iota_2, \dots, \iota_n \rangle \mid \iota_j \in
-\mathcal{I}, n \geq 1 \}$$
-Questo tipo permette di mappare in modo univoco namespaces, package
-di Java, moduli di Rust e scope risolti in C++.
+\section{The Type System $\mathcal{T}$}
+To ensure language agnosticism, we define the type system as an
+algebra of sum and product types \cite{TODO:algebraic_data_types}.
 
-\subsection{Riferimenti a Tipi ($\tau$)}
-Un riferimento a un tipo $\tau$ nell'IR modella il ciclo di vita
-della scoperta e della risoluzione dei simboli. Per garantire la
-\textit{Type Safety} tra le fasi di estrazione e la generazione del
-grafo, definiamo $\tau$ come un tipo somma a cinque stati:
+\subsection{Identifiers and Paths ($\pi$)}
+Let $\mathcal{I}$ be the set of valid strings as identifiers. We
+define the type \textbf{Qualified Name} ($\pi$) as the set of finite
+non-empty sequences of identifiers:
+$$\pi = \{ \langle \iota_1, \iota_2, \dots, \iota_n \rangle \mid
+\iota_j \in \mathcal{I}, n \geq 1 \}$$
+This type uniquely maps namespaces, Java packages, Rust modules, and
+resolved scopes in C++.
+
+\subsection{Type References ($\tau$)}
+A type reference $\tau$ in the IR models the lifecycle of symbol
+discovery and resolution. To guarantee \textit{Type Safety} between
+the extraction phases and the graph generation, we define $\tau$ as
+an eight-state sum type:
 \begin{align*}
   \tau ::=&\ \text{Prim}(\mathcal{T}_{p}) \\
   &\mid \text{Unresolved}(\pi_{raw}) \\
@@ -44,224 +45,268 @@ grafo, definiamo $\tau$ come un tipo somma a cinque stati:
   &\mid \text{Resolved}(\pi_{abs}) \\
   &\mid \text{External}(\pi_{ext}) \\
   &\mid \text{Union}(\vec{\tau}) \\
-  &\mid \text{Failed}(\vec{\tau})
+  &\mid \text{EvaluatedAccess}(\tau_{path}, \tau_{type}) \\
+  &\mid \text{Failed}(\pi_{raw})
 \end{align*}
-Dove:
+Where:
 \begin{itemize}
-  \item \textbf{Prim}: Rappresenta i tipi primitivi fondamentali
-    ($\mathcal{T}_{p}$). Poiché le parole chiave primitive variano drasticamente
-    tra i linguaggi, il set $\mathcal{T}_{p}$ non è statico ma è
-    fornito da un \textit{Primitive Registry}
-    architetturale (\textit{Data-Driven}) alimentato in fase di caricamento.
-    Essendo definiti a livello di linguaggio, non necessitano di risoluzione.
-  \item \textbf{ResolutionQuery($\mathcal{Q}$)}: Sostituisce il
-    vecchio stato \texttt{Unresolved}. Rappresenta un'espressione
-    algebrica composta da operazioni \texttt{Find}, \texttt{Extract}
-    e \texttt{Call}. È il prodotto parziale che rimanda la risoluzione alla Fase 2.
-  \item \textbf{Resolved}: Rappresenta un tipo definito dall'utente
-    (interno al progetto) la cui dichiarazione o definizione è stata
-    localizzata e associata con successo nello spazio dei nomi
-    assoluto del progetto. Il percorso $\pi_{abs}$ è
-    relativo alla radice dell'albero dei moduli.
-  \item \textbf{Union($\vec{\tau}$)}: Cattura una disgiunzione di tipi
-    (es. in Python \texttt{Union[A, B]} o in TypeScript \texttt{A | B}). 
-    Mantiene un vettore di riferimenti che dovranno essere singolarmente processati.
-  \item \textbf{External}: Rappresenta un tipo riconosciuto e
-    localizzato spazialmente, ma appartenente ad un modulo o
-    ecosistema al di fuori del codice sorgente fornito in input (es.
-    librerie standard, \texttt{java.util.*}, crates esterne).
-  \item \textbf{Failed($\vec{\tau}$)}: Indica che la fase di risoluzione statica ha
-    fallito. Mantiene traccia di tutte le alternative di fallimento per supportare analisi di fallback. Questo stato è cruciale per permettere calcoli statistici sul \textit{Recall} (copertura e confidenza dell'analizzatore).
+  \item \textbf{Prim}: Represents fundamental primitive types
+    ($\mathcal{T}_{p}$). Since primitive keywords vary drastically
+    across languages, the set $\mathcal{T}_{p}$ is not static but
+    provided by a Data-Driven architectural \textit{Primitive
+    Registry} populated at load time. Being defined at the language
+    level, they do not require resolution.
+  \item \textbf{Unresolved}: A raw text path extracted by the parser
+    before any substitution.
+  \item \textbf{ResolutionQuery($\mathcal{Q}$)}: Represents an
+    algebraic expression composed of \texttt{Find}, \texttt{Extract},
+    and \texttt{Call} operations. It is the partial product that
+    defers resolution to Phase 2.
+  \item \textbf{Resolved}: Represents a user-defined type (internal
+    to the project) whose declaration or definition has been
+    successfully localized and associated within the absolute
+    namespace of the project. The path $\pi_{abs}$ is relative to the
+    root of the module tree.
+  \item \textbf{External}: Represents a type that is recognized and
+    spatially localized, but belongs to a module or ecosystem outside
+    the provided source code (e.g., standard libraries,
+    \texttt{java.util.*}, external crates).
+  \item \textbf{Union($\vec{\tau}$)}: Captures a disjunction of types
+    (e.g., \texttt{Union[A, B]} in Python or \texttt{A | B} in
+    TypeScript). It maintains a vector of references that must be
+    individually processed.
+  \item \textbf{EvaluatedAccess($\tau_{path}, \tau_{type}$)}: A
+    wrapper that preserves both the originally queried path and the
+    final structural type. This ensures that intermediate access
+    chains generate corresponding dependency edges.
+  \item \textbf{Failed($\pi_{raw}$)}: Indicates that the static
+    resolution phase has failed. It keeps track of the target path to
+    support fallback analysis and calculate statistical metrics on
+    \textit{Recall} (coverage and confidence of the analyzer).
 \end{itemize}
-Questa rigorosa separazione permette al type system di imporre che la
-generazione del grafo avvenga esclusivamente a partire da riferimenti
-\texttt{Resolved} o \texttt{External}.
 
-\section{Modellazione dei Costrutti Strutturali}
-I Tipi Strutturati rappresentano il nucleo dell'analisi
-architetturale. Essi vengono modellati come tipi prodotto le cui
-componenti definiscono lo stato e il comportamento dell'entità.
+Figure \ref{fig:typeref_lifecycle} illustrates the complete state
+machine of a type reference during the analysis pipeline. This
+rigorous separation allows the type system to enforce that graph
+generation occurs exclusively from \texttt{Resolved} or
+\texttt{External} references.
 
-\subsection{Membri e Firme}
-Definiamo il tipo \textbf{Field} ($f$), che rappresenta un attributo
-o campo dati, definito come il prodotto tra un identificatore, un
-riferimento a un tipo e un insieme di eventuali annotazioni/decoratori associate:
+\begin{figure}[htpb]
+  \centering
+  \includegraphics[width=0.8\textwidth]{images/typeref_lifecycle.png}
+  \caption{State machine diagram illustrating the lifecycle of a Type
+  Reference ($\tau$) from syntactic extraction to semantic resolution.}
+  \label{fig:typeref_lifecycle}
+\end{figure}
+
+\section{Modeling Structural Constructs}
+Structured Types represent the core of the architectural analysis.
+They are modeled as product types whose components define the state
+and behavior of the entity.
+
+\subsection{Members and Signatures}
+We define the \textbf{Field} type ($f$), representing an attribute or
+data field, defined as the product of an identifier, a type
+reference, and a set of associated annotations/decorators:
 $$f = \iota \times \tau \times \mathcal{P}(\tau)$$
-Definiamo il tipo \textbf{Parameter} ($p$) per gestire i parametri
-passati alle funzioni:
-$$p = \iota^? \times \tau \times \mathbb{B}$$ dove
-l'identificatore $\iota^?$ è opzionale (per supportare funzioni
-lambda e parametri anonimi), $\tau$ è il tipo e $\mathbb{B}$ indica
-la proprietà variadica del parametro.
+We define the \textbf{Parameter} type ($p$) to handle parameters
+passed to functions:
+$$p = \iota^? \times \tau \times \mathbb{B}$$ where the identifier
+$\iota^?$ is optional (to support lambda functions and anonymous
+parameters), $\tau$ is the type, and $\mathbb{B}$ indicates the
+variadic property of the parameter.
 
-Per astrarre il concetto di "firma" di una funzione dal componente
-che la implementa, introduciamo il tipo \textbf{Signature} ($\sigma$):
+To abstract the concept of a function's "signature" from the
+component that implements it, we introduce the \textbf{Signature}
+type ($\sigma$):
 $$\sigma = \vec{p} \times \tau_{ret}$$
-dove $\vec{p}$ è il vettore dei parametri e $\tau_{ret}$ è il tipo di ritorno.
+where $\vec{p}$ is the parameter vector and $\tau_{ret}$ is the return type.
 
-Su questa base, per modellare il corpo gerarchico di una funzione,
-introduciamo il costrutto \textbf{Block} ($\mathcal{B}$). Un blocco
-lessicale (tipicamente delimitato da parentesi graffe \texttt{\{\}})
-isola uno scope interno in cui possono essere dichiarate variabili
-locali. Sfruttando la medesima struttura dei campi dati ($f =
-\iota \times \tau$), le variabili locali sono formalizzate
-elegantemente come un vettore di $f$. Il blocco traccia le proprie
-dipendenze comportamentali e può annidare ricorsivamente ulteriori
-blocchi (come nei costrutti \texttt{if} o \texttt{while}):
+Building on this, to model the hierarchical body of a function, we
+introduce the \textbf{Block} construct ($\mathcal{B}$). A lexical
+block (typically delimited by braces \texttt{\{\}}) isolates an
+internal scope where local variables can be declared. Leveraging the
+same structure as data fields ($f = \iota \times \tau$), local
+variables are elegantly formalized as a vector of $f$. The block
+tracks its behavioral dependencies and can recursively nest further
+blocks (as in \texttt{if} or \texttt{while} statements):
 $$\mathcal{B} = \langle \vec{f}_{local}, \vec{\tau}_{calls},
-\vec{\tau}_{inst}, \vec{\tau}_{accesses}, \vec{\tau}_{casts}, \vec{\mathcal{B}}_{sub} \rangle$$
-dove $\vec{\tau}_{calls}$ rappresenta l'insieme dei riferimenti ai
-tipi le cui funzioni vengono esplicitamente invocate nel blocco, $\vec{\tau}_{inst}$
-rappresenta i tipi strutturati esplicitamente istanziati (es. tramite \texttt{new}), $\vec{\tau}_{accesses}$ rappresenta i riferimenti diretti in lettura o scrittura allo stato di un
-componente, e $\vec{\tau}_{casts}$ cattura i cast espliciti di tipo (es. conversioni \texttt{as} o cast C-like).
+\vec{\tau}_{inst}, \vec{\tau}_{accesses}, \vec{\tau}_{casts},
+\vec{\mathcal{B}}_{sub} \rangle$$
+where $\vec{\tau}_{calls}$ represents the set of type references
+whose functions are explicitly invoked within the block,
+$\vec{\tau}_{inst}$ represents the structured types explicitly
+instantiated (e.g., via \texttt{new}), $\vec{\tau}_{accesses}$
+represents the direct read or write references to a component's
+state, and $\vec{\tau}_{casts}$ captures explicit type casts (e.g.,
+\texttt{as} conversions or C-like casts).
 
-Definiamo infine il tipo universale \textbf{Function}
-($\mathcal{F}$) come contenitore che lega un nome qualificato a una
-specifica firma, a un opzionale blocco radice che ne modella il corpo, a un flag booleano per i costruttori, e a un set di annotazioni:
-$$\mathcal{F} = \langle \pi, \sigma,
-\mathcal{B}^?, \mathbb{B}_{ctor}, \mathcal{P}(\tau) \rangle$$
+Finally, we define the universal \textbf{Function} type
+($\mathcal{F}$) as a container that binds a qualified name to a
+specific signature, an optional root block modeling its body, a
+boolean flag for constructors, and a set of annotations:
+$$\mathcal{F} = \langle \pi, \sigma, \mathcal{B}^?,
+\mathbb{B}_{ctor}, \mathcal{P}(\tau) \rangle$$
 
-Il ruolo architetturale di una $\mathcal{F}$ (se funge da Metodo o da
-Free Function) non è codificato nel suo tipo, ma è determinato
-esclusivamente dal contesto strutturale in cui viene inserita
-(all'interno di un tipo strutturato o di un modulo).
+The architectural role of an $\mathcal{F}$ (whether it acts as a
+Method or a Free Function) is not encoded in its type, but is
+determined exclusively by the structural context in which it is
+placed (within a structured type or a module).
 
-L'overloading è gestito naturalmente dalla cardinalità dell'insieme
-delle funzioni all'interno di un tipo strutturato o di un modulo:
-un'entità può contenere più funzioni con lo stesso $\mathcal{I}$ ma
-diversa firma $\sigma$.
+Overloading is naturally handled by the cardinality of the set of
+functions within a structured type or module: an entity can contain
+multiple functions with the same $\mathcal{I}$ but different
+signatures $\sigma$.
 
-\subsection{Tipi Strutturati ($\mathcal{S}$)}
-Sia $\mathcal{K} = \{ \text{Class, Struct, Interface, Trait, Enum, EnumVariant} \}$ il
-dominio delle tipologie di tipi strutturati. Un tipo strutturato è
-definito dalla tupla:
-$$\mathcal{S} = \langle \pi, k \in \mathcal{K}, \vec{f}, \vec{\mathcal{F}}, \vec{\tau}_{sup}, \vec{\mathcal{S}}_{nest}, \mathcal{P}(\tau) \rangle$$
-dove:
+\subsection{Structured Types ($\mathcal{S}$)}
+Let $\mathcal{K} = \{ \text{Class, Struct, Interface, Trait, Enum,
+EnumVariant} \}$ be the domain of structured type categories. A
+structured type is defined by the tuple:
+$$\mathcal{S} = \langle \pi, k \in \mathcal{K}, \vec{f},
+\vec{\mathcal{F}}, \vec{\tau}_{sup}, \vec{\mathcal{S}}_{nest},
+\mathcal{P}(\tau), \vec{\delta}_{imp} \rangle$$
+where:
 \begin{itemize}
-  \item $\pi$: il nome univoco che identifica
-    l'entità all'interno del sistema.
-  \item $k$: la categoria strutturale (definita in
-    $\mathcal{K}$) che preserva la semantica originale del costrutto.
-  \item $\vec{f}$: l'insieme dei campi (\textit{fields}) che
-    compongono lo stato dell'entità.
-  \item $\vec{\mathcal{F}}$: l'insieme delle funzioni (che assumono
-    ruolo di metodi) che definiscono il comportamento dell'entità.
-  \item $\vec{\tau}_{sup}$: l'insieme dei riferimenti ai super-tipi,
-    modellando le relazioni di ereditarietà o di implementazione di interfacce/trait.
-  \item $\vec{\mathcal{S}}_{nest}$: l'insieme dei tipi annidati (\textit{nested types}).
-  \item $\mathcal{P}(\tau)$: l'insieme delle annotazioni, attributi o decoratori applicati all'entità.
+  \item $\pi$: the unique name identifying the entity within the system.
+  \item $k$: the structural category (defined in $\mathcal{K}$) that
+    preserves the original semantics of the construct.
+  \item $\vec{f}$: the set of fields that compose the state of the entity.
+  \item $\vec{\mathcal{F}}$: the set of functions (assuming the role
+    of methods) that define the behavior of the entity.
+  \item $\vec{\tau}_{sup}$: the set of references to super-types,
+    modeling inheritance or trait/interface implementation relationships.
+  \item $\vec{\mathcal{S}}_{nest}$: the set of nested types.
+  \item $\mathcal{P}(\tau)$: the set of annotations, attributes, or
+    decorators applied to the entity.
+  \item $\vec{\delta}_{imp}$: the set of explicit dependencies
+    (imports) defined within the scope of the structured type.
 \end{itemize}
 
 \subsection{Type Alias ($\mathcal{A}$)}
-Un \textbf{Type Alias} permette di definire un nuovo nome per un tipo esistente. È modellato come la tupla:
+A \textbf{Type Alias} allows defining a new name for an existing
+type. It is modeled as the tuple:
 $$\mathcal{A} = \langle \pi, \tau_{target} \rangle$$
-dove $\tau_{target}$ è il riferimento al tipo originale. In fase di costruzione del grafo, vengono mantenuti come nodi indipendenti per tracciare accuratamente l'uso semantico dei domini.
+where $\tau_{target}$ is the reference to the original type. During
+graph construction, they are maintained as independent nodes to
+accurately track the semantic use of domains.
 
-\subsection{Blocchi di Implementazione ($\mathcal{X}$)}
-Per supportare linguaggi come Rust e C++ (separazione tra
-dichiarazione e definizione), in fase di estrazione introduciamo il
-costrutto temporaneo \textbf{ImplBlock} o \textbf{Implementation Extension}:
-$$\mathcal{X} = \langle \pi, \tau_{target}, \tau_{trait}^?, \vec{\mathcal{F}}, \vec{\mathcal{S}}_{nest}, \vec{\mathcal{A}} \rangle$$
-dove $\pi$ è il nome dell'estensione (solitamente derivato dal target), $\tau_{target}$ è il tipo a cui si applica l'implementazione,
-$\tau_{trait}^?$ è un riferimento opzionale al trait o interfaccia
-che si sta implementando, e gli altri campi rappresentano funzioni,
-tipi annidati e alias associati all'estensione.
-Come elaborato nella fase di Risoluzione (Fase 1 e 2), le estensioni
-fungono da "zucchero sintattico": i loro metodi, tipi annidati e trait vengono
-\textit{appiattiti} all'interno del tipo strutturato di riferimento,
-scomparendo di fatto dal modello architetturale unificato finale.
+\subsection{Implementation Extensions ($\mathcal{X}$)}
+To support languages like Rust and C++ (separation between
+declaration and definition), during extraction we introduce the
+temporary construct \textbf{ImplBlock} or \textbf{Implementation Extension}:
+$$\mathcal{X} = \langle \pi, \tau_{target}, \tau_{trait}^?,
+\vec{\mathcal{F}}, \vec{\mathcal{S}}_{nest}, \vec{\mathcal{A}} \rangle$$
+where $\pi$ is the name of the extension (usually derived from the
+target), $\tau_{target}$ is the type to which the implementation
+applies, $\tau_{trait}^?$ is an optional reference to the implemented
+trait or interface, and the other fields represent functions, nested
+types, and aliases associated with the extension.
+As processed in the Resolution Phase (Phase 1 and 2), extensions act
+as "syntactic sugar": their methods, nested types, and traits are
+\textit{flattened} into the reference structured type, effectively
+disappearing from the final unified architectural model.
 
-\section{Architettura dei Componenti}
-L'intero sistema software, una volta analizzato, è rappresentato come
-un'istanza del tipo \textbf{Modulo} ($\mathcal{M}$), che funge da
-radice del \textit{Component Tree}. Ogni elemento $T \in \mathcal{M}$
-rappresenta una foresta gerarchica di componenti, che aggrega
-ricorsivamente l'intera struttura del software (moduli annidati, tipi
-strutturati e funzioni). Questa struttura costituisce il dominio
-della nostra rappresentazione intermedia.
+\section{Component Architecture}
+Once analyzed, the entire software system is represented as an
+instance of the \textbf{Module} type ($\mathcal{M}$), which serves as
+the root of the \textit{Component Tree}. Every element $T \in
+\mathcal{M}$ represents a hierarchical forest of components,
+recursively aggregating the entire software structure (nested
+modules, structured types, and functions). This structure constitutes
+the domain of our intermediate representation.
 
-\subsection{Componente ($\mathcal{C}$)}
-Definiamo un \textbf{Componente} ($\mathcal{C}$) come l'unione
-disgiunta (sum type) dei costrutti strutturali definitivi del
-sistema. Ogni componente rappresenta l'unità logica che può comparire
-come vertice nel grafo delle dipendenze:
+\subsection{Component ($\mathcal{C}$)}
+We define a \textbf{Component} ($\mathcal{C}$) as the disjoint union
+(sum type) of the definitive structural constructs of the system.
+Each component represents the logical unit that can appear as a
+vertex in the dependency graph:
 $$\mathcal{C} ::= \text{Mod}(\mathcal{M}) \mid
-\text{StructuredType}(\mathcal{S}) \mid \text{TypeAlias}(\mathcal{A}) \mid \text{Function}(\mathcal{F})
-\mid \text{Field}(\pi, \tau) \mid \text{Primitive}(str) \mid \text{External}(\pi)$$
+\text{StructuredType}(\mathcal{S}) \mid \text{TypeAlias}(\mathcal{A})
+\mid \text{Function}(\mathcal{F}) \mid \text{Field}(\pi, \tau) \mid
+\text{Primitive}(str) \mid \text{External}(\pi)$$
 
-\subsection{Modulo ($\mathcal{M}$)}
-L'intera struttura del programma è catturata dal tipo \textbf{Modulo}
-($\mathcal{M}$), definito ricorsivamente per riflettere la gerarchia
-del file system o dei namespace:
-$$\mathcal{M} = \langle \pi, str_{lang}^?, str_{path}^?, \vec{\delta}_{imp}, \vec{\mathcal{M}}_{nest},
-\vec{\mathcal{S}}, \vec{\mathcal{A}}, \vec{\mathcal{F}}, \vec{f}_{free},
+\subsection{Module ($\mathcal{M}$)}
+The entire program structure is captured by the \textbf{Module} type
+($\mathcal{M}$), defined recursively to reflect the hierarchy of the
+file system or namespaces:
+$$\mathcal{M} = \langle \pi, str_{lang}^?, str_{path}^?,
+\vec{\delta}_{imp}, \vec{\mathcal{M}}_{nest}, \vec{\mathcal{S}},
+\vec{\mathcal{A}}, \vec{\mathcal{F}}, \vec{f}_{free},
 \vec{\mathcal{X}} \rangle$$
-dove $\vec{\delta}_{imp}$ è l'insieme delle dipendenze esplicite
-(import/use/include) definite nel modulo. Ogni elemento $\delta_{imp}$
-contiene il percorso base, un
-eventuale alias, e un flag per indicare l'inclusione \textit{wildcard}.
-Ogni elemento del software è quindi un nodo in un albero di
-componenti $T \in \mathcal{D}_{IR}$.
+where $\vec{\delta}_{imp}$ is the set of explicit dependencies
+(import/use/include) defined in the module. Each element
+$\delta_{imp}$ contains the base path, an optional alias, and a flag
+indicating a \textit{wildcard} inclusion. Every software element is
+therefore a node in a component tree $T \in \mathcal{D}_{IR}$.
 
-\section{Configurazione dell'Analizzatore ($\mathcal{K}_{cfg}$)}
-Per garantire flessibilità nell'adattamento ai diversi ecosistemi
-linguistici e alle diverse precisioni richieste, l'analizzatore
-supporta un modello di configurazione parametrico:
+A complete overview of the entities described so far, their
+composition, and their semantic references is illustrated in Figure
+\ref{fig:ir_model} via a UML class diagram.
+
+\begin{figure}[htpb]
+  \centering
+  \includegraphics[width=\textwidth]{images/IR_model.png}
+  \caption{UML class diagram representing the complete Intermediate
+    Representation (IR) domain model, highlighting hierarchical
+  composition and semantic references via \texttt{TypeRef}.}
+  \label{fig:ir_model}
+\end{figure}
+
+\section{Analyzer Configuration ($\mathcal{K}_{cfg}$)}
+To guarantee flexibility in adapting to different linguistic
+ecosystems and the diverse precisions required, the analyzer supports
+a parametric configuration model:
 $$\mathcal{K}_{cfg} = \langle \text{ModuleConfig},
-\text{TransitiveImports},
-\text{SupportImplBlocks}, \text{SelfKeyword} \rangle$$
-dove:
+\text{TransitiveImports}, \text{SupportImplBlocks}, \text{SelfKeyword} \rangle$$
+where:
 \begin{itemize}
-  \item \textbf{ModuleStrategies} modella le regole di raggruppamento
-    logico ed è composto da una tupla di flag booleani ortogonali:
-    $\langle \text{FileBased}, \text{DirectoryBased},
-    \text{PackageDeclBased}, \text{NamespaceBased},
-    \text{InlineModBased} \rangle$. Se tutti i flag sono falsi, il
-    linguaggio (es. C) non prevede un sistema di moduli.
-  \item \textbf{TransitiveImports} indica se le importazioni
-    esportano transitivamente i propri membri (es. Python).
-  \item \textbf{SupportImplBlocks} determina se il linguaggio
-    supporta l'estrazione di blocchi di implementazione scorporati
-    dalla dichiarazione del tipo strutturato.
-  \item \textbf{SelfKeyword} definisce la convenzione usata dal
-    linguaggio per il riferimento all'istanza corrente (\texttt{this}
-    o \texttt{self}), utile se \textbf{ImplicitFirstParamAsSelf} non è
-    applicabile.
-  \item \textbf{ImplicitFirstParamAsSelf} indica se il linguaggio (come Python)
-    utilizza il primo parametro dei metodi di istanza per riferirsi
-    all'oggetto corrente.
-  \item \textbf{ForwardDeclarations} indica se il linguaggio permette
-    di separare
-    la dichiarazione dei metodi (nella definizione della classe)
-    dalla loro implementazione (es. C++ out-of-line methods).
+  \item \textbf{ModuleStrategies} models logical grouping rules and
+    is composed of a tuple of orthogonal boolean flags: $\langle
+    \text{FileBased}, \text{DirectoryBased}, \text{PackageDeclBased},
+    \text{NamespaceBased}, \text{InlineModBased} \rangle$. If all
+    flags are false, the language (e.g., C) does not feature a module system.
+  \item \textbf{TransitiveImports} indicates whether imports
+    transitively export their own members (e.g., Python).
+  \item \textbf{SupportImplBlocks} determines if the language
+    supports extracting implementation blocks detached from the
+    structured type declaration.
+  \item \textbf{SelfKeyword} defines the convention used by the
+    language to reference the current instance (\texttt{this} or
+    \texttt{self}), useful if \textbf{ImplicitFirstParamAsSelf} is
+    not applicable.
+  \item \textbf{ImplicitFirstParamAsSelf} indicates whether the
+    language (like Python) uses the first parameter of instance
+    methods to refer to the current object.
+  \item \textbf{ForwardDeclarations} indicates whether the language
+    allows separating the method declaration (in the class
+    definition) from its implementation (e.g., C++ out-of-line methods).
 \end{itemize}
 
-A scopo illustrativo, la seguente tabella riassume i profili di
-configurazione per i principali linguaggi supportati:
+For illustrative purposes, Table \ref{tab:lang_config_general} and
+Table \ref{tab:lang_config_modules} summarize the configuration
+profiles for the main supported languages:
 
 \begin{table}[h]
   \centering
-  \begin{tabular}{|l|c|c|c|c|}
+  \begin{tabular}{|l|c|c|c|}
     \hline
-    \textbf{Linguaggio} & \textbf{TransitiveImports} &
+    \textbf{Language} & \textbf{TransitiveImports} &
     \textbf{ImplBlocks} & \textbf{SelfKeyword} \\ \hline
-    \textbf{Java} & False & False &
-    \texttt{this} \\ \hline
-    \textbf{Rust} & False & True &
-    \texttt{self} \\ \hline
-    \textbf{Python} & True & False &
-    \texttt{self} \\ \hline
+    \textbf{Java} & False & False & \texttt{this} \\ \hline
+    \textbf{Rust} & False & True & \texttt{self} \\ \hline
+    \textbf{Python} & True & False & \texttt{self} \\ \hline
     \textbf{C++} & False & True & \texttt{this} \\ \hline
     \textbf{C} & False & False & \texttt{this} \\ \hline
   \end{tabular}
-  \caption{Profili di configurazione dei linguaggi implementati}
+  \caption{General configuration profiles of the implemented languages}
+  \label{tab:lang_config_general}
 \end{table}
 
 \begin{table}[h]
   \centering
   \begin{tabular}{|l|c|c|c|c|c|}
     \hline
-    \textbf{Linguaggio} & \textbf{FileBased} & \textbf{DirBased} &
+    \textbf{Language} & \textbf{FileBased} & \textbf{DirBased} &
     \textbf{PkgDecl} & \textbf{Namespace} & \textbf{InlineMod} \\ \hline
     \textbf{Java} & False & False & True & False & False \\ \hline
     \textbf{Rust} & True & True & False & False & True \\ \hline
@@ -269,46 +314,55 @@ configurazione per i principali linguaggi supportati:
     \textbf{C++} & False & False & False & True & False \\ \hline
     \textbf{C} & False & False & False & False & False \\ \hline
   \end{tabular}
-  \caption{Dettaglio delle ModuleStrategies per i linguaggi supportati}
+  \caption{Detail of ModuleStrategies for the supported languages}
+  \label{tab:lang_config_modules}
 \end{table}
 
-\section{Costruzione del Grafo e Trait Bounds}
-Il processo finale di costruzione del grafo delle dipendenze
-$\mathcal{G} = (V, E)$ avviene tramite un'operazione di
-\textit{flattening} dell'albero gerarchico dei moduli $T$.
+\section{Graph Construction and Trait Bounds}
+The final process of constructing the dependency graph $\mathcal{G} =
+(V, E)$ occurs through a \textit{flattening} operation of the
+hierarchical module tree $T$.
 
-\subsection{Flattening e Nodi}
-L'albero dei moduli $\mathcal{M}$ viene ispezionato ricorsivamente.
-Ogni tipo strutturato $\mathcal{S}$ e funzione $\mathcal{F}$ estratta
-viene promossa a vertice in $V$. I tipi strutturati annidati
-$\vec{\mathcal{S}}_{nest}$ (inclusi i campi interni di enumeratori,
-ovvero \textit{enum varianti}) vengono appiattiti in vertici
-indipendenti ed equipaggiati del proprio namespace qualificato
-ereditato dal padre.
+\subsection{Flattening and Nodes}
+The module tree $\mathcal{M}$ is inspected recursively. Every
+extracted structured type $\mathcal{S}$ and function $\mathcal{F}$ is
+promoted to a vertex in $V$. Nested structured types
+$\vec{\mathcal{S}}_{nest}$ (including internal enum fields, i.e.,
+\textit{enum variants}) are flattened into independent vertices and
+equipped with their own qualified namespace inherited from the parent.
 
-\subsection{Archi e Trait Bounds}
-Gli archi orientati $E \subseteq V \times V \times \text{Kind}$
-vengono estratti mappando le relazioni $\tau$ risolte ai rispettivi
-componenti target:
+\subsection{Edges and Trait Bounds}
+As visually summarized in Figure \ref{fig:graph_flattening}, the
+directed edges $E \subseteq V \times V \times \text{Kind}$ are
+extracted by mapping the resolved relationships $\tau$ to their
+respective target components:
 \begin{itemize}
-  \item \textbf{ModuleContainment e NestedIn}: Derivano
-    strutturalmente dalla posizione gerarchica e legano i figli ai
-    rispettivi contenitori o tipi padre.
-  \item \textbf{Trait Bounds e Implementazioni}: I costrutti
-    \textit{Trait} e i \textit{Trait Bounds} sui parametri generici
-    vengono convertiti in dipendenze strutturali. I blocchi di
-    implementazione temporanei $\mathcal{B}_{lk}$ generano archi di
-    tipo \textit{Implements} dal tipo \textit{target} $\tau$ verso le
-    interfacce o trait implementati, per poi collassare e trasferire
-    le proprie funzioni come metodi del \textit{target}.
-  \item \textbf{Imports}: Esplicitano le dichiarazioni dirette di
-    utilizzo di altri componenti o moduli esterni.
-  \item \textbf{Relazioni Comportamentali}: Generati dai blocchi
-    interni $\mathcal{B}$, includono \textit{AccessesField},
-    \textit{Instantiates}, \textit{Calls}, e \textit{CastsTo}, modellando accuratamente
-    i flussi di invocazione, la creazione di istanze, l'accesso in memoria e le conversioni di tipo.
-  \item \textbf{Aliases}: Espande la nozione di referenza catturando il legame semantico 
-    da un TypeAlias verso il suo bersaglio originario.
+  \item \textbf{ModuleContainment and NestedIn}: Structurally derived
+    from the hierarchical position, linking children to their
+    respective containers or parent types.
+  \item \textbf{Trait Bounds and Implementations}: \textit{Trait}
+    constructs and \textit{Trait Bounds} on generic parameters are
+    converted into structural dependencies. Temporary implementation
+    blocks $\mathcal{X}$ generate \textit{Implements} edges from the
+    \textit{target} type $\tau$ to the implemented interfaces or
+    traits, before collapsing and transferring their functions as
+    methods of the \textit{target}.
+  \item \textbf{Imports}: Explicate direct declarations of usage for
+    other components or external modules.
+  \item \textbf{Behavioral Relationships}: Generated by internal
+    blocks $\mathcal{B}$, these include \textit{AccessesField},
+    \textit{Instantiates}, \textit{Calls}, and \textit{CastsTo},
+    accurately modeling invocation flows, instance creation, memory
+    access, and type conversions.
+  \item \textbf{Aliases}: Expands the notion of reference by
+    capturing the semantic link from a TypeAlias to its original target.
 \end{itemize}
 
-\includegraphics[width=\textwidth]{images/mermaid-diagram-guest-low.png}
+\begin{figure}[htpb]
+  \centering
+  \includegraphics[width=\textwidth]{images/graph_flattening_process.png}
+  \caption{Visual representation of the Component Tree flattening
+    process, where nested elements are promoted to top-level graph
+  nodes and hierarchical containment is converted to \textit{NestedIn} edges.}
+  \label{fig:graph_flattening}
+\end{figure}

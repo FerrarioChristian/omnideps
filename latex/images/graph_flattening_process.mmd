@@ -1,0 +1,64 @@
+flowchart LR
+    %% Left Side: Hierarchical IR
+    subgraph IR [Phase 1: Hierarchical Component Tree]
+        direction TB
+        subgraph M1 [Module: Core]
+            direction TB
+            subgraph S1 [Class: Server]
+                direction TB
+                F1[Method: start]
+                F2[Method: stop]
+            end
+            subgraph S2 [Class: Config]
+                direction TB
+                F3[Method: load]
+            end
+        end
+    end
+
+    %% Transition
+    IR ==> |Flattening & Edge Generation| DG
+
+    %% Right Side: Flat Dependency Graph
+    subgraph DG [Phase 2: Flat Dependency Graph]
+        direction TB
+        N_M1((Module: Core))
+        N_S1((Class: Server))
+        N_S2((Class: Config))
+        N_F1((Method: start))
+        N_F2((Method: stop))
+        N_F3((Method: load))
+        
+        %% Structural Edges (Containment)
+        N_S1 -. NestedIn .-> N_M1
+        N_S2 -. NestedIn .-> N_M1
+        N_F1 -. NestedIn .-> N_S1
+        N_F2 -. NestedIn .-> N_S1
+        N_F3 -. NestedIn .-> N_S2
+        
+        %% Behavioral/Semantic Edges
+        N_F1 == Instantiates ==> N_S2
+        N_F1 == Calls ==> N_F3
+    end
+    
+    %% Behavioral context in IR (just to show intent)
+    F1 -.- |"new Config()"| S2
+    F1 -.- |"config.load()"| F3
+
+    %% Styling
+    style IR fill:#fafafa,stroke:#333,stroke-width:2px,stroke-dasharray: 5 5
+    style DG fill:#fafafa,stroke:#333,stroke-width:2px,stroke-dasharray: 5 5
+    
+    style M1 fill:#e1f5fe,stroke:#0277bd,stroke-width:2px
+    style S1 fill:#fff9c4,stroke:#fbc02d,stroke-width:2px
+    style S2 fill:#fff9c4,stroke:#fbc02d,stroke-width:2px
+    style F1 fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px
+    style F2 fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px
+    style F3 fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px
+    
+    style N_M1 fill:#e1f5fe,stroke:#0277bd,stroke-width:2px
+    style N_S1 fill:#fff9c4,stroke:#fbc02d,stroke-width:2px
+    style N_S2 fill:#fff9c4,stroke:#fbc02d,stroke-width:2px
+    style N_F1 fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px
+    style N_F2 fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px
+    style N_F3 fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px
