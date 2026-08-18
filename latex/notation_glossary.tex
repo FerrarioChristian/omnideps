@@ -1,132 +1,63 @@
-\chapter{Notazione Matematica e Glossario}
+\chapter{Mathematical Notation and Glossary}
+\label{apx:notation}
 
-Per garantire il rigore formale e la chiarezza dell'esposizione, i
-capitoli successivi utilizzano una notazione matematica derivata
-dalla teoria dei tipi e dalla semantica funzionale. Questo capitolo
-funge da riferimento rapido per la simbologia e i concetti formali
-introdotti nella formalizzazione del sistema.
+To ensure formal rigor and clarity of exposition, the subsequent chapters utilize a mathematical notation derived from type theory and functional semantics. This chapter serves as a quick reference for the symbology and formal concepts introduced in the formalization of the system.
 
-\section{Convenzioni Notazionali}
-Il modello utilizza le seguenti convenzioni standard per descrivere
-le strutture dati e le funzioni del sistema:
+\section{Notational Conventions}
+The model uses the following standard conventions to describe the data structures and functions of the system:
 
 \begin{itemize}
-  \item \textbf{Tuple (Prodotto Cartesiano)} $\langle x_1, x_2,
-    \dots, x_n \rangle$: Rappresentano tipi composti (corrispondenti
-    alle \texttt{struct}  nel codice sorgente). Ogni elemento della
-    tupla definisce una proprietà essenziale dell'entità.
-  \item \textbf{Unione Disgiunta (Tipo Somma)} $A \mid B \mid C$:
-    Indica che un valore può appartenere a uno e un solo tipo tra
-    quelli elencati (corrispondente agli \texttt{enum} nel codice). È
-    utilizzato per modellare il polimorfismo o l'incertezza.
-  \item \textbf{Vettori e Sequenze} $\vec{X}$: Indica una sequenza
-    finita e ordinata di elementi di tipo $X$ (corrispondente alle
-    liste, array o \texttt{Vec} in memoria).
-  \item \textbf{Opzionalità} $X^?$: Indica un valore che può essere
-    presente (di tipo $X$) oppure assente (corrispondente a \texttt{Option<T>}).
-  \item \textbf{Firme Funzionali} $f : A \to B$: Denota una funzione
-    $f$ che accetta un input dal dominio $A$ e restituisce un output
-    nel codominio $B$. Se l'input è composto da più argomenti, si
-    utilizza il prodotto cartesiano (es. $A \times B \to C$).
+    \item \textbf{Tuples (Cartesian Product)} $\langle x_1, x_2, \dots, x_n \rangle$: Represent composite types (corresponding to \texttt{structs} in the source code). Each element of the tuple defines an essential property of the entity.
+    \item \textbf{Disjoint Union (Sum Type)} $A \mid B \mid C$: Indicates that a value can belong to one and only one type among those listed (corresponding to \texttt{enums} in the code). It is used to model polymorphism or uncertainty.
+    \item \textbf{Vectors and Sequences} $\vec{X}$: Indicates a finite, ordered sequence of elements of type $X$ (corresponding to lists, arrays, or \texttt{Vec} in memory).
+    \item \textbf{Optionality} $X^?$: Indicates a value that may be present (of type $X$) or absent (corresponding to \texttt{Option<T>}).
+    \item \textbf{Function Signatures} $f : A \to B$: Denotes a function $f$ that takes an input from domain $A$ and returns an output in codomain $B$. If the input consists of multiple arguments, the Cartesian product is used (e.g., $A \times B \to C$).
 \end{itemize}
 
-\section{Glossario dei Tipi e dei Domini}
-Di seguito sono definiti i simboli principali che costituiscono
-l'alfabeto della nostra Rappresentazione Intermedia (IR) e della
-pipeline di analisi.
+\section{Glossary of Types and Domains}
+The following defines the principal symbols that constitute the alphabet of our Intermediate Representation (IR) and the analysis pipeline.
 
-\subsection{Tipi Base e Identificatori}
+\subsection{Base Types and Identifiers}
 \begin{itemize}
-  \item $\mathcal{I}$ (\textbf{Identifier}): L'insieme di tutte le
-    stringhe alfanumeriche valide utilizzate per nominare variabili,
-    funzioni o classi.
-  \item $\pi$ (\textbf{Qualified Name}): Una sequenza
-    gerarchica di identificatori ($\langle \iota_1, \dots, \iota_n \rangle \in \mathcal{I}^*$)
-    che rappresenta il percorso assoluto e univoco di un'entità (es.
-    il namespace o il modulo).
-  \item $\tau$ (\textbf{Type Reference}): Un riferimento astratto a
-    un tipo. Rappresentato da un tipo somma a sette stati che ne
-    modella il ciclo di vita durante l'analisi: \texttt{Prim}
-    (primitivo di base), \texttt{Unresolved} (nome grezzo appena
-    estratto), \texttt{ResolutionQuery} (espressione algebrica di
-    intento), \texttt{Resolved} (percorso assoluto accertato nel
-    codebase), \texttt{External} (percorso risolto tramite import ma
-    non analizzato nel codebase), \texttt{Failed} (tentativo di
-    risoluzione non andato a buon fine), o \texttt{EvaluatedAccess} 
-    (wrapper che preserva sia il percorso originariamente interrogato sia il tipo strutturale finale, garantendo la generazione di archi multipli per le catene di accesso intermedie).
+    \item $\mathcal{I}$ (\textbf{Identifier}): The set of all valid alphanumeric strings used to name variables, functions, or classes.
+    \item $\pi$ (\textbf{Qualified Name}): A hierarchical sequence of identifiers ($\langle \iota_1, \dots, \iota_n \rangle \in \mathcal{I}^*$) that represents the absolute and unique path of an entity (e.g., a namespace or a module path).
+    \item $\tau$ (\textbf{Type Reference}): An abstract reference to a type. It is represented by a seven-state sum type that models its lifecycle during the analysis: \texttt{Prim} (base primitive), \texttt{Unresolved} (raw name just extracted), \texttt{ResolutionQuery} (algebraic expression of intent), \texttt{Resolved} (verified absolute path in the codebase), \texttt{External} (path resolved via import but not analyzed in the codebase), \texttt{Failed} (unsuccessful resolution attempt), or \texttt{EvaluatedAccess} (a wrapper that preserves both the originally queried path and the final structural type, ensuring the generation of multiple edges for intermediate access chains).
 \end{itemize}
 
-\subsection{Membri Strutturali e Firme}
+\subsection{Structural Members and Signatures}
 \begin{itemize}
-  \item $f$ (\textbf{Field}): Un campo dati appartenente a una
-    struttura, definito dalla coppia identificatore e tipo ($\langle
-    \iota, \tau \rangle$).
-  \item $p$ (\textbf{Parameter}): Un parametro in ingresso a una
-    funzione, comprendente nome opzionale, tipo e indicatore di variadicità ($\langle \iota^?, \tau, \mathbb{B} \rangle$).
-  \item $\sigma$ (\textbf{Signature}): La firma architetturale di una
-    funzione, composta dalla tupla $\langle \vec{p}, \tau_{ret} \rangle$. 
-    Astrae i tipi di input e output isolandoli dal componente implementativo.
-  \item $\mathcal{B}$ (\textbf{Block}): Un blocco lessicale (es.
-    delimitato da \texttt{\{\}}) che modella uno scope interno.
-    Traccia le variabili locali dichiarate, le chiamate, le
-    istanziazioni e annida in modo ricorsivo eventuali sotto-blocchi.
-  \item $\mathcal{F}$ (\textbf{Function}): Un componente funzionale
-    universale definito dalla tupla $\langle \iota, \sigma, \mathcal{B} \rangle$. 
-    Il suo ruolo architetturale (metodo o funzione libera)
-    è determinato unicamente dal costrutto in cui è annidato.
+    \item $v$ (\textbf{Variable}): A local variable declared within a block, defined by its identifier and type ($\langle \iota, \tau \rangle$).
+    \item $f$ (\textbf{Field}): A data field belonging to a structure, defined by the identifier and type pair ($\langle \iota, \tau \rangle$).
+    \item $p$ (\textbf{Parameter}): An input parameter to a function, comprising an optional name, a type, and a variadicity indicator ($\langle \iota^?, \tau, \mathbb{B} \rangle$).
+    \item $\sigma$ (\textbf{Signature}): The architectural signature of a function, composed of the tuple $\langle \vec{p}, \tau_{ret} \rangle$. It abstracts the input and output types, isolating them from the implementing component.
+    \item $\mathcal{B}$ (\textbf{Block}): A lexical block (e.g., delimited by \texttt{\{\}}) that models an internal scope. It tracks declared local variables, calls, instantiations, and recursively nests any sub-blocks.
+    \item $\mathcal{F}$ (\textbf{Function}): A universal functional component defined by the tuple $\langle \iota, \sigma, \mathcal{B} \rangle$. Its architectural role (method or free function) is determined solely by the construct in which it is nested.
 \end{itemize}
 
-\subsection{Entità Architetturali}
+\subsection{Architectural Entities}
 \begin{itemize}
-  \item $\mathcal{S}$ (\textbf{Structured Type}): L'astrazione di
-    classi, struct, interfacce e trait. Aggrega campi, funzioni,
-    gerarchie di ereditarietà e tipi annidati.
-  \item $\mathcal{X}$ (\textbf{Implementation Extension}): Costrutto
-    sintattico di estrazione temporaneo tipico di linguaggi come Rust
-    o C++ (i cosiddetti \textit{Impl Block}). Associa un insieme di funzioni e alias a un tipo target. Viene
-    appiattito all'interno di $\mathcal{S}$ durante la Fase di
-    Risoluzione, scomparendo dal modello finale.
-  \item $\mathcal{C}$ (\textbf{Component}): Il tipo somma universale
-    che abbraccia le entità analizzabili definitive del sistema
-    (Moduli, Tipi Strutturati, Funzioni).
-  \item $\mathcal{M}$ (\textbf{Module}): L'unità gerarchica
-    fondamentale. Il modulo radice funge da dominio della
-    Rappresentazione Intermedia ($\mathcal{D}_{IR}$) e aggrega
-    ricorsivamente tutto il codice sorgente analizzato.
+    \item $\mathcal{S}$ (\textbf{Structured Type}): The abstraction of classes, structs, interfaces, and traits. It aggregates fields, functions, inheritance hierarchies, and nested types.
+    \item $\mathcal{A}$ (\textbf{Alias}): A type alias mapping a new identifier to an existing type reference ($\langle \iota, \tau \rangle$), such as a \texttt{typedef} in C or a \texttt{type} alias in Rust.
+    \item $\mathcal{X}$ (\textbf{Implementation Extension}): A temporary syntactic extraction construct typical of languages like Rust or C++ (the so-called \textit{Impl Blocks}). It associates a set of functions and aliases to a target type. It is flattened into $\mathcal{S}$ during the Resolution Phase, disappearing from the final model.
+    \item $\mathcal{C}$ (\textbf{Component}): The universal sum type that embraces the definitive analyzable entities of the system (Modules, Structured Types, Functions, and Aliases).
+    \item $\mathcal{M}$ (\textbf{Module}): The fundamental hierarchical unit. The root module acts as the domain of the Intermediate Representation ($\mathcal{D}_{IR}$) and recursively aggregates all analyzed source code.
 \end{itemize}
 
-\subsection{Modello di Risoluzione e Grafo}
+\subsection{Resolution Model and Graph}
 \begin{itemize}
-  \item $\mathcal{Q}$ (\textbf{Query Algebra}): L'insieme delle
-    espressioni algebriche costanti ($\text{Find}$, $\text{Extract}$,
-    $\text{Call}$) che modellano l'intento logico di risoluzione di un tipo, rinviandone
-    l'esecuzione (valutazione lazy).
-  \item $\Sigma$ (\textbf{Scope}): Un singolo ambiente di visibilità lessicale, contenente una mappa di simboli associati a identificatori $\iota$, e i riferimenti ai tipi base (supertipi) da cui eredita.
-  \item $\mathcal{T}$ (\textbf{Scope Tree}): L'albero globale degli scope $\Sigma$. Costituisce l'architettura centrale di Name Resolution del sistema. Sostituisce i classici registri piatti, permettendo la risoluzione gerarchica (lexical climbing) e l'ereditarietà in tempo logaritmico rispetto all'altezza dell'albero.
-  \item $\Gamma$ (\textbf{Execution Context}): Il contesto immutabile
-    composto dall'albero $\mathcal{T}$, l'ecosistema dei tipi primitivi e il path base corrente,
-    utilizzato dal valutatore per eseguire le query $\mathcal{Q}$.
-  \item $\mathcal{G}$ (\textbf{Dependency Graph}): Il grafo orientato
-    finale $\langle V, E \rangle$. I vertici $V$ sono i componenti
-    estratti dal codice e gli archi $E$ sono le relazioni semantiche
-    di dipendenza (ereditarietà, composizione, uso).
+    \item $\mathcal{Q}$ (\textbf{Query Algebra}): The set of constant algebraic expressions (\text{Find}, \text{Extract}, \text{Call}) that model the logical intent of resolving a type, deferring its execution (lazy evaluation).
+    \item $\Sigma$ (\textbf{Scope}): A single environment of lexical visibility, containing a map of symbols associated with identifiers $\iota$, and references to the base types (supertypes) from which it inherits.
+    \item $\mathcal{T}$ (\textbf{Scope Tree}): The global tree of $\Sigma$ scopes. It constitutes the central Name Resolution architecture of the system. It replaces classic flat registries, allowing hierarchical resolution (lexical climbing) and inheritance in logarithmic time with respect to the height of the tree.
+    \item $\Gamma$ (\textbf{Execution Context}): The immutable context composed of the tree $\mathcal{T}$, the ecosystem of primitive types, and the current base path, used by the evaluator to execute the queries $\mathcal{Q}$.
+    \item $\mathcal{G}$ (\textbf{Dependency Graph}): The final directed graph $G = (V, E)$. The vertices $V$ are the components extracted from the code and the edges $E$ are the semantic dependency relationships (inheritance, composition, usage).
 \end{itemize}
 
-\subsection{Fasi dell'Analisi}
+\subsection{Analysis Phases}
 \begin{itemize}
-  \item $\Phi$ (\textbf{Full Analysis}): La funzione matematica
-    complessiva che definisce la pipeline architetturale
-    ($\Phi = \gamma \circ \rho_2 \circ \rho_1 \circ \alpha \circ \varepsilon$).
-  \item $\varepsilon$ (\textbf{Extraction}): Fase dipendente dal
-    linguaggio che traduce il CST del singolo file in moduli $\mathcal{M}$.
-  \item $\alpha$ (\textbf{Aggregation}): Funzione che
-    fonde i moduli estratti dai singoli file in un unico ecosistema globale.
-  \item $\rho_1$ (\textbf{Symbol Definition}): La Fase 1 della risoluzione, che
-    attraversa l'IR unificato per costruire l'albero statico degli scope $\mathcal{T}$, registrando tutti i simboli (tipi, moduli, alias) e le relazioni di ereditarietà base (es. trait \texttt{Deref}).
-  \item $\rho_2$ (\textbf{Name Resolution}): La Fase 2 della risoluzione, che
-    sfrutta il contesto $\Gamma$ (basato su $\mathcal{T}$) per valutare algebricamente ogni
-    query $\mathcal{Q}$ e risolvere i riferimenti di tipo $\tau$, producendo
-    percorsi assoluti validati.
-  \item $\gamma$ (\textbf{Graphing}): L'ultima fase che converte il
-    modello a oggetti unificato e risolto nel grafo delle dipendenze $\mathcal{G}$.
+    \item $\Phi$ (\textbf{Full Analysis}): The overall mathematical function that defines the architectural pipeline ($\Phi = \gamma \circ \rho_2 \circ \rho_1 \circ \alpha \circ \varepsilon$).
+    \item $\varepsilon$ (\textbf{Extraction}): The language-dependent phase that translates the CST of a single file into modules $\mathcal{M}$.
+    \item $\alpha$ (\textbf{Aggregation}): The function that merges the modules extracted from individual files into a single global ecosystem.
+    \item $\rho_1$ (\textbf{Symbol Definition}): Phase 1 of resolution, which traverses the unified IR to build the static scope tree $\mathcal{T}$, registering all symbols (types, modules, aliases) and base inheritance relationships (e.g., Rust's \texttt{Deref} trait).
+    \item $\rho_2$ (\textbf{Name Resolution}): Phase 2 of resolution, which leverages the context $\Gamma$ (based on $\mathcal{T}$) to algebraically evaluate each query $\mathcal{Q}$ and resolve the type references $\tau$, producing validated absolute paths.
+    \item $\gamma$ (\textbf{Graphing}): The final phase that converts the unified and resolved object model into the dependency graph $\mathcal{G}$.
 \end{itemize}
