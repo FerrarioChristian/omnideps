@@ -1,0 +1,343 @@
+hapter{The Analysis Process}
+\label{ch:analysis_process}
+
+\section{Pipeline Overview}
+\label{sec:pipeline_overview}
+
+The analysis system is modeled as a composition of strongly typed transformations between formally defined domains. Let $\mathcal{L}$ be the set of supported languages, $\mathcal{W}$ the domain of a Workspace (a collection of source files $\mathcal{S}_{code}$), and $\mathcal{D}_{IR}$ the domain of the Intermediate Representation defined in Chapter \ref{ch:ir_formalization}. The complete analysis function $\Phi$ is defined as:
+$$\Phi : \mathcal{W} \to \mathcal{G} \qquad \Phi = \gamma \circ R \circ E_w$$
+where:
+\begin{itemize}
+  \item $E_w : \mathcal{W} \to \vec{\mathcal{M}}$ is the \textbf{Workspace Extraction} function, which applies the per-file parser $E : \mathcal{L} \times \mathcal{S}_{code} \to \mathcal{M}$ to every source file and unifies the results into a single forest of modules.
+  \item $R : \vec{\mathcal{M}} \to \vec{\mathcal{M}}$ is the \textbf{Name Resolution} function, operating entirely on the IR domain.
+  \item $\gamma : \vec{\mathcal{M}} \to \mathcal{G}$ is the \textbf{Graph Construction} function, covered in Chapter \ref{ch:graph_construction}.
+\end{itemize}
+This formulation highlights a fundamental property: the system is a composition of pure functions where the output of each phase is the well-typed input of the next. If each function preserves the structural invariants of its output domain, the composition is guaranteed to be semantically correct (\textit{Type Safety}).
+
+\section{Phase 1: Syntactic Extraction ($E$)}
+\label{sec:extraction}
+
+The extraction phase maps the nodes of a Concrete Syntax Tree ($\mathcal{N}$) into the IR domain $\mathcal{D}_{IR}$. This is the \textbf{only phase that depends on the source language} $L \in \mathcal{L}$. Since CST nodes contain only positional metadata (byte offsets), every extraction function additionally receives the raw source code $S$ to retrieve textual content.
+
+\subsection{Architectural Layers}
+
+The extraction subsystem is organized into four logical layers, each depending only on the layers below it:
+
+\begin{table}[htpb]
+  \centering
+  \begin{tabular}{|c|l|l|}
+    \hline
+    \textbf{Layer} & \textbf{Module} & \textbf{Responsibility} \\ \hline
+    1 (Top) & \texttt{analyzer.rs} & Orchestration: parsing, CST traversal (\texttt{walk\_cst}) \\ \hline
+    2 & \texttt{heuristics/mod.rs} & Dispatcher (\texttt{dispatch\_node}), priority routing \\ \hline
+    3 & \texttt{heuristics/classifiers.rs}, \texttt{parsers.rs} & Classification predicates and IR component parsers \\ \hline
+    4 (Bottom) & \texttt{heuristics/*\_extraction.rs} & Low-level data extraction from CST nodes \\ \hline
+  \end{tabular}
+  \caption{Logical layer architecture of the extraction subsystem.}
+  \label{tab:extraction_layers}
+\end{table}
+
+\subsection{The Entry Point: \texttt{generic\_extract}}
+
+The top-level extraction function \texttt{generic\_extract} receives a Tree-sitter \texttt{Language} grammar and a source string, and produces a vector of IR modules:
+\begin{enumerate}
+  \item A Tree-sitter parser is instantiated and configured with the language grammar.
+  \item The source code is parsed into a CST, producing a root node.
+  \item If the language uses package declarations (e.g., Java), the root is scanned for a package declaration node.
+  \item The recursive traversal function \texttt{walk\_cst} is invoked on the root node, populating a module vector.
+\end{enumerate}
+
+\subsection{CST Traversal: \texttt{walk\_cst}}
+\label{sec:walk_cst}
+
+The function \texttt{walk\_cst} is the core of the extraction phase. It recursively visits every node of the CST and delegates classification to the dispatcher. The traversal logic follows three rules:
+
+\begin{enumerate}
+  \item For each CST node, invoke \texttt{dispatch\_node}. If the dispatcher returns a recognized component, insert it into the current module context and \textbf{return} (do not descend into children). This ``pruning'' rule prevents the methods of a class from being extracted both as methods of the class and as independent free functions.
+  \item \textbf{Exception for Modules}: When a module is recognized (e.g., Rust \texttt{mod}, C++ \texttt{namespace}), a temporary module vector is created and the children of the module node are re-traversed in the context of the new module. After traversal, the populated module is inserted as a sub-module.
+  \item \textbf{Exception for Functions}: When a function is recognized, its children of type ``body'' or ``block'' are still traversed, because some languages allow defining classes or structs inside a function body.
+  \item If the dispatcher returns \texttt{None} (unrecognized node), recursively traverse all children.
+\end{enumerate}
+
+An implicit ``root'' module is created lazily when the first component is encountered, ensuring that the IR always contains at least one module.
+
+\subsection{The Heuristic Dispatcher}
+\label{sec:dispatcher}
+
+The dispatcher is the central decision point. For each CST node, it invokes a chain of \texttt{try\_parse\_*} functions in a fixed priority order, returning the first successful match:
+
+\begin{enumerate}
+  \item \textbf{Imports} (highest priority): Recognized via exact node kind matching (\texttt{use\_declaration}, \texttt{import\_statement}, \texttt{preproc\_include}, etc.).
+  \item \textbf{Attributes / Decorators}: Recognized and buffered as pending annotations to be attached to the next component.
+  \item \textbf{Modules / Namespaces}: Recognized if inline modules or namespaces are enabled in the language configuration.
+  \item \textbf{Structured Types}: Classes, structs, interfaces, traits, enums.
+  \item \textbf{Functions / Methods}: Free functions, method declarations, constructors.
+  \item \textbf{Implementation Blocks}: Rust \texttt{impl} blocks (only if \texttt{support\_impl\_blocks} is enabled).
+  \item \textbf{Type Aliases}: \texttt{typedef}, \texttt{type} alias statements.
+  \item \textbf{Free Variables / Global Declarations} (lowest priority).
+\end{enumerate}
+
+The dispatch order is chosen to prevent ambiguity: a module node containing struct definitions must be captured as a module before any inner struct is matched, and a class node must be captured whole before its methods are individually matched as functions.
+
+\subsection{Classification Heuristics}
+\label{sec:classifiers}
+
+The classifiers are boolean predicates that identify the \textit{role} of a CST node using string-based pattern matching on the node's \texttt{kind()} property. This approach is the key to language agnosticism: rather than maintaining separate grammar rules per language, the analyzer exploits the observation that Tree-sitter grammars across different languages use remarkably similar naming conventions for equivalent constructs \cite{TODO:tree_sitter}.
+
+Each classifier follows a pattern of \textbf{positive keywords} (the node kind must contain one of several expected substrings) combined with \textbf{negative exclusions} (the node kind must not contain substrings that indicate a different role). Table \ref{tab:classifiers} summarizes the main classifiers and their cross-language coverage.
+
+\begin{table}[htpb]
+  \centering
+  \small
+  \begin{tabular}{|l|l|l|}
+    \hline
+    \textbf{Classifier} & \textbf{Positive Keywords} & \textbf{Negative Exclusions} \\ \hline
+    \texttt{is\_module} & \texttt{mod\_item}, \texttt{module}, \texttt{namespace} & \texttt{identifier} \\ \hline
+    \texttt{is\_structured\_type} & \texttt{struct}, \texttt{class}, \texttt{interface}, \texttt{trait}, \texttt{enum} & \texttt{expression}, \texttt{call}, \texttt{body}, \texttt{list}, \texttt{constructor}, ... \\ \hline
+    \texttt{is\_function} & \texttt{function}, \texttt{method}, \texttt{fn\_item}, \texttt{def}, \texttt{constructor} & --- \\ \hline
+    \texttt{is\_import} & (exact match: specific node kinds per language) & --- \\ \hline
+    \texttt{is\_impl\_block} & \texttt{impl\_item}, \texttt{impl\_block} & --- \\ \hline
+    \texttt{is\_free\_variable} & \texttt{static\_item}, \texttt{const\_item}, \texttt{declaration} & parent is function/block \\ \hline
+  \end{tabular}
+  \caption{Summary of the main classifier predicates and their heuristic matching rules.}
+  \label{tab:classifiers}
+\end{table}
+
+The negative exclusions are necessary to prevent false positives. For instance, the node kind \texttt{struct\_expression} contains the substring ``struct'' but represents an instantiation (e.g., \texttt{MyStruct \{ field: value \}}), not a type definition. Similarly, \texttt{constructor\_declaration} contains ``struct'' (via ``con\textbf{struct}or'') and must be excluded from the structured type classifier.
+
+\subsection{Structural Parsers}
+
+Once a node has been classified, a \texttt{try\_parse\_*} function invokes the appropriate extractors to populate the IR component:
+
+\begin{itemize}
+  \item \textbf{Structured Types}: The parser extracts the qualified name, fields, methods, super-types, nested types, and annotations. Methods, fields, and nested types are extracted internally by the parser (using the generic list combinator \texttt{extract\_list\_of}), which is why the CST traversal prunes the subtree after recognizing a structured type.
+  \item \textbf{Functions}: The parser extracts the identifier, parameters, return type, annotations, and body block. If the function has a body (i.e., it is not a forward declaration), the body is extracted as a structured \texttt{Block} ($\mathcal{B}$) via \texttt{extract\_block}.
+  \item \textbf{Imports}: The parser combines structural CST inspection (named fields) with textual fallbacks (searching for \texttt{as} aliases, wildcard \texttt{*} symbols, and path separators).
+  \item \textbf{Implementation Blocks}: The parser extracts the target type (\texttt{impl\_for}), the optional implemented trait, methods, nested types, and type aliases.
+\end{itemize}
+
+\subsection{Low-Level Extractors}
+
+The lowest layer of the extraction subsystem provides atomic functions that interact directly with CST nodes:
+
+\begin{itemize}
+  \item \textbf{\texttt{extract\_identifier}}: Extracts the simple name of a component by trying a chain of named fields (\texttt{name}, \texttt{type\_identifier}, \texttt{identifier}), with a fallback to the \texttt{declarator} field for C/C++ declarations where the identifier may be nested inside pointer or function declarators.
+  \item \textbf{\texttt{extract\_qualified\_name}}: Extracts multi-part names (e.g., \texttt{std::vec::Vec}) by splitting on separator characters (\texttt{:}, \texttt{.}).
+  \item \textbf{\texttt{extract\_type\_ref}}: Converts a CST node into a \texttt{TypeRef}, operating through a cascade of progressively less specific strategies:
+    \begin{enumerate}
+      \item If the node is a direct identifier or scoped identifier, extract its text immediately.
+      \item Try named fields (\texttt{type}, \texttt{return\_type}, \texttt{field\_type}).
+      \item Iterate over children looking for \texttt{type\_identifier} or \texttt{primitive\_type} nodes.
+      \item Fall back to textual parsing: search for \texttt{:} or \texttt{->} in the node text and extract everything after it.
+      \item If all strategies fail, return \texttt{TypeRef::Failed}.
+    \end{enumerate}
+    For union types (e.g., Python \texttt{Union[A, B]} or \texttt{A | B}), the extractor recursively decomposes the union and returns \texttt{TypeRef::Union($\vec{\tau}$)}.
+  \item \textbf{\texttt{extract\_parameters}}: Locates the \texttt{parameters} named field and iterates over children of type ``parameter'', extracting name, type, and variadic flag for each. A sanitization step compares the extracted type with the parameter name to prevent the common false positive where an untyped parameter's name (e.g., Python's \texttt{self}) is mistakenly returned as its type.
+  \item \textbf{\texttt{extract\_super\_types}}: Searches for super-type references in a variety of named fields (\texttt{super\_type}, \texttt{extends}, \texttt{implements}, \texttt{superclass}, \texttt{interfaces}, \texttt{base\_class\_clause}) and through trait bound syntax.
+  \item \textbf{\texttt{extract\_list\_of}}: A generic higher-order combinator that takes a parser function and applies it to all children of a node. If a child is not matched by the parser but is a container node (its kind contains ``body'', ``list'', or ``block''), the combinator descends recursively. A guard prevents descent into function bodies to avoid extracting local variables as fields.
+\end{itemize}
+
+\subsection{Structured Body Extraction}
+\label{sec:body_extraction}
+
+The body of a function is extracted into a structured \texttt{Block} ($\mathcal{B}$) that preserves the lexical scope hierarchy. The function \texttt{extract\_block} classifies each child of a body node into three categories:
+
+\begin{enumerate}
+  \item \textbf{Local Variable Declarations}: Nodes matching known declaration kinds (\texttt{let\_declaration}, \texttt{local\_variable\_declaration}, \texttt{variable\_declaration}, etc.) are extracted as \texttt{Field} entries in the block's \texttt{declarations} vector. When a variable has no explicit type annotation, \texttt{infer\_variable\_type} inspects the initializer expression for instantiation or constructor patterns (e.g., \texttt{new Foo()}, \texttt{Bar::new()}).
+  \item \textbf{Nested Blocks}: Children whose kind contains ``body'' or ``block'' (or equals ``compound\_statement'') are recursively extracted as sub-blocks, creating a tree of \texttt{Block} structures that mirrors the control-flow nesting of the source code.
+  \item \textbf{Behavioral Dependencies}: All remaining children are passed to \texttt{find\_behavioral\_deps}, which recursively searches the subtree for:
+    \begin{itemize}
+      \item \textbf{Instantiations}: \texttt{object\_creation\_expression} (Java/C++ \texttt{new}), \texttt{struct\_expression} (Rust struct literals).
+      \item \textbf{Function Calls}: \texttt{call\_expression}, \texttt{method\_invocation}, with special handling for scoped calls (\texttt{Module::func()}), method calls (\texttt{obj.method()}), and simple calls (\texttt{func()}).
+      \item \textbf{Field Accesses}: \texttt{field\_access}, \texttt{member\_expression}.
+      \item \textbf{Type Casts}: \texttt{cast\_expression}, \texttt{type\_cast\_expression}.
+    \end{itemize}
+    The behavioral dependency search skips nested block nodes to avoid double-counting: dependencies inside sub-blocks are captured by the recursive \texttt{extract\_block} call, not by \texttt{find\_behavioral\_deps}.
+\end{enumerate}
+
+\subsection{Annotation and Decorator Extraction}
+
+Metadata annotations, decorators, and attributes are extracted across diverse syntactic forms:
+\begin{itemize}
+  \item \textbf{Python}: Decorators are extracted from \texttt{decorated\_definition} parent nodes, handling both simple (\texttt{@decorator}) and parameterized (\texttt{@decorator(args)}) forms.
+  \item \textbf{Rust}: Attributes are extracted by walking preceding siblings looking for \texttt{attribute\_item} nodes. Derive macros (\texttt{\#[derive(Debug, Clone)]}) are expanded by inspecting argument children.
+  \item \textbf{Java}: Annotations are extracted from \texttt{modifiers} children containing \texttt{marker\_annotation} or \texttt{annotation} nodes.
+\end{itemize}
+
+Extracted annotations are buffered as ``pending attributes'' during CST traversal and attached to the next recognized component, preserving the association between a decorator and the entity it decorates.
+
+\subsection{Language-Agnostic Structural Heuristics}
+
+The extraction layer relies on two categories of heuristics that operate purely on CST structure without requiring language-specific branches:
+
+\begin{itemize}
+  \item \textbf{Recursive Declarator Descent}: In languages like C and C++, the base identifier or parameter list of a function declaration can be nested inside multiple declarator nodes (e.g., \texttt{pointer\_declarator} wrapping \texttt{function\_declarator}). The extractors recursively descend the CST until they identify the semantic leaf (the identifier or the parameter list), enabling correct extraction of functions returning pointers, typedefs, and other complex declaration forms.
+  \item \textbf{Contextual Classification via Parent Chain}: To distinguish a global variable from a local variable (both of which produce the same \texttt{declaration} node kind in C), the classifier walks up the parent chain. If the declaration is nested inside a \texttt{compound\_statement} or \texttt{function\_definition}, it is classified as local; if its parent is a \texttt{translation\_unit} or \texttt{declaration\_list}, it is classified as a global/free variable.
+\end{itemize}
+
+\section{Workspace Orchestration and Module Strategies}
+\label{sec:workspace_orchestration}
+
+While \texttt{generic\_extract} operates on individual files, the analyzer is designed for multi-file projects. The workspace orchestration proceeds as follows:
+
+\begin{enumerate}
+  \item The workspace directory is recursively scanned, filtering files by their extension to determine the source language.
+  \item Each file is independently extracted via \texttt{parse\_source}, which invokes \texttt{generic\_extract} and then applies a \textbf{Module Grouping Strategy} to determine the hierarchical placement of the extracted modules.
+  \item All extracted module hierarchies from all files are accumulated into a single global \texttt{$\vec{\mathcal{M}}$}. Primitive registries from each language are merged into a combined registry.
+  \item Only after all files have been extracted and unified does the system invoke Phase 2 (Name Resolution) on the complete workspace. This design ensures that cross-file dependencies are resolved transparently, because the resolver operates on the entire project simultaneously.
+\end{enumerate}
+
+\subsection{Module Grouping Strategies}
+
+The module grouping strategy determines how the flat output of \texttt{generic\_extract} is organized into the hierarchical module tree. The choice of strategy is controlled by the \texttt{ModuleConfig} section of the language configuration ($\mathcal{K}_{cfg}$):
+
+\begin{itemize}
+  \item \textbf{Directory-Based} (Python, Rust): The file's relative path within the workspace is used to construct a nested module hierarchy. Common root prefixes (\texttt{src}, \texttt{lib}, \texttt{include}) are stripped, and the file stem becomes the leaf module name. For example, the file \texttt{src/core/utils.py} produces the module path $\langle \texttt{core}, \texttt{utils} \rangle$.
+  \item \textbf{Package-Declaration-Based} (Java): The file-level package statement (e.g., \texttt{package com.example.service;}) determines the module hierarchy. File-scoped imports are distributed to all top-level structured types to ensure that each class carries its own import context.
+  \item \textbf{Namespace / Inline Module} (C++, Rust): Namespace or inline module blocks parsed during CST traversal directly create sub-modules in the IR tree.
+  \item \textbf{Flat / Fallback} (C): All components are placed directly into a single root module.
+\end{itemize}
+
+\subsection{Out-of-Line Method Linking}
+\label{sec:out_of_line}
+
+In C++, methods are frequently declared inside a class header (\texttt{.hpp}) and defined out-of-line in a separate source file (\texttt{.cpp}) using qualified names (e.g., \texttt{void MyClass::myMethod() \{ ... \}}). Since the extraction phase processes files independently, these out-of-line definitions are initially extracted as free functions with multi-part names.
+
+When the \texttt{forward\_declarations} flag is enabled in the language configuration, the function \texttt{link\_out\_of\_line\_methods} performs a post-extraction linking step:
+\begin{enumerate}
+  \item Free functions with qualified names (i.e., names containing more than one segment) are identified and removed from the free function list.
+  \item For each such function, the class prefix is extracted and matched against the structured types in the current module.
+  \item If the target class is found, the method is stripped of its class prefix and appended to the class's method list.
+  \item If the target class is not found in the current module (because the declaration and definition are in separate files), a synthetic \texttt{ImplBlock} is created with the target type set to a \texttt{ResolutionQuery}. This allows the standard name resolution mechanism (Phase 2) to resolve the target class across file boundaries.
+\end{enumerate}
+
+This approach unifies the handling of Rust \texttt{impl} blocks and C++ out-of-line methods under the same \texttt{ImplBlock} abstraction, reinforcing the language-agnostic design.
+
+\section{Phase 2: Name Resolution ($R$)}
+\label{sec:name_resolution}
+
+The name resolution phase transforms the symbolic type references ($\tau = \texttt{Unresolved}$) produced by the extraction phase into semantically resolved pointers ($\tau = \texttt{Resolved}$, \texttt{External}, \texttt{Primitive}$, or $\texttt{Failed}$). This phase operates entirely on the IR domain and is independent of the source language.
+
+The resolution is decomposed into two algebraic sub-phases:
+
+\begin{enumerate}
+  \item \textbf{Query Building} ($R_{build}$): Traverses the module hierarchy with a local \textit{Symbol Stack} ($\rho$), replacing raw \texttt{Unresolved} paths with algebraic \texttt{ResolutionQuery} expressions.
+  \item \textbf{Query Execution} ($R_{exec}$): Builds a global \textit{Scope Tree} ($\mathcal{E}$) from the entire workspace and evaluates all query expressions against it.
+\end{enumerate}
+
+\subsection{The Query Algebra ($\mathcal{Q}$)}
+
+Rather than resolving raw strings eagerly, the system encodes resolution intent as an algebraic formula $\mathcal{Q}$ composed of three navigation primitives:
+
+\begin{itemize}
+  \item \textbf{Find($s$)}: Ascending search. Starting from the current lexical scope, climb up the scope tree until a symbol named $s$ is found. This models lexical scope resolution.
+  \item \textbf{Extract($q$, $s$)}: Structural member descent. Evaluate sub-query $q$ to obtain a scope, then search for member $s$ within that scope (including inherited members from super-types). This models qualified access paths like \texttt{obj.field} or \texttt{Module::Type}.
+  \item \textbf{Call($q$)}: Transitive invocation. Evaluate sub-query $q$ to obtain a function or callable, then resolve to its return type. This models method chaining patterns like \texttt{foo.bar().baz()}.
+\end{itemize}
+
+For example, the chained access \texttt{a.b.method()} is encoded as:
+$$\texttt{Call}(\texttt{Extract}(\texttt{Extract}(\texttt{Find}(\texttt{a}), \texttt{b}), \texttt{method}))$$
+
+\subsection{Phase 2a: Query Building and the Symbol Stack ($\rho$)}
+\label{sec:query_building}
+
+The first sub-phase traverses the extracted module hierarchy and transforms every \texttt{TypeRef::Unresolved} into a \texttt{TypeRef::ResolutionQuery} by applying the \textit{Symbol Stack} ($\rho$).
+
+The Symbol Stack is an ephemeral lexical environment that tracks local variable and parameter bindings within function scopes. It is structured as a stack of frames, where each frame maps identifier names to their corresponding query expressions. When the builder encounters a local variable declaration \texttt{let x: Foo}, it pushes the binding $x \mapsto \texttt{Find}(\texttt{Foo})$ onto the current frame. When a type reference \texttt{x.bar} is later encountered, the builder looks up $x$ in the stack and substitutes it, producing $\texttt{Extract}(\texttt{Find}(\texttt{Foo}), \texttt{bar})$.
+
+This substitution mechanism serves a dual purpose:
+\begin{itemize}
+  \item It removes local variable names from the IR, since local variables are not architectural graph nodes. The dependency is redirected from the variable name to the type it carries.
+  \item It enables resolution of method chains: if \texttt{x} is of type \texttt{Foo}, then \texttt{x.bar()} generates $\texttt{Call}(\texttt{Extract}(\texttt{Find}(\texttt{Foo}), \texttt{bar}))$, which will correctly resolve \texttt{bar} as a member of \texttt{Foo}.
+\end{itemize}
+
+For languages that use an implicit \texttt{self} or \texttt{this} parameter, the builder injects the appropriate binding based on the language configuration ($\mathcal{K}_{cfg}$). In Python, where \texttt{self} is the first explicit parameter of methods, the configuration flag \texttt{implicit\_first\_param\_as\_self} triggers automatic injection of the self binding.
+
+At the end of Phase 2a, the Symbol Stack is destroyed. All type references in the IR are now either \texttt{ResolutionQuery} expressions (to be evaluated in Phase 2b) or already in a terminal state (\texttt{Primitive}, \texttt{Failed}).
+
+\subsection{Phase 2b: Query Execution and the Scope Tree ($\mathcal{E}$)}
+\label{sec:query_execution}
+
+The second sub-phase builds a global \textbf{Scope Tree} ($\mathcal{E}$) from the entire workspace and evaluates all \texttt{ResolutionQuery} expressions against it.
+
+\subsubsection{The Scope Tree}
+
+The Scope Tree is a hierarchical data structure that mirrors the lexical scoping rules of the source code. It is implemented using an \textbf{Arena Allocator} pattern: all scopes reside in a contiguous flat vector (\texttt{Vec<Scope>}), indexed by integer \texttt{ScopeId} values. Each scope contains:
+\begin{itemize}
+  \item A \textbf{symbol table}: a hash map from identifier names to \texttt{Symbol} entries (which can be modules, types, type aliases, or values).
+  \item A \textbf{parent pointer}: an optional \texttt{ScopeId} referencing the enclosing scope.
+  \item An \textbf{import list}: the imports declared in this scope.
+  \item A \textbf{super-types list}: the inheritance or trait implementation references for type scopes.
+\end{itemize}
+
+The arena allocator eliminates the need for reference-counted pointers or recursive data structures, satisfying the Rust ownership model while enabling efficient traversal. Navigation between scopes is performed via integer indexing, and path reconstruction proceeds by ascending parent pointers.
+
+The Scope Tree is constructed by recursively registering all modules, structured types, functions, fields, type aliases, and implementation blocks from the workspace. After all types are declared, deferred \texttt{ImplBlock} registrations are processed: the target type is located in the tree, and the block's methods, nested types, and type aliases are flattened into the target type's scope.
+
+\subsubsection{Lexical Scope Climbing}
+
+When evaluating a \texttt{Find($s$)} query, the executor starts at the scope where the reference was declared and climbs the parent chain until the identifier $s$ is found:
+
+\begin{enumerate}
+  \item Search the current scope's symbol table and its inherited super-type scopes (using depth-first, left-to-right method resolution order).
+  \item Search the current scope's imports: if an import path ends with $s$ (direct import) or with a wildcard \texttt{*} (wildcard import), attempt to resolve the full path globally.
+  \item If not found, move to the parent scope and repeat.
+  \item If the root scope is reached without a match, attempt a global search from the root.
+  \item If the global search also fails, check the \textit{Primitive Registry}. If $s$ is a known primitive type, return \texttt{TypeRef::Primitive}.
+  \item Otherwise, return \texttt{TypeRef::Failed}.
+\end{enumerate}
+
+Special handling is provided for the keywords \texttt{self}/\texttt{this} (resolved to the enclosing type), \texttt{Self} (resolved to the target type in an \texttt{impl} block), and \texttt{super} (resolved to the parent type in an inheritance chain).
+
+\subsubsection{Member Extraction and Inheritance Resolution}
+
+When evaluating an \texttt{Extract($q$, $s$)} query, the executor first evaluates $q$ to obtain a target scope, then searches for member $s$ within that scope. If $s$ is not found directly, the search proceeds through the type's super-type hierarchy using a depth-first, left-to-right traversal. A \texttt{visited} set prevents infinite loops in the presence of diamond inheritance or circular trait dependencies.
+
+For Rust, a special mechanism handles the \texttt{Deref} trait: when a type alias named \texttt{Target} is defined inside an \texttt{impl Deref for T} block, the target type is added to \texttt{T}'s super-types, enabling automatic deref coercion during member resolution.
+
+\subsubsection{Transitive Import Resolution}
+
+When the \texttt{transitive\_imports} flag is enabled (e.g., for Python), the resolver can follow import chains through intermediate modules. If a member $s$ is not found directly in a module scope, the resolver inspects the module's imports for re-exported symbols. This models Python's practice of importing and re-exporting names through \texttt{\_\_init\_\_.py} files.
+
+\subsection{The Execution Context ($\Gamma$)}
+
+The query execution operates within an immutable \textbf{Execution Context}:
+$$\Gamma = \langle \mathcal{E}, \mathcal{PR}, \mathcal{K}_{cfg} \rangle$$
+where $\mathcal{E}$ is the Scope Tree, $\mathcal{PR}$ is the Primitive Registry, and $\mathcal{K}_{cfg}$ is the language configuration. The immutability of $\Gamma$ during execution guarantees deterministic, side-effect-free evaluation across all modules, and ensures that the resolution result is independent of the order in which queries are evaluated.
+
+\subsection{Resolution Configuration ($\mathcal{K}_{cfg}$)}
+
+Due to the semantic differences between supported languages, the resolution phase is parameterized by a per-language configuration. Table \ref{tab:resolution_config} summarizes the key configuration parameters and their effects on the resolution behavior.
+
+\begin{table}[htpb]
+  \centering
+  \small
+  \begin{tabular}{|l|l|p{6cm}|}
+    \hline
+    \textbf{Parameter} & \textbf{Type} & \textbf{Effect on Resolution} \\ \hline
+    \texttt{transitive\_imports} & \texttt{bool} & Enables following import chains through intermediate modules. \\ \hline
+    \texttt{support\_impl\_blocks} & \texttt{bool} & Activates flattening of \texttt{ImplBlock} methods into target type scopes. \\ \hline
+    \texttt{forward\_declarations} & \texttt{bool} & Enables \texttt{link\_out\_of\_line\_methods} for C++ qualified definitions. \\ \hline
+    \texttt{self\_keyword} & \texttt{Option<String>} & Injects the self/this binding into method scopes. \\ \hline
+    \texttt{self\_type\_keyword} & \texttt{Option<String>} & Injects a \texttt{Self} type alias in \texttt{impl} block scopes. \\ \hline
+    \texttt{implicit\_first\_param\_as\_self} & \texttt{bool} & Treats the first method parameter as an implicit self reference (Python). \\ \hline
+    \texttt{extract\_dynamic\_fields} & \texttt{bool} & Enables extraction of dynamically assigned instance fields (Python \texttt{self.x = ...}). \\ \hline
+    \texttt{deref\_coercion\_target\_name} & \texttt{Option<String>} & Identifies the target alias in \texttt{Deref} trait implementations (Rust). \\ \hline
+  \end{tabular}
+  \caption{Key resolution configuration parameters and their semantic effects.}
+  \label{tab:resolution_config}
+\end{table}
+
+Through this configuration map $\mathcal{K}_{cfg}: \mathcal{L} \to \mathcal{C}_{params}$, the resolution engine specializes its behavior for each language while maintaining a strictly language-agnostic core algorithm.
+
+\section{Properties of the Analysis Model}
+\label{sec:analysis_properties}
+
+The formal decomposition of the pipeline demonstrates three fundamental properties:
+
+\begin{enumerate}
+  \item \textbf{Type Safety}: Each function $f: I \to O$ operates strictly on its declared input and output domains. The composition of well-typed functions through the three phases is itself well-typed, preventing the generation of inconsistent intermediate states.
+  \item \textbf{Language Agnosticism}: The separation between Phase 1 ($L$-dependent) and Phases 2--3 ($L$-independent) ensures that the resolution engine and graph construction logic are not influenced by the syntax of the source language. The only language-dependent component is the extraction heuristic, which itself avoids hardcoded language branches in favor of structural pattern matching on CST node kinds.
+  \item \textbf{Termination}: The CST traversal is structurally recursive (bounded by the finite depth of the syntax tree). The scope climbing algorithm is bounded by the finite depth of the scope tree. Cycle detection via visited sets prevents infinite loops in inheritance resolution. Therefore, the entire analysis process is guaranteed to terminate in finite time for all valid inputs.
+\end{enumerate}
+

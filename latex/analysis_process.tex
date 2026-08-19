@@ -1,246 +1,314 @@
-\chapter{Formalizzazione del Processo di Analisi Funzionale}
-\section{Introduzione}
-Il sistema di analisi è modellato come una sequenza di trasformazioni
-tra domini. La pipeline complessiva è definita dalla composizione di
-tre fasi principali: Estrazione Sintattica, Risoluzione Semantica e
-Costruzione del Grafo.
-Siano $\mathcal{L}$ l'insieme dei linguaggi supportati,
-$\mathcal{W}$ il dominio di un Workspace (costituito da molteplici
-file sorgenti $\mathcal{S}_{code}$) e
-$\mathcal{D}_{IR}$ il dominio della rappresentazione intermedia
-definito nel capitolo precedente.
+\chapter{The Analysis Pipeline}
+\label{ch:analysis_pipeline}
 
-La funzione di analisi completa $\Phi$ è definita come la
-composizione delle tre fasi fondamentali:
-$$\Phi : \mathcal{W} \to \mathcal{G}$$
-$$\Phi = G \circ R \circ E_{w}$$
-Dove:
-\begin{itemize}
-  \item $E_{w} : \mathcal{W} \to \vec{\mathcal{M}}$ è la funzione di
-    \textbf{Estrazione Olistica}, che applica il parser sintattico $E
-    : \mathcal{L} \times \mathcal{S}_{code} \to \mathcal{M}$ a ogni
-    file del workspace, unificando le estrazioni in una singola
-    foresta di moduli.
-  \item $R : \vec{\mathcal{M}} \to \vec{\mathcal{M}}$ è la funzione di
-    \textbf{Risoluzione} (motore a Query).
-  \item $G : \vec{\mathcal{M}} \to \mathcal{G}$ è la funzione di
-    \textbf{Costruzione del Grafo}.
-\end{itemize}
-Questa formulazione evidenzia come il sistema sia una composizione di
-funzioni pure dove l'output di ogni funzione è l'input della
-successiva. Se le funzioni sono ben tipizzate e semanticamente
-corrette, allora la loro composizione, se ben tipizzata, é
-semanticamente corretta.
+\section{Overview}
+\label{sec:pipeline_overview}
 
-\section{Fase 1: Estrazione Sintattica ($E$)}
-L'estrazione mappa i nodi dell'albero sintattico concreto
-($\mathcal{N}$) nel dominio dell'IR. Questa fase è l'unica dipendente
-dal linguaggio $L \in \mathcal{L}$. Poiché i nodi dell'albero
-sintattico contengono solo metadati posizionali, ogni funzione riceve
-in input anche il codice sorgente $S \in \mathcal{S}_{code}$.
+The analysis system is modeled as a composition of three sequential
+transformations, each operating on well-defined input and output
+domains. Let $\mathcal{L}$ be the set of supported languages,
+$\mathcal{W}$ the domain of a Workspace (a collection of source files
+$\mathcal{S}_{code}$), and $\mathcal{D}_{IR}$ the domain of the
+Intermediate Representation defined in Chapter
+\ref{ch:ir_formalization}. The complete analysis function $\Phi$ is defined as:
+$$\Phi : \mathcal{W} \to \mathcal{G} \qquad \Phi = \gamma \circ R \circ E_w$$
 
-\subsection{Funzioni Core}
-\begin{itemize}
-  \item \textbf{Generic Extract} ($\text{generic\_extract} :
-    \mathcal{L} \times \mathcal{S}_{code} \to \mathcal{M}$): \\
-    Mappa l'intero sorgente in un unico \textbf{Modulo Radice}
-    $\mathcal{M}$ che funge da entry-point del Component Tree.
-  \item \textbf{Node Dispatcher} ($\text{dispatch\_node} :
-    \mathcal{N} \times \mathcal{S}_{code} \to \mathcal{C}^?$): \\
-    Dato un nodo sintattico, identifica il costrutto e delega
-    l'estrazione al parser specifico, restituendo un Componente opzionale.
-\end{itemize}
+The pipeline is illustrated in Figure \ref{fig:analysis_pipeline}.
+Each phase receives the output of its predecessor and produces a
+strictly richer representation of the codebase.
 
-\subsection{Parser Strutturali}
-Le funzioni di mapping che istanziano i componenti principali o
-estraggono i tipi base necessari per la costruzione dell'IR.
-\begin{itemize}
-  \item $\text{try\_parse\_import} : \mathcal{N} \times
-    \mathcal{S}_{code} \to \mathcal{I}_{import}^?$ (Import)
-  \item $\text{try\_parse\_structured\_type} : \mathcal{N} \times
-    \mathcal{S}_{code} \to \mathcal{S}^?$ (Tipi Strutturati)
-  \item $\text{try\_parse\_function} : \mathcal{N} \times
-    \mathcal{S}_{code} \to \mathcal{F}^?$ (Funzioni)
-  \item $\text{try\_parse\_impl\_block} : \mathcal{N} \times
-    \mathcal{S}_{code} \to \mathcal{B}_{lk}^?$ (Blocchi di Implementazione)
-\end{itemize}
+\begin{figure}[htpb]
+  \centering
+  \includegraphics[width=\textwidth]{images/analysis_pipeline.png}
+  \caption{Overview of the three-phase analysis pipeline, from source
+  code to dependency graph.}
+  \label{fig:analysis_pipeline}
+\end{figure}
 
-\subsection{Helper di Estrazione}
-Funzioni atomiche che estraggono i tipi base necessari per la
-costruzione dei componenti dell'IR:
-\begin{itemize}
-  \item $\text{extract\_qualified\_name} : \mathcal{N} \times
-    \mathcal{S}_{code} \to \mathcal{QN}^?$ \\
-    Estrae il nome qualificato (es. \texttt{std::vec::Vec})
-    analizzando l'identificatore o il percorso sintattico.
-  \item $\text{extract\_type\_ref} : \mathcal{N} \times
-    \mathcal{S}_{code} \to \tau$ \\
-    Mappa un nodo rappresentante un tipo in un riferimento $\tau$
-    (generando stati \texttt{Unresolved} o \texttt{Failed}).
-  \item $\text{extract\_fields} : \mathcal{N} \times
-    \mathcal{S}_{code} \to \vec{F}$ \\
-    Estrae l'insieme dei campi di un tipo strutturato.
-  \item $\text{extract\_parameters} : \mathcal{N} \times
-    \mathcal{S}_{code} \to \vec{P}$ \\
-    Estrae la lista dei parametri di una funzione, preservando
-    ordine, tipi e variadicità.
-    \item $\text{extract\_super\_types} : \mathcal{N} \times
-    \mathcal{S}_{code} \to \vec{\tau}$ \\
-    Estrae i riferimenti alle gerarchie di ereditarietà o
-    implementazione di trait (gestendo anche sintassi specifiche come
-    i Trait Bounds in Rust).
-\end{itemize}
+A fundamental design property of this decomposition is the separation
+between language-dependent and language-independent logic. Phase 1 is
+the only phase that interacts with language-specific syntax; Phases 2
+and 3 operate entirely on the language-agnostic IR, ensuring that the
+core analytical logic is shared across all supported languages.
 
-L'astrazione di queste funzioni è supportata da euristiche puramente \textit{strutturali}, prive di regole cablate per linguaggio. Ad esempio:
-\begin{itemize}
-    \item \textbf{Discesa Strutturale dei Declarator:} In linguaggi complessi come C e C++, l'identificatore base o l'elenco parametri possono trovarsi annidati all'interno di molteplici nodi (es. \texttt{pointer\_declarator}, \texttt{function\_declarator}). Gli estrattori discendono ricorsivamente l'AST fino a identificare le foglie semantiche, garantendo flessibilità per alias o puntatori a funzione.
-    \item \textbf{Classificazione Contestuale:} L'analizzatore identifica variabili globali e locali non dal tipo del nodo (spesso identico, es. \texttt{declaration}), ma ispezionando l'ambiente parentale (es. escludendo dichiarazioni interne a blocchi di codice \texttt{compound\_statement}).
-\end{itemize}
+\section{Phase 1: Syntactic Extraction ($E_w$)}
+\label{sec:phase1_overview}
 
-\section{Fase 2: Risoluzione dei Nomi e Motore a Query ($R$)}
-La fase di risoluzione trasforma i riferimenti simbolici estratti dal
-codice in puntatori
-semantici certi, attraversando due step algebrici (Sostituzione ed
-Esecuzione). Questa fase opera interamente sul dominio dell'IR ed è
-indipendente dal linguaggio sorgente e dal numero di file che
-compongono il Workspace.
+$$E_w : \mathcal{W} \to \vec{\mathcal{M}}$$
 
-\subsection{L'Algebra delle Query e lo Scope Tree}
-L'intera formalizzazione dell'architettura a due fasi (basata sul
-  \textit{Symbol Stack} per la sostituzione locale e sullo
-\textit{Scope Tree} per la navigazione globale) è trattata in
-modo esaustivo nel Capitolo \ref{ch:name_resolution}.
-A differenza dei modelli a registro piatto, l'adozione di un albero gerarchico allocato tramite \textit{Arena Allocator} modella esattamente lo scope lessicale sorgente. Durante l'esecuzione delle query, il motore effettua un \textit{Lexical Climbing}: partendo dallo scope corrente risale la gerarchia fino a trovare l'identificatore cercato (oppure ricade nei tipi nativi del \textit{Primitive Registry}).
-La fusione
-unificata di tutti i moduli $\vec{\mathcal{M}}$ estratti nel
-Workspace permette allo Scope Tree di tracciare dipendenze
-*cross-file* senza latenza computazionale.
+The extraction phase transforms source code into the Intermediate
+Representation. For each source file in the workspace, a Tree-sitter
+parser \cite{TODO:tree_sitter} generates a Concrete Syntax Tree
+(CST), which is then traversed by a set of heuristic classifiers and
+parsers to identify and extract the relevant software components
+(modules, structured types, functions, fields, imports, and
+implementation blocks).
 
-\subsection{Configurazione e Politiche di Risoluzione}
-A causa delle differenze semantiche tra i vari linguaggi supportati, la fase di
-risoluzione è parametrizzata rispetto a una \textbf{Configurazione}
-($\mathcal{K}_{cfg}$).
-Tale configurazione permette di attivare o disattivare euristiche specifiche per
-emulare le convenzioni di namespace del linguaggio analizzato, senza alterare
-la logica core dell'esecutore algebrico. La configurazione si
-articola su tre assi:
-\begin{itemize}
-  \item \textbf{Global Scope Fallback}: Determina se un tipo non
-    trovato nel namespace corrente debba essere cercato nel namespace
-    globale (es. \texttt{root} in Java) o se debba essere considerato
-    non risolto. È cruciale per linguaggi come Java e C++, che
-    ammettono l'uso implicito di entità globali.
-  \item \textbf{Transitive Imports}: Selettore booleano che modella
-    la transitività dei moduli. In linguaggi come C e C++,
-    l'inclusione di un file propaga al modulo corrente anche tutto
-    ciò che tale file ha importato a sua volta (\textit{header
-    propagation}). Se attivato, l'algoritmo di risoluzione naviga
-    ricorsivamente l'albero degli import.
-  \item \textbf{Cyclic MRO Check (Method Resolution Order)}: Modella
-    la tolleranza al ciclo nell'ereditarietà. Linguaggi come C++
-    permettono gerarchie complesse di ereditarietà multipla, mentre
-    Java la restringe alle sole interfacce. L'esecutore mantiene
-    traccia dei percorsi visitati durante la ricerca di un membro
-    (\textit{find-going-down}) e risolve la MRO effettuando una
-    scansione \textit{Depth-First, Left-to-Right} che, se
-    \texttt{cyclic\_mro\_check} è attivo, previene deadlock
-    computazionali causati da eventuali dipendenze circolari (valide
-    o malformate) tra tipi.
-\end{itemize}
-Attraverso questa mappa di proprietà $\mathcal{K}_{cfg}: \mathcal{L}
-\to \{0,1\}^3$,
-il motore di risoluzione $\mathcal{R}$ si specializza mantenendo un
-design strettamente language-agnostic.
+\subsection{Input}
 
-\subsection{Appiattimento (Flattening) dei Blocchi di Implementazione}
-Durante la fase di risoluzione, il sistema applica una trasformazione
-strutturale ai blocchi di implementazione ($\mathcal{B}_{lk}$).
-Poiché $\mathcal{B}_{lk}$ rappresenta un costrutto sintattico per
-separare dichiarazione e definizione, esso viene rimosso dal modello
-architetturale finale per preservare l'agnosticismo:
+The input is a \textbf{Workspace} $\mathcal{W}$: a directory tree
+containing source files in one or more of the supported languages (C,
+C++, Java, Python, Rust). Each file is independently parsed and extracted.
+
+\subsection{Process}
+
+The extraction operates through four logical layers:
+
 \begin{enumerate}
-  \item Per ogni blocco $\mathcal{B}_{lk}$ associato a un tipo target
-    $\mathcal{S}$, le funzioni $\vec{\mathcal{F}}$ contenute nel blocco vengono
-    spostate all'interno della lista delle funzioni del tipo target.
-  \item I tipi strutturati annidati $\vec{\mathcal{S}}_{nest}$
-    contenuti nel blocco
-    vengono spostati all'interno della lista dei tipi annidati del tipo target.
-  \item Se il blocco implementa un trait ($\text{trait}^?$), il
-    riferimento a tale trait viene aggiunto all'insieme dei
-    super-tipi ($\vec{\tau}_{sup}$) del tipo $\mathcal{S}$.
+  \item \textbf{Parsing}: Tree-sitter generates a CST for each source
+    file, preserving every token of the original code.
+  \item \textbf{Classification}: Heuristic predicates inspect CST
+    node kinds (e.g., \texttt{struct\_item},
+    \texttt{function\_definition}, \texttt{class\_declaration}) using
+    string-based pattern matching to determine the role of each node.
+    This approach exploits the structural similarity of Tree-sitter
+    grammars across languages to avoid maintaining per-language rule sets.
+  \item \textbf{Structural Parsing}: Classified nodes are transformed
+    into IR components by extracting their constituent parts (names,
+    fields, methods, parameters, return types, super-types, annotations).
+  \item \textbf{Body Extraction}: Function bodies are analyzed to
+    extract behavioral dependencies (function calls, type
+    instantiations, field accesses, type casts) and local variable
+    declarations, organized into a recursive \texttt{Block} structure
+    that mirrors the lexical scope hierarchy of the source code.
 \end{enumerate}
-Al termine della risoluzione, i blocchi di implementazione scompaiono
-dal modello IR e non partecipano alla successiva generazione del grafo.
 
-\section{Fase 3: Costruzione del Grafo delle Dipendenze ($G$)}
-La fase finale proietta la struttura gerarchica dell'IR in un grafo
-orientato $\mathcal{G} = \langle V, E \rangle$ che rappresenta le
-interconnessioni architetturali del sistema.
+After individual file extraction, a \textbf{Module Grouping Strategy}
+organizes the extracted modules into a hierarchical tree that
+reflects the project's namespace conventions. Different strategies
+are applied depending on the language: directory-based namespacing
+(Python, Rust), package declarations (Java), explicit namespace
+blocks (C++), or a flat fallback (C). For C++, an additional
+\textbf{out-of-line method linking} step associates method
+definitions written in \texttt{.cpp} files with their class
+declarations in \texttt{.hpp} headers.
 
-\subsection{Nodi ($V$)}
-Ogni componente $c \in \mathcal{C}$ presente nella rappresentazione
-intermedia, in seguito alla name resolution, diventa un vertice del
-grafo. L'identità di un nodo è garantita dal suo nome qualificato
-assoluto (assumendo per il momento di non trattare il function overloading).
-% Ogni componente $c \in \mathcal{C}$ presente nel sistema risolto
-% diventa un vertice del grafo. L'identità matematica e l'unicità di
-% un nodo sono garantite dal suo $\mathcal{QN}_{id}$ (che, come
-% definito per $\Sigma$, include la firma per le funzioni in
-% overloading), impedendo il collasso di entità omonime ma distinte.
+\subsection{Output}
 
-\subsection{Archi e Relazioni ($E$)}
-Un arco $e = \langle u, v, k \rangle \in E$ rappresenta una
-dipendenza dal componente $u$ verso il componente $v$ di tipo $k \in
-\text{Kind}$. Il sistema estrae archi analizzando i riferimenti
-risolti all'interno di ogni componente:
+The output is a forest of \textbf{Module trees} $\vec{\mathcal{M}}$,
+unified across all files in the workspace. Each module contains its
+structured types, free functions, imports, implementation blocks,
+type aliases, and free variables. All type references ($\tau$) at
+this stage are in the \texttt{Unresolved} state: they carry the
+symbolic name extracted from the source code but have not yet been
+linked to their target component.
+
+\subsection{Key Properties}
 \begin{itemize}
-  \item \textbf{Ereditarietà e Implementazione}: Generata da ogni
-    $\tau \in \vec{\tau}_{sup}$ di un tipo strutturato. Poiché i
-    blocchi di implementazione sono stati appiattiti, questa
-    relazione unifica in modo agnostico sia l'ereditarietà di classe
-    che l'implementazione di trait/interfacce ($k = \text{IsA}$).
-  \item \textbf{Importazioni}: Generata dalle dipendenze esplicite
-    registrate nella lista $\mathcal{I}_{imports}$ di ogni Modulo,
-    collegando un modulo ai tipi o sottomoduli importati ($k = \text{Imports}$).
-  \item \textbf{Composizione/Uso}: Generata dal tipo di ogni campo
-    $F$ ($k = \text{UsesFieldType}$).
-  \item \textbf{Interazione Architetturale}: Generata dai tipi
-    all'interno della firma $\sigma$ di ogni funzione (sia essa
-    metodo o funzione libera), ovvero dai parametri $\vec{P}$ e dal
-    tipo di ritorno $\tau_{ret}$ ($k = \text{UsesParamType},
-    \text{UsesReturnType}$).
-  \item \textbf{Interazione Comportamentale}: Generata dall'analisi ricorsiva
-    dei blocchi lessicali $\mathcal{B}$ che costituiscono il corpo
-    di ogni funzione, includendo le dichiarazioni di variabili locali
-    ($k = \text{UsesLocalType}$),
-    le chiamate a funzioni o metodi
-    ($\vec{\tau}_{calls}$, $k = \text{Calls}$), l'istanziazione
-    esplicita di tipi strutturati ($\vec{\tau}_{inst}$, $k =
-    \text{Instantiates}$),
-    e gli accessi espliciti in lettura/scrittura allo stato di un
-    componente ($\vec{\tau}_{accesses}$, $k = \text{AccessesField}$).
-  \item \textbf{Contenimento}: Generata dalla gerarchia dei moduli e
-    dei tipi annidati ($k = \text{NestedIn}, \text{ModuleContainment}$).
+  \item This is the \textbf{only language-dependent} phase. The
+    heuristic classifiers and extractors are the sole components that
+    interact with language-specific CST node kinds.
+  \item Each file is extracted \textbf{independently}. Cross-file
+    dependencies are not resolved in this phase.
+  \item The output IR is \textbf{structurally complete} but
+    \textbf{semantically unresolved}: the topology of the codebase
+    (what components exist and what they contain) is fully captured,
+    but the targets of type references are not yet known.
 \end{itemize}
-Il grafo così costruito fornisce una visione unificata e agnostica
-delle dipendenze, permettendo analisi metriche e strutturali cross-linguaggio.
 
-\section{Proprietà del Modello}
-La formalizzazione dimostra tre proprietà fondamentali del sistema:
+The detailed implementation of this phase, including the heuristic
+classification system, the extraction algorithms, and the module
+grouping strategies, is presented in Chapter \ref{ch:extraction}.
+
+\section{Phase 2: Name Resolution ($R$)}
+\label{sec:phase2_overview}
+
+$$R : \vec{\mathcal{M}} \to \vec{\mathcal{M}}$$
+
+The name resolution phase transforms the symbolic type references
+produced by extraction into resolved semantic pointers. This is the
+phase that connects the isolated components into a coherent
+dependency network by determining, for each type reference, which
+component in the workspace it refers to.
+
+\subsection{Input}
+
+The input is the unified forest of module trees $\vec{\mathcal{M}}$
+produced by Phase 1, where all type references are in the
+\texttt{Unresolved} state.
+
+\subsection{Process}
+
+The resolution is decomposed into two algebraic sub-phases:
+
 \begin{enumerate}
-  \item \textbf{Type Safety}: Ogni funzione $f: I \to O$ opera
-    rigorosamente sui tipi definiti, assicurando che la composizione
-    delle funzioni attraverso le diverse fasi dell'analisi sia sempre
-    ben tipizzata, impedendo così la generazione di stati inconsistenti.
-  \item \textbf{Agnosticismo}: La separazione netta tra la Fase 1
-    ($L$-dependent) e le Fasi 2 e 3 ($L$-independent) assicura che il
-    core logico non sia influenzato dalla sintassi del linguaggio
-    sorgente, ma dipenda esclusivamente da proprietà semantiche
-    trasversali (come, ad esempio, le regole di visibilità o la
-    transitività degli import in linguaggi come C/C++).
-  \item \textbf{Terminazione}: Poiché la navigazione degli alberi di
-    sintassi avviene per ricorsione strutturale, e posto che le
-    operazioni interne alle singole funzioni siano dimostrabilmente
-    finite su tutti i possibili input, l'intero processo di analisi
-    convergerà sempre in tempo finito.
+  \item \textbf{Query Building} ($R_{build}$): The module hierarchy
+    is traversed with an ephemeral \textit{Symbol Stack} ($\rho$)
+    that tracks local variable bindings. Each \texttt{Unresolved}
+    type reference is replaced by an algebraic \textit{Resolution
+    Query} ($\mathcal{Q}$) composed of three primitives:
+    \begin{itemize}
+      \item \texttt{Find($s$)}: Ascending scope search for identifier $s$.
+      \item \texttt{Extract($q$, $s$)}: Structural member access on
+        the result of sub-query $q$.
+      \item \texttt{Call($q$)}: Return-type extraction after
+        evaluating sub-query $q$ as a callable.
+    \end{itemize}
+    The Symbol Stack enables local variable substitution: when a
+    reference such as \texttt{x.method()} is encountered, the stack
+    replaces \texttt{x} with its declared type, transforming the
+    reference into a query that can be resolved globally.
+
+  \item \textbf{Query Execution} ($R_{exec}$): A global \textit{Scope
+    Tree} ($\mathcal{E}$) is constructed from the entire workspace
+    using an arena allocator. Each query expression is then evaluated
+    against this tree using \textit{Lexical Scope Climbing}: starting
+    from the scope where the reference was declared, the algorithm
+    ascends the parent chain, checking local symbols, imports, and
+    inherited members, until the target is found or the root is reached.
+\end{enumerate}
+
+The resolution is parameterized by a per-language
+\textbf{configuration} ($\mathcal{K}_{cfg}$) that controls behaviors
+such as transitive import resolution, implicit self/this parameter
+injection, and Deref coercion handling.
+
+\subsection{Output}
+
+The output is the same forest of module trees $\vec{\mathcal{M}}$,
+but with all type references transformed into one of four terminal states:
+
+\begin{itemize}
+  \item \texttt{Resolved($\pi$)}: The reference was successfully
+    linked to a component within the workspace, identified by its
+    absolute qualified name $\pi$.
+  \item \texttt{External($\pi$)}: The reference points to a component
+    outside the analyzed workspace (e.g., standard library types,
+    third-party dependencies).
+  \item \texttt{Primitive($s$)}: The reference is a built-in
+    primitive type (e.g., \texttt{int}, \texttt{bool}, \texttt{String}).
+  \item \texttt{Failed($\pi$)}: The resolution was unsuccessful (the
+    target could not be found in any accessible scope).
+\end{itemize}
+
+\subsection{Key Properties}
+\begin{itemize}
+  \item This phase is \textbf{completely language-independent}. The
+    resolution algorithm operates solely on the IR, with
+    language-specific behavior controlled by configuration flags.
+  \item The resolution is \textbf{workspace-global}: because the
+    Scope Tree is built from all files simultaneously, cross-file
+    dependencies are resolved transparently.
+  \item The Execution Context ($\Gamma = \langle \mathcal{E},
+    \mathcal{PR}, \mathcal{K}_{cfg} \rangle$) is \textbf{immutable}
+    during query evaluation, guaranteeing deterministic results
+    independent of evaluation order.
+\end{itemize}
+
+The detailed implementation of this phase, including the query
+algebra, the Scope Tree construction, the lexical climbing algorithm,
+and the inheritance resolution mechanism, is presented in Chapter
+\ref{ch:name_resolution}.
+
+\section{Phase 3: Graph Construction ($\gamma$)}
+\label{sec:phase3_overview}
+
+$$\gamma : \vec{\mathcal{M}} \to \mathcal{G}$$
+
+The graph construction phase projects the resolved IR into a flat
+directed dependency graph $\mathcal{G} = (V, E)$ suitable for
+architectural analysis and visualization.
+
+\subsection{Input}
+
+The input is the resolved forest of module trees $\vec{\mathcal{M}}$
+produced by Phase 2, where type references are in their terminal states.
+
+\subsection{Process}
+
+The construction proceeds in two steps:
+
+\begin{enumerate}
+  \item \textbf{Node Flattening}: The hierarchical module tree is
+    recursively traversed, and every component (module, structured
+    type, function, field, type alias) is extracted into a flat
+    vector of vertices $V$. Each vertex receives a globally unique
+    qualified name computed by prepending all ancestor module names.
+    Additionally, implicit nodes are synthesized for primitive types
+    and external dependencies that are referenced by edges but not
+    declared in the workspace.
+  \item \textbf{Edge Generation}: The module tree is traversed a
+    second time, inspecting every resolved type reference to emit
+    directed edges. The system defines 15 distinct edge kinds
+    organized into five categories: structural (containment and
+    nesting), inheritance, type-level (field types, parameter types,
+    return types), behavioral (calls, instantiations, field
+    accesses), and auxiliary (imports, casts, annotations). After
+    generation, edges are deduplicated to prevent inflated coupling metrics.
+\end{enumerate}
+
+The graph is exported in two formats: a raw JSON serialization of the
+full \texttt{DependencyGraph} structure, and a
+Cytoscape.js-compatible format \cite{TODO:cytoscape_js} where
+structural containment is encoded as compound node nesting rather
+than explicit edges.
+
+\subsection{Output}
+
+The output is a \textbf{Dependency Graph} $\mathcal{G} = (V, E)$:
+\begin{itemize}
+  \item $V$: A flat set of vertices, each identified by its absolute
+    qualified name and typed by its component kind (Module, Class,
+    Struct, Function, Field, etc.).
+  \item $E$: A set of directed edges, each a triple $\langle
+    \pi_{from}, \pi_{to}, \text{kind} \rangle$ specifying the source,
+    target, and nature of the dependency.
+\end{itemize}
+
+An \texttt{AnalysisSummary} is also produced, containing aggregate
+statistics (total modules, structured types, free functions, resolved
+references, and failed references).
+
+\subsection{Key Properties}
+\begin{itemize}
+  \item This phase is \textbf{completely language-independent}.
+  \item Edges are generated \textbf{only} from resolved type
+    references (\texttt{Resolved} and \texttt{External}). Failed or
+    unresolved references do not produce spurious edges.
+  \item The graph is \textbf{flat}: the original hierarchical nesting
+    is encoded either as explicit containment edges or, in the
+    Cytoscape export, as compound node parent relationships.
+\end{itemize}
+
+The detailed implementation of this phase, including the flattening
+algorithm, the complete edge taxonomy, and the Cytoscape export
+process, is presented in Chapter \ref{ch:graph_construction}.
+
+\section{End-to-End Data Flow}
+\label{sec:data_flow}
+
+Table \ref{tab:pipeline_summary} summarizes the input, output, and
+key characteristics of each phase.
+
+\begin{table}[htpb]
+  \centering
+  \small
+  \begin{tabular}{|l|l|l|l|l|}
+    \hline
+    \textbf{Phase} & \textbf{Input} & \textbf{Output} &
+    \textbf{L-dependent?} & \textbf{Scope} \\ \hline
+    1. Extraction & Source files ($\mathcal{W}$) & Unresolved IR
+    ($\vec{\mathcal{M}}$) & Yes & Per-file \\ \hline
+    2. Resolution & Unresolved IR ($\vec{\mathcal{M}}$) & Resolved IR
+    ($\vec{\mathcal{M}}$) & No & Workspace-global \\ \hline
+    3. Graph Construction & Resolved IR ($\vec{\mathcal{M}}$) &
+    Dependency Graph ($\mathcal{G}$) & No & Workspace-global \\ \hline
+  \end{tabular}
+  \caption{Summary of the three pipeline phases: inputs, outputs,
+  language dependency, and operational scope.}
+  \label{tab:pipeline_summary}
+\end{table}
+
+This pipeline design ensures that:
+\begin{enumerate}
+  \item Each phase is a \textbf{pure function} operating on
+    well-typed domains. The composition $\Phi = \gamma \circ R \circ
+    E_w$ is itself well-typed.
+  \item Adding support for a new language requires implementing
+    \textbf{only} the extraction heuristics (Phase 1). Phases 2 and 3
+    are entirely reused.
+  \item The pipeline \textbf{terminates} for all valid inputs: the
+    CST traversal is bounded by the finite tree depth, the scope
+    climbing is bounded by the finite scope depth, and cycle
+    detection prevents infinite loops in inheritance resolution.
 \end{enumerate}

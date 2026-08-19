@@ -1,0 +1,31 @@
+flowchart LR
+    %% Inputs and Outputs
+    Src[\Source Code\]
+    CST([Concrete Syntax<br/>Trees])
+    IR([Unresolved IR])
+    ResIR([Resolved IR])
+    Graph((Dependency<br/>Graph))
+
+    %% Processes
+    P0[Tree-sitter Parser]
+    P1[Phase 1:<br/>Extraction]
+    P2[Phase 2:<br/>Resolution]
+    P3[Phase 3:<br/>Graph<br/>Generation]
+
+    %% Flow
+    Src --> P0 --> CST
+    CST --> P1 --> IR
+    IR --> P2 --> ResIR
+    ResIR --> P3 --> Graph
+
+    %% Styling
+    style Src fill:#eceff1,stroke:#607d8b,stroke-width:2px
+    style CST fill:#e3f2fd,stroke:#1565c0,stroke-width:2px
+    style IR fill:#fff9c4,stroke:#fbc02d,stroke-width:2px
+    style ResIR fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px
+    style Graph fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
+    
+    style P0 fill:#fafafa,stroke:#333,stroke-width:1px,stroke-dasharray: 5 5
+    style P1 fill:#fafafa,stroke:#333,stroke-width:2px
+    style P2 fill:#fafafa,stroke:#333,stroke-width:2px
+    style P3 fill:#fafafa,stroke:#333,stroke-width:2px
