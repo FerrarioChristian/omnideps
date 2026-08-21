@@ -1,242 +1,543 @@
-\chapter{Costruzione e Risoluzione delle Query Architetturali}
+\chapter{Name Resolution}
 \label{ch:name_resolution}
 
-La fase di \textit{Reference Resolution} (Risoluzione dei
-Riferimenti) è il cuore logico dell'analizzatore architetturale. Il
-suo scopo è trasformare riferimenti astratti ed esposti ad ambiguità
-testuali (i nomi grezzi estratti dall'albero sintattico) in
-identificatori univoci e globalmente validi, creando i collegamenti
-necessari per il grafo delle dipendenze.
+\section{Overview}
+\label{sec:resolution_overview}
 
-Nelle prime iterazioni del sistema, la risoluzione operava in un
-singolo passaggio sincrono (eseguendo il \textit{lookup} non appena
-il nodo veniva incontrato). Tale approccio si è rivelato inadeguato
-per due motivi fondamentali: l'impossibilità di risolvere i
-\textit{forward references} (tipi dichiarati testualmente dopo il
-loro utilizzo) e l'incapacità di analizzare catene di chiamate di
-metodi (es. \texttt{a.f().g()}).
-Per allinearci alla teoria dei compilatori, abbiamo riprogettato la
-risoluzione introducendo un \textbf{Query Engine Bifase}, basato sul
-principio della \textit{lazy evaluation} (valutazione pigra).
+The name resolution phase transforms the symbolic type references
+($\tau = \texttt{Unresolved}$) produced by the extraction phase into
+semantically resolved pointers. Formally:
+$$R : \vec{\mathcal{M}} \to \vec{\mathcal{M}}$$
 
-\section{Fase 2a: Costruzione delle Query (Substitution Phase)}
+The input and output share the same type ($\vec{\mathcal{M}}$), but
+the type references undergo a state transition: every
+\texttt{TypeRef::Unresolved} is replaced by one of the terminal
+states \texttt{Resolved}, \texttt{External}, \texttt{Primitive}, or
+\texttt{Failed}. This phase operates entirely on the IR domain and is
+independent of the source language.
 
-Nella prima sotto-fase ($R_{build}$), l'obiettivo non è scoprire
-\textit{dove} si trovi un componente, ma formalizzare
-\textit{l'intento logico} della ricerca.
+The resolution is decomposed into two algebraic sub-phases:
+\begin{enumerate}
+  \item \textbf{Query Building} ($R_{build}$): Traverses the module
+    hierarchy with a local \textit{Symbol Stack} ($\rho$), replacing
+    raw \texttt{Unresolved} paths with algebraic
+    \texttt{ResolutionQuery} expressions.
+  \item \textbf{Query Execution} ($R_{exec}$): Builds a global
+    \textit{Scope Tree} ($\mathcal{E}$) from the entire workspace and
+    evaluates all query expressions against it.
+\end{enumerate}
 
-Le variabili locali (es. \texttt{let v: a.b.T}) sono essenziali per
-il tracciamento del flusso di controllo, ma non costituiscono nodi
-architetturali nel grafo finale. Vengono utilizzate esclusivamente in
-questa fase come ponte logico. L'analizzatore attraversa l'IR
-avvalendosi di un ambiente lessicale effimero, il \textbf{Symbol
-Stack} ($\rho$).
-Quando viene dichiarata una variabile locale, l'ambiente $\rho$ ne
-registra l'associazione testuale. Quando la variabile viene
-utilizzata, il sistema consuma il riferimento sostituendo
-sintatticamente il nome locale con la formula matematica
-corrispondente al suo tipo, generando un costrutto intermedio
-chiamato \texttt{ResolutionQuery($\mathcal{Q}$)}.
+This two-phase decomposition separates local concerns (variable
+binding, method chaining) from global concerns (workspace-wide symbol
+lookup), and ensures that the execution phase can operate on the
+entire workspace simultaneously, making cross-file resolution transparent.
 
-\subsection{L'Algebra delle Query ($\mathcal{Q}$)}
+\section{The Query Algebra ($\mathcal{Q}$)}
+\label{sec:query_algebra}
 
-Per garantire la massima astrazione, ogni operazione di accesso o
-invocazione in qualsiasi linguaggio di programmazione è stata ridotta
-alla combinazione di sole tre primitive matematiche. Queste primitive
-catturano le direzioni di navigazione (salita e discesa) nel grafo
-gerarchico dei moduli.
+Rather than resolving raw strings eagerly, the system encodes
+resolution intent as an algebraic formula $\mathcal{Q}$ composed of
+three navigation primitives:
 
 \begin{itemize}
-  \item \texttt{Find(name)} (\textit{Ricerca Ascendente}): Definisce
-    il \textbf{punto di partenza assoluto} dell'espressione. È
-    necessario perché un'espressione come \texttt{T.x} non ha
-    significato finché non si stabilisce a quale \texttt{T} si faccia
-    riferimento nell'albero dei moduli. Il \texttt{Find} ordina al
-    motore di risoluzione di agganciarsi al contesto lessicale
-    corrente e "risalire" progressivamente la gerarchia degli scope
-    (Lexical Scope Climbing) finché non individua la prima entità chiamata
-    \texttt{name}.
-  \item \texttt{Extract(query, name)} (\textit{Discesa Strutturale}):
-    Rappresenta l'operatore di accesso ai membri (es. il punto
-    \texttt{.} o i due punti \texttt{::}). L'operatore riceve in
-    input una sub-query (il contesto padre) e il nome del membro
-    figlio da cercare. Valuta la sub-query per ottenere l'indirizzo
-    del genitore, dopodiché discende di un livello al suo interno
-    alla ricerca del membro indicato, attraversando opzionalmente la
-    catena di ereditarietà.
-  \item \texttt{Call(query)} (\textit{Invocazione Transitiva}):
-    Rappresenta l'esecuzione di un blocco di codice. Indica al
-    valutatore che la sub-query passata in input identifica una
-    funzione (o metodo), ma che l'espressione corrente necessita del
-    suo \textbf{tipo di ritorno} per poter proseguire. È la primitiva
-    fondamentale che abilita la concatenazione di metodi (es. in
-      \texttt{a.f().g()}, il tipo di ritorno di \texttt{f()} diventa il
-    \texttt{Find} di partenza per \texttt{g()}).
+  \item $\texttt{Find}(s)$: \textbf{Ascending search}. Starting from
+    the current lexical scope, climb up the scope tree until a symbol
+    named $s$ is found. This models lexical scope resolution, where a
+    name is first searched locally, then in enclosing scopes, then globally.
+  \item $\texttt{Extract}(q, s)$: \textbf{Structural member descent}.
+    Evaluate sub-query $q$ to obtain a scope (a module or a type),
+    then search for member $s$ within that scope, including inherited
+    members from super-types. This models qualified access paths such
+    as \texttt{obj.field}, \texttt{Module::Type}, or \texttt{package.Class}.
+  \item $\texttt{Call}(q)$: \textbf{Transitive invocation}. Evaluate
+    sub-query $q$ to obtain a function or callable, then resolve to
+    its return type. This models method chaining patterns where the
+    result of a function call is used as the receiver of a subsequent access.
 \end{itemize}
 
-Attraverso questa algebra, un'espressione testuale complessa come
-\texttt{i.f()} (con \texttt{i} di tipo \texttt{a.b.T}) viene espansa
-nella query innestata:
-$$ \texttt{Call(Extract(Extract(Extract(Find('a'), 'b'), 'T'), 'f'))} $$
+These three primitives are sufficient to encode the resolution intent
+of any type reference that appears in practice. Table
+\ref{tab:query_examples} illustrates several representative encodings.
 
-Al termine dell'attraversamento, l'ambiente lessicale $\rho$ viene
-completamente distrutto, lasciando l'IR popolato unicamente da
-espressioni che non dipendono dalle variabili locali.
-
-\section{Fase 2b: Esecuzione delle Query (Navigation Phase)}
-
-La fase di navigazione ($R_{exec}$) si attua \textbf{solo dopo} aver
-letto e tradotto tutto il codice dell'intero Workspace. Questa
-posticipazione garantisce che l'ordine di dichiarazione delle classi
-nei file sorgenti sia ininfluente.
-
-Per valutare le query in modo deterministico e corretto rispetto allo
-scoping locale, l'algoritmo si avvale di un \textbf{Contesto di
-Esecuzione Immutabile} ($\Gamma$). Esso racchiude la conoscenza
-globale del progetto e lo stato della traversata, ed è formalmente
-definito come la tupla:
-$$ \Gamma = \langle \mathcal{E}, \mathcal{PR} \rangle $$
-dove:
-\begin{itemize}
-  \item $\mathcal{E}$ è lo \textbf{Scope Tree} (o Environment Tree):
-    un albero gerarchico creato a tempo zero, appena prima
-    dell'esecuzione. Mappa l'annidamento reale dei costrutti del
-    codice (moduli, classi, funzioni, blocchi) e conserva i simboli locali.
-  \item $\mathcal{PR}$ è il \textbf{Primitive Registry}, il
-    dizionario data-driven contenente le parole chiave dei tipi base
-    del linguaggio in uso.
-\end{itemize}
-
-\subsection{Formalizzazione dello Scope Tree ($\mathcal{E}$)}
-Per permettere alla risoluzione di supportare l'accesso ai parametri
-e alle variabili locali (che non sopravvivono a livello globale),
-abbiamo abbandonato l'uso di un registro globale piatto a favore di
-un \textbf{Albero degli Ambienti Lessicali} ($\mathcal{E}$). A causa
-dei rigidi controlli del \textit{Borrow Checker} del linguaggio Rust,
-che impediscono la creazione diretta di strutture ad albero
-pointer-based mutuamente ricorsive, lo Scope Tree è implementato
-tramite l'\textbf{Arena Pattern}.
-
-Tutti i nodi dell'albero (gli \textit{Scope}) risiedono in un array
-contiguo di memoria (l'Arena) e sono referenziati unicamente dal loro
-indice (ScopeId):
-$$ \mathcal{E}_{arena} : \text{ScopeId} \to \text{Scope} $$
-
-Ogni Scope contiene un puntatore (indice) al padre, e una mappa dei
-\textbf{Simboli} definiti localmente:
-$$ \text{Scope} = \langle id, parent, \text{symbols} : \text{String}
-\to \text{Symbol} \rangle $$
-
-Dove un $\text{Symbol}$ rappresenta il tipo somma delle entità architetturali:
-$$ \text{Symbol} = \text{Module}(id) \mid \text{Type}(id) \mid \text{TypeAlias}(\tau) \mid
-\text{Value}(\tau) $$
-L'intuizione architetturale fondamentale risiede nelle entità
-\text{Value} e \text{TypeAlias}, che conservano il tipo ($\tau$) o la sua query non
-risolta. In modo trasparente, la risoluzione di un \text{TypeAlias} espande la query sottostante per recuperare il riferimento definitivo senza che le procedure chiamanti debbano gestire l'indirezione. Questa struttura permette al valutatore di inferire i tipi
-di ritorno attraversando l'albero bottom-up, partendo dallo scope più
-profondo (il blocco di codice corrente) fino alla radice globale.
-
-\subsection{Lexical Scope Climbing e Punti di Salto}
-Per valutare un operatore \texttt{Find}, il contesto di esecuzione
-$\Gamma$ applica l'algoritmo di \textit{Lexical Scope Climbing}. Partendo
-dallo Scope corrente in cui la query è stata generata
-(es. il blocco di una funzione), l'algoritmo cerca il nome richiesto
-all'interno dei simboli locali.
-Se la risorsa non viene trovata, si sposta allo Scope padre
-ricorsivamente, fino ad arrivare alla radice (il Global Scope).
-Contestualmente, a ogni livello risalito, l'algoritmo
-ispeziona i \textbf{Jump Points} (le clausole di \texttt{import} o
-\texttt{use}), verificando se il nome è un \textit{alias} che punta a
-una risorsa esterna. Questo meccanismo riproduce fedelmente le regole
-di \textit{Lexical Scoping} presenti nei compilatori reali.
-
-\subsection{Gestione Modulare Agnostica (Module Strategies)}
-I linguaggi di programmazione presentano differenze architetturali
-profonde nella definizione e organizzazione dei moduli. Per gestire
-questa diversità senza intaccare l'agnosticismo dell'albero degli
-scope, il motore fa affidamento su un sistema di strategie
-combinabili, rappresentate da \textit{feature flags} booleane. Questa
-architettura consente di sovrapporre più comportamenti per linguaggi complessi.
-
-\begin{table}[h!]
+\begin{table}[htpb]
   \centering
-  \begin{tabular}{|l|p{9cm}|l|}
+  \small
+  \begin{tabular}{|l|l|}
     \hline
-    \textbf{Strategia (Flag)} & \textbf{Descrizione e Comportamento}
-    & \textbf{Es. Linguaggio} \\ \hline
-    \texttt{file\_based} & Ogni file fisico sorgente viene trattato
-    come un modulo isolato. Il nome del file (senza estensione) funge
-    da identificatore del modulo. & Rust, Python, Go \\ \hline
-    \texttt{directory\_based} & Le directory fisiche vengono
-    convertite in moduli padre, annidando i moduli dei file in base
-    alla struttura della cartella. & Rust, Python \\ \hline
-    \texttt{package\_decl\_based} & Il file viene scannerizzato per
-    dichiarazioni di pacchetto esplicite a livello di file (es.
-    \texttt{package org.example;}). Il contenuto viene collocato
-    all'interno di questo percorso logico. & Java, Go \\ \hline
-    \texttt{namespace\_based} & Il sistema supporta blocchi di
-    namespace testuali espliciti annidati (es. \texttt{namespace X \{
-    ... \}}). In questo modello un singolo file può contenere
-    frammenti di più moduli/namespace logici. & C++, C\# \\ \hline
-    \texttt{inline\_mod\_based} & Il codice supporta la definizione
-    di moduli inline all'interno del file, che fungono da
-    delimitatori di scope (es. \texttt{mod tests \{ ... \}} in Rust).
-    & Rust \\ \hline
+    \textbf{Source Expression} & \textbf{Query Encoding} \\ \hline
+    \texttt{Foo} & $\texttt{Find}(\texttt{Foo})$ \\ \hline
+    \texttt{a.b.T} &
+    $\texttt{Extract}(\texttt{Extract}(\texttt{Find}(\texttt{a}),
+    \texttt{b}), \texttt{T})$ \\ \hline
+    \texttt{foo()} & $\texttt{Call}(\texttt{Find}(\texttt{foo}))$ \\ \hline
+    \texttt{obj.method()} &
+    $\texttt{Call}(\texttt{Extract}(\texttt{Find}(\texttt{obj}),
+    \texttt{method}))$ \\ \hline
+    \texttt{a.f().g()} &
+    $\texttt{Call}(\texttt{Extract}(\texttt{Call}(\texttt{Extract}(\texttt{Find}(\texttt{a}),
+    \texttt{f})), \texttt{g}))$ \\ \hline
   \end{tabular}
-  \caption{Strategie modulari combinabili del motore di risoluzione.}
-  \label{tab:module_strategies}
+  \caption{Examples of source expressions and their corresponding
+  query algebra encodings.}
+  \label{tab:query_examples}
 \end{table}
 
-\subsection{Ereditarietà (MRO) e Astrazioni Specifiche per Linguaggio}
-L'operatore \texttt{Extract(P, m)} implementa nativamente la logica
-di \textit{Dynamic Dispatch Statica}. Se il membro $m$ non esiste
-nello Scope del padre $P$, il valutatore estrae i
-super-tipi (\texttt{super\_types}) di $P$ e lancia
-una ricerca ricorsiva \textit{Depth-First, Left-to-Right} (Profondità
-prima, da sinistra a destra) lungo l'albero genealogico.
-Questo approccio risolve il \textbf{Diamond Problem} nei linguaggi
-con ereditarietà multipla (es. C++, Python), garantendo il prelievo
-della prima implementazione valida.
+\section{Phase 2a: Query Building ($R_{build}$)}
+\label{sec:query_building}
 
-Per preservare l'agnosticismo dell'analizzatore e al contempo gestire
-casi peculiari, il motore implementa funzionalità guidate da
-\textit{feature flags}:
+The first sub-phase traverses the extracted module hierarchy and
+transforms every \texttt{TypeRef::Unresolved} into a
+\texttt{TypeRef::ResolutionQuery}. The transformation is performed by
+the function \texttt{substitute\_type}, which applies the
+\textit{Symbol Stack} ($\rho$) to resolve local variable references
+and encode the remaining path segments as \texttt{Extract} and
+\texttt{Call} queries.
+
+\subsection{The Symbol Stack ($\rho$)}
+
+The Symbol Stack is an ephemeral lexical environment that tracks
+local variable and parameter bindings within function scopes. It is
+structured as a stack of frames:
+$$\rho = [\sigma_1, \sigma_2, \ldots, \sigma_n] \quad \text{where}
+\quad \sigma_i : \text{Identifier} \to \mathcal{Q}$$
+
+Each frame $\sigma_i$ maps identifier names to their corresponding
+query expressions. Frames are pushed when entering a function or
+block scope, and popped when exiting. Lookup proceeds from the top of
+the stack downward (most-recently-pushed frame first), modeling
+lexical shadowing.
+
+\subsection{The Substitution Algorithm}
+
+When the builder encounters a \texttt{TypeRef::Unresolved} with a
+qualified name $\langle s_1, s_2, \ldots, s_n \rangle$, it proceeds as follows:
+\begin{enumerate}
+  \item Look up $s_1$ in the Symbol Stack. If found, use the stored
+    query $q$ as the base; otherwise, use $\texttt{Find}(s_1)$.
+  \item For each subsequent segment $s_i$ ($i > 1$), wrap the
+    accumulator in $\texttt{Extract}(\cdot, s_i)$.
+  \item If the reference was found in a ``call'' context (e.g., the
+    function part of a call expression), wrap the result in
+    $\texttt{Call}(\cdot)$.
+\end{enumerate}
+
+For \texttt{TypeRef::Union} variants, the substitution is applied
+recursively to each member of the union.
+
+\subsection{Variable and Parameter Binding}
+
+As the builder traverses function bodies, it pushes bindings onto the
+Symbol Stack:
+
 \begin{itemize}
-  \item \textbf{Forward Declarations e Out-Of-Line Methods}: Per
-    linguaggi come C++, il sistema intercetta le \textit{free
-    functions} la cui firma indica un'appartenenza a una classe (es.
-    \texttt{Class::method()}) e le ricolloca chirurgicamente nello
-    scope della rispettiva classe, risolvendo la scissione tra header
-    e implementazione. A tale scopo, la risoluzione dello scope 
-    di destinazione supporta un \textit{Global Scope Fallback},
-    permettendo di localizzare correttamente la classe genitrice 
-    anche quando definita in file differenti (es. \texttt{.h} vs \texttt{.cpp}).
-  \item \textbf{Implicit First Parameter as Self}: Per linguaggi come
-    Python, il primo parametro di un metodo d'istanza viene
-    automaticamente registrato nello Scope della funzione come
-    puntatore alla classe contenitore, consentendo la risoluzione
-    trasparente di accessi come \texttt{self.field},
-    indipendentemente dal nome testuale del parametro.
+  \item \textbf{Parameters}: For each parameter with a declared type
+    $\tau$, the binding $\text{param\_name} \mapsto
+    \texttt{Find}(\tau)$ is pushed. For variadic parameters and
+    parameters with failed type extraction, no binding is pushed.
+  \item \textbf{Local Variables}: For each local variable declaration
+    in a block, the binding $\text{var\_name} \mapsto
+    \texttt{Find}(\tau)$ is pushed, where $\tau$ is the declared or
+    inferred type.
+  \item \textbf{Block Scoping}: When entering a sub-block (an
+    \texttt{if}, \texttt{while}, or anonymous scope), a new frame is
+    pushed. When exiting, the frame is popped. This correctly models
+    lexical scoping, where a variable declared in an inner block
+    shadows one in an outer block but does not outlive it.
 \end{itemize}
 
-\subsection{Inferenza Semantica e Decoppiamento Primitivo}
-Durante l'esecuzione, il valutatore si avvale di ulteriori euristiche.
-All'ingresso di un tipo strutturato, inietta le query relative ai
-lessemi \texttt{self} e \texttt{this}, permettendo la risoluzione
-immediata delle chiamate a metodi di classe. Inoltre, affronta il
-problema dei falsi negativi operando un \textbf{Decoppiamento
-Primitivo}: qualora un'intera query fallisca la sua valutazione nel
-$\mathcal{GR}$, il sistema interroga il \textit{Primitive Registry}
-(un dizionario data-driven caricato a compile-time). Se il nome base
-coincide con una parola chiave del linguaggio (es. \texttt{int},
-\texttt{String}), il riferimento viene declassato allo stato
-\texttt{Prim}, evitando di contrassegnarlo come dipendenza
-\texttt{Failed} o \texttt{External} e garantendo la pulizia semantica
-del grafo architetturale finale.
+\subsection{Implicit Self/This Injection}
 
-\subsection{Estensioni: Tipi Unione e Metadati}
-L'architettura del resolver supporta nativamente pattern linguistici complessi come Tipi Unione, Annotazioni e Decoratori:
+For languages with an implicit receiver parameter, the builder
+injects special bindings based on the language configuration:
 \begin{itemize}
-    \item \textbf{Tipi Unione}: costrutti come \texttt{Union[A, B]} sono analizzati esplorando ricorsivamente ogni riferimento interno al dominio $\vec{\tau}$ dell'unione. Il resolver genera query algebriche separate, e il generatore di grafo (Fase 3) emette archi indipendenti per ogni target possibile, preservando la natura probabilistica del tipo senza perdite di informazione.
-    \item \textbf{Annotazioni e Decoratori}: trattati come metadati applicati a classi, campi e funzioni, vengono estratti dal modulo euristico (superando barriere sintattiche come i tag \texttt{\#[]} in Rust o le direttive \texttt{[[ ]]} in C++). Il resolver ne valuta lo stato \texttt{TypeRef} impiegando lo scope contestuale del nodo annotato. Le annotazioni, anche se irrisolte, vengono aggregate in output producendo archi specializzati (\texttt{AnnotatedWith}), permettendo un'analisi profonda delle iniezioni di dipendenza e della programmazione orientata agli aspetti.
+  \item If \texttt{self\_keyword} is set (e.g., \texttt{"self"} for
+    Rust, \texttt{"this"} for Java/C++), a binding $\texttt{self}
+    \mapsto \texttt{Find}(\text{EnclosingType})$ is pushed when
+    entering a method scope.
+  \item If \texttt{implicit\_first\_param\_as\_self} is true
+    (Python), the first parameter of each method (typically named
+    \texttt{self}) is automatically bound to the enclosing class,
+    regardless of its declared type.
 \end{itemize}
+
+This mechanism is what allows references like \texttt{self.field} or
+\texttt{this.method()} to be correctly resolved to members of the
+enclosing type.
+
+\subsection{Output of Phase 2a}
+
+At the end of the query building phase, the Symbol Stack is
+destroyed. All type references in the IR are now either:
+\begin{itemize}
+  \item \texttt{TypeRef::ResolutionQuery($q$)}: An algebraic
+    expression ready for evaluation.
+  \item \texttt{TypeRef::Primitive($s$)}: Already resolved to a
+    primitive type during extraction.
+  \item \texttt{TypeRef::Failed}: Already marked as unresolvable
+    during extraction.
+\end{itemize}
+
+No \texttt{TypeRef::Unresolved} values remain.
+
+\section{Phase 2b: Query Execution ($R_{exec}$)}
+\label{sec:query_execution}
+
+The second sub-phase builds a global Scope Tree from the entire
+workspace and evaluates all \texttt{ResolutionQuery} expressions. The
+key property of this phase is that it runs \textbf{after} the entire
+workspace has been parsed into memory, making source file order and
+forward references irrelevant.
+
+\subsection{The Scope Tree ($\mathcal{E}$)}
+\label{sec:scope_tree}
+
+The Scope Tree is a hierarchical data structure that mirrors the
+lexical scoping rules of the source code. Each scope represents a
+named lexical environment (a module, a class, a function, or a block)
+and contains a symbol table mapping identifiers to their semantic roles.
+
+\subsubsection{Arena Allocator Implementation}
+
+The Scope Tree is implemented using an \textbf{Arena Allocator}
+pattern: all scopes reside in a contiguous flat vector
+(\texttt{Vec<Scope>}), indexed by integer \texttt{ScopeId} values
+(\texttt{type ScopeId = usize}). Each \texttt{Scope} structure contains:
+
+\begin{itemize}
+  \item \texttt{id: ScopeId}: The scope's index in the arena.
+  \item \texttt{parent: Option<ScopeId>}: A pointer to the enclosing scope.
+  \item \texttt{name: String}: The scope's identifier (e.g., the
+    module name, the class name).
+  \item \texttt{symbols: HashMap<String, Symbol>}: The symbol table.
+  \item \texttt{imports: Vec<Import>}: The import declarations
+    visible in this scope.
+  \item \texttt{super\_types: Vec<TypeRef>}: The inheritance or trait
+    implementation references (for type scopes).
+  \item \texttt{is\_module: bool}: Whether this scope represents a
+    module (affects import resolution behavior).
+  \item \texttt{language: Option<String>}: The language of the module
+    (for configuration lookup).
+\end{itemize}
+
+The \texttt{Symbol} enum distinguishes four kinds of entries:
+\begin{itemize}
+  \item \texttt{Module(ScopeId)}: A sub-module, pointing to its scope.
+  \item \texttt{Type(ScopeId)}: A structured type (class, struct,
+    interface, trait), pointing to its scope.
+  \item \texttt{TypeAlias(TypeRef)}: A type alias, storing its target reference.
+  \item \texttt{Value(TypeRef)}: A concrete value (field, function,
+    parameter, local variable), storing its type reference.
+\end{itemize}
+
+The arena allocator eliminates the need for reference-counted
+pointers (\texttt{Rc<RefCell<...>>}) or recursive ownership
+structures. This satisfies the Rust ownership model without runtime
+overhead while enabling efficient traversal via integer indexing.
+Path reconstruction (e.g., computing the absolute qualified name of a
+scope) proceeds by ascending parent pointers and collecting names.
+
+\subsubsection{Scope Tree Construction}
+
+The Scope Tree is constructed by the function
+\texttt{ScopeTree::build}, which recursively registers all components
+from the workspace modules:
+
+\begin{enumerate}
+  \item \textbf{Root}: A root scope (id: 0, name: \texttt{"root"}) is created.
+  \item \textbf{Modules}: \texttt{register\_module} walks module
+    paths, creating intermediate module scopes or merging with
+    existing ones (if the same module path was contributed by
+    multiple files). Imports, type aliases, structured types, free
+    functions, free variables, and sub-modules are registered within
+    the module scope.
+  \item \textbf{Structured Types}:
+    \texttt{register\_structured\_type} creates a type scope,
+    registers fields as \texttt{Symbol::Value}, methods as
+    \texttt{Symbol::Value} (with function sub-scopes containing
+    parameters and body declarations), records super-types, and
+    recursively handles nested types.
+  \item \textbf{Functions and Blocks}: \texttt{register\_function}
+    and \texttt{register\_block} create hierarchical scopes for
+    parameters, local variable declarations, and nested code blocks
+    (\texttt{block\_0}, \texttt{block\_1}, etc.).
+  \item \textbf{Implementation Blocks}: \texttt{ImplBlock}
+    registrations are \textbf{deferred} into a
+    \texttt{pending\_impl\_blocks} list. After all types are
+    declared, these are processed: the target type is located in the
+    tree (with a global fallback search across all scopes if not
+    found in the immediate parent), and the block's methods, nested
+    types, and type aliases are flattened into the target type's scope.
+\end{enumerate}
+
+\subsection{The Execution Context ($\Gamma$)}
+
+Query evaluation operates within an immutable Execution Context:
+$$\Gamma = \langle \mathcal{E}, \mathcal{PR}, \mathcal{K}_{cfg} \rangle$$
+where $\mathcal{E}$ is the Scope Tree, $\mathcal{PR}$ is the
+Primitive Registry, and $\mathcal{K}_{cfg}$ is the language
+configuration. The immutability of $\Gamma$ during execution
+guarantees deterministic, side-effect-free evaluation and ensures
+that results are independent of the order in which queries are processed.
+
+\subsection{Lexical Scope Climbing}
+\label{sec:lexical_climbing}
+
+When evaluating a $\texttt{Find}(s)$ query starting from scope
+$\sigma_0$, the executor implements the following algorithm:
+
+\begin{enumerate}
+  \item \textbf{Special Keywords}: If $s$ is \texttt{super} or
+    \texttt{super()}, invoke the super-type resolver. If $s$ is
+    \texttt{Self}, resolve to the target type of the current
+    \texttt{impl} block context.
+
+  \item \textbf{Local Symbol Search}: Search $\sigma_0$'s symbol
+    table for $s$. If found, resolve the symbol (see below).
+    Additionally, search inherited scopes via super-types (Section
+    \ref{sec:inheritance_resolution}).
+
+  \item \textbf{Import Search}: Iterate over $\sigma_0$'s imports:
+    \begin{itemize}
+      \item If an import path ends with $s$ (direct import), attempt
+        to resolve the full path globally via \texttt{find\_global}.
+        If the path is not found in the workspace, classify it as
+        \texttt{TypeRef::External}.
+      \item If an import is a wildcard (\texttt{*}), construct a
+        specific path by replacing the wildcard with $s$ and attempt
+        global resolution.
+    \end{itemize}
+
+  \item \textbf{Climb}: Set $\sigma_0 \leftarrow
+    \text{parent}(\sigma_0)$ and repeat from step 2.
+
+  \item \textbf{Root Fallback}: If the root scope is reached without
+    a match, attempt a global search from the root using \texttt{find\_global}.
+
+  \item \textbf{Primitive Check}: If the global search also fails,
+    consult the Primitive Registry ($\mathcal{PR}$). If $s$ is a
+    known primitive type for the current language, return
+    \texttt{TypeRef::Primitive($s$)}.
+
+  \item \textbf{Failure}: Return \texttt{TypeRef::Failed}.
+\end{enumerate}
+
+\subsection{Global Path Resolution}
+
+The function \texttt{find\_global} resolves absolute qualified paths
+by navigating from the root scope downward. For a path $\langle s_1,
+s_2, \ldots, s_n \rangle$, it looks up $s_1$ in the root scope,
+navigates to the resulting scope, looks up $s_2$, and so on. If at
+any point a segment is not found, the function returns \texttt{None},
+and the caller may classify the reference as \texttt{External}.
+
+A special case handles single-segment paths: if $n = 1$ and $s_1$ is
+recognized by the Primitive Registry, the function returns
+\texttt{TypeRef::Primitive} directly.
+
+\subsection{Member Extraction and Inheritance Resolution}
+\label{sec:inheritance_resolution}
+
+When evaluating an $\texttt{Extract}(q, s)$ query, the executor first
+evaluates $q$ to obtain a target scope, then searches for member $s$
+within that scope. If $s$ is not found directly, the search proceeds
+through the type's super-type hierarchy.
+
+The function \texttt{find\_symbol\_in\_scope\_and\_supers} implements
+the following algorithm:
+
+\begin{enumerate}
+  \item Search the target scope's symbol table for $s$. If found,
+    return the resolved symbol.
+  \item For each super-type reference in the scope's \texttt{super\_types} list:
+    \begin{enumerate}
+      \item Evaluate the super-type reference (which may itself be a
+        \texttt{ResolutionQuery}) to obtain a resolved type.
+      \item Locate the super-type's scope in the Scope Tree.
+      \item Recursively search the super-type's scope for $s$,
+        including its own super-types.
+    \end{enumerate}
+  \item The traversal follows a \textbf{depth-first, left-to-right}
+    order, which corresponds to the Method Resolution Order (MRO) of
+    most object-oriented languages.
+  \item A \texttt{visited} set (tracking query strings) prevents
+    infinite loops in the presence of diamond inheritance or circular
+    trait dependencies.
+\end{enumerate}
+
+\subsubsection{Rust Deref Coercion as Inheritance}
+
+Rust does not have class inheritance, but the \texttt{Deref} trait
+provides a form of implicit type coercion: if a type \texttt{T}
+implements \texttt{Deref<Target = U>}, then methods of \texttt{U} can
+be called on values of type \texttt{T}. To model this within the
+resolution framework, the Scope Tree construction detects
+\texttt{Deref} implementations:
+
+When registering an \texttt{ImplBlock} that implements the
+\texttt{Deref} trait and contains a type alias named \texttt{Target},
+the target type is added to the implementing type's
+\texttt{super\_types} list. This allows the standard inheritance
+resolution algorithm to search through \texttt{Deref} targets,
+effectively treating \texttt{Deref} coercion as a form of structural
+inheritance.
+
+\subsection{Transitive Import Resolution}
+\label{sec:transitive_imports}
+
+When the \texttt{transitive\_imports} configuration flag is enabled
+(e.g., for Python), the resolver can follow import chains through
+intermediate modules. This models the common Python pattern of
+importing and re-exporting names through \texttt{\_\_init\_\_.py} files.
+
+The function \texttt{resolve\_via\_transitive\_imports} is invoked
+when a member $s$ is not found directly in a module scope. It
+inspects the module's imports for entries that match $s$ (either by
+name or via a wildcard). If a matching import is found, the import
+path is resolved globally. If the path points to a known workspace
+entity, the resolution succeeds; otherwise, the reference is
+classified as \texttt{External}.
+
+This mechanism is controlled per-language: it is enabled for Python
+(where re-exports are idiomatic) and disabled for languages like Java
+and Rust (where import semantics are strictly non-transitive).
+
+\subsection{Call Query Evaluation}
+
+When evaluating a $\texttt{Call}(q)$ query, the executor first
+evaluates $q$ to obtain a function or callable scope. It then looks
+up the function's return type in the scope's symbol table (stored as
+a \texttt{Symbol::Value} with the return type reference). If the
+return type is itself a \texttt{ResolutionQuery}, it is evaluated
+recursively. This enables resolution of method chains of arbitrary depth.
+
+\section{Implementation Block Flattening}
+\label{sec:impl_flattening}
+
+During Scope Tree construction, implementation blocks
+(\texttt{ImplBlock}) are flattened into the scope of their target
+type. This process serves to unify the syntactic separation of
+declaration and definition (common in Rust and C++) with the
+conceptual unity of a type and its methods.
+
+The flattening algorithm:
+\begin{enumerate}
+  \item Identifies the target type name from \texttt{ib.impl\_for}.
+  \item Searches for the target type scope within the parent scope.
+    If not found locally, a \textbf{global fallback search} scans all
+    arena scopes for a matching name (handling the case where C++
+    \texttt{.h} and \texttt{.cpp} files contribute to different modules).
+  \item If \texttt{self\_type\_keyword} is configured (e.g.,
+    \texttt{"Self"} for Rust), a \texttt{Symbol::TypeAlias} pointing
+    to the target type is injected into the type's scope.
+  \item All methods from the \texttt{ImplBlock} are registered as
+    symbols of the target type scope.
+  \item All nested types and type aliases are similarly flattened
+    into the target scope.
+  \item If the block implements a trait
+    (\texttt{ib.implements\_trait}), the trait reference is added to
+    the target type's \texttt{super\_types}.
+\end{enumerate}
+
+After flattening, implementation blocks no longer exist as
+independent entities in the Scope Tree. Their contents have been
+absorbed into the target type, and the standard member resolution
+algorithm can locate them without special-casing.
+
+\section{The Primitive Registry ($\mathcal{PR}$)}
+\label{sec:primitive_registry}
+
+To prevent built-in types (e.g., \texttt{int}, \texttt{bool},
+\texttt{String}, \texttt{void}, \texttt{usize}) from being classified
+as \texttt{Failed} or \texttt{External}, the analyzer maintains a
+data-driven Primitive Registry. The registry is loaded from a JSON
+file (\texttt{primitives.json}) that maps language names to lists of
+primitive type identifiers:
+
+\begin{verbatim}
+{
+  "rust": ["i8", "i16", "i32", "i64", "u8", ..., "bool", "str", "String", ...],
+  "java": ["int", "long", "float", "double", "boolean", "char", "void", ...],
+  "python": ["int", "float", "str", "bool", "None", "bytes", ...],
+  ...
+}
+\end{verbatim}
+
+When analyzing a multi-language workspace, the registries for all
+encountered languages are merged into a single combined registry.
+During query execution, the executor consults the registry as a last
+resort before marking a reference as \texttt{Failed}: if the
+single-segment name matches a known primitive, the reference is
+resolved as \texttt{TypeRef::Primitive}.
+
+This data-driven approach allows adding primitives without modifying
+the resolver's code, and ensures that common types like \texttt{int}
+or \texttt{bool} are correctly classified regardless of the language context.
+
+\section{Resolution Configuration ($\mathcal{K}_{cfg}$)}
+\label{sec:resolution_config}
+
+Due to the semantic differences between supported languages, the
+resolution phase is parameterized by a per-language configuration.
+Table \ref{tab:resolution_config} summarizes the key parameters and
+their effects.
+
+\begin{table}[htpb]
+  \centering
+  \small
+  \begin{tabular}{|l|l|p{6cm}|}
+    \hline
+    \textbf{Parameter} & \textbf{Type} & \textbf{Effect on Resolution} \\ \hline
+    \texttt{transitive\_imports} & \texttt{bool} & Enables following
+    import chains through intermediate modules (Python). \\ \hline
+    \texttt{support\_impl\_blocks} & \texttt{bool} & Activates
+    flattening of \texttt{ImplBlock} methods into target type scopes
+    (Rust, C++). \\ \hline
+    \texttt{forward\_declarations} & \texttt{bool} & Enables
+    out-of-line method linking before resolution (C++). \\ \hline
+    \texttt{self\_keyword} & \texttt{Option<String>} & Injects a
+    self/this binding pointing to the enclosing type in method scopes. \\ \hline
+    \texttt{self\_type\_keyword} & \texttt{Option<String>} & Injects
+    a \texttt{Self} type alias in \texttt{impl} block scopes (Rust). \\ \hline
+    \texttt{implicit\_first\_param\_as\_self} & \texttt{bool} &
+    Treats the first method parameter as an implicit self reference
+    (Python). \\ \hline
+    \texttt{extract\_dynamic\_fields} & \texttt{bool} & Enables
+    extraction of dynamically assigned instance fields (Python). \\ \hline
+    \texttt{deref\_coercion\_target\_name} & \texttt{Option<String>}
+    & Identifies the target alias in \texttt{Deref} trait
+    implementations (Rust). \\ \hline
+  \end{tabular}
+  \caption{Key resolution configuration parameters and their semantic effects.}
+  \label{tab:resolution_config}
+\end{table}
+
+Table \ref{tab:lang_config_matrix} shows the concrete configuration
+values for each supported language.
+
+\begin{table}[htpb]
+  \centering
+  \small
+  \begin{tabular}{|l|c|c|c|c|c|c|}
+    \hline
+    \textbf{Parameter} & \textbf{Python} & \textbf{Rust} &
+    \textbf{Java} & \textbf{C++} & \textbf{C} \\ \hline
+    \texttt{transitive\_imports} & \checkmark & & & & \\ \hline
+    \texttt{support\_impl\_blocks} & & \checkmark & & \checkmark & \\ \hline
+    \texttt{forward\_declarations} & & & & \checkmark & \checkmark \\ \hline
+    \texttt{self\_keyword} & --- & \texttt{self} & \texttt{this} &
+    \texttt{this} & --- \\ \hline
+    \texttt{self\_type\_keyword} & --- & \texttt{Self} & --- & --- &
+    --- \\ \hline
+    \texttt{implicit\_first\_param\_as\_self} & \checkmark & & & & \\ \hline
+    \texttt{extract\_dynamic\_fields} & \checkmark & & & & \\ \hline
+    \texttt{deref\_coercion\_target\_name} & --- & \texttt{Target} &
+    --- & --- & --- \\ \hline
+  \end{tabular}
+  \caption{Concrete resolution configuration values for each
+  supported language.}
+  \label{tab:lang_config_matrix}
+\end{table}
+
+Through this configuration map $\mathcal{K}_{cfg}: \mathcal{L} \to
+\mathcal{C}_{params}$, the resolution engine specializes its behavior
+for each language while maintaining a strictly language-agnostic core algorithm.

@@ -1,0 +1,19 @@
+stateDiagram-v2
+    direction LR
+
+    [*] --> Unresolved: Extraction Phase
+    [*] --> Prim: Extraction Phase
+    
+    state "Semantic Resolution (Phase 2)" as ResPhase {
+        Unresolved --> ResolutionQuery: Apply Algebra
+        ResolutionQuery --> Resolved: Match  (Internal)
+        ResolutionQuery --> External: Match  (Library)
+        ResolutionQuery --> Failed: No Match 
+    }
+    
+    Resolved --> GraphGeneration
+    External --> GraphGeneration
+    Prim --> GraphGeneration
+    
+    Failed --> [*]: Fallback/Stats
+    GraphGeneration --> [*]: Final Dependency Edge
