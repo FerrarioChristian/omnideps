@@ -1,0 +1,238 @@
+\chapter{Graph Construction}
+\label{ch:graph_construction}
+
+\section{Overview}
+\label{sec:graph_overview}
+
+The graph construction phase is the third and final stage of the analysis pipeline. It receives as input the module hierarchy produced by the extraction phase and refined by the name resolution phase, in which all type references $\tau$ have been resolved to their final states (\texttt{Resolved}, \texttt{External}, \texttt{Primitive}, or \texttt{Failed}). The output is a \textbf{Dependency Graph} $\mathcal{G} = (V, E)$, a flat directed multigraph where every vertex represents a software component and every edge represents a semantic dependency between two components.
+
+Formally, the graph construction function $\gamma$ is defined as:
+$$\gamma : \vec{\mathcal{M}} \to \mathcal{G}$$
+
+The construction process is decomposed into two sequential sub-phases:
+\begin{enumerate}
+  \item \textbf{Node Flattening}: The hierarchical Component Tree ($\mathcal{D}_{IR}$) is recursively traversed and all components (modules, structured types, functions, fields, and type aliases) are extracted into a linear vector of vertices $V$.
+  \item \textbf{Edge Generation}: The same tree is traversed a second time, this time inspecting every resolved type reference $\tau$ to emit directed edges $E$ between the components that participate in a dependency relationship.
+\end{enumerate}
+
+After both sub-phases complete, a post-processing step synthesizes implicit nodes (primitives and external types referenced by edges but not present in the workspace) and deduplicates edges to prevent inflated coupling metrics.
+
+\section{Node Flattening}
+\label{sec:node_flattening}
+
+The Intermediate Representation is structured as a recursive tree of modules ($\mathcal{M}$), where each module can contain sub-modules, structured types, functions, type aliases, and free variables. The dependency graph, however, requires a flat set of vertices. The flattening algorithm recursively traverses the module tree and promotes every component to an independent graph node.
+
+\subsection{Qualified Name Computation}
+
+During flattening, each component's name is recomputed as a globally unique \textbf{Qualified Name} $\pi$ by prepending the names of all ancestor modules. For instance, a class \texttt{User} declared inside module \texttt{auth}, which is itself nested in the root module, receives the qualified name $\langle \texttt{auth}, \texttt{User} \rangle$. The root module name is filtered out from the prefix to avoid redundant path segments.
+
+This globally qualified naming scheme guarantees that every vertex in the graph has a unique identifier, even when multiple entities share the same local name across different modules.
+
+\subsection{Entities Promoted to Vertices}
+
+The flattening process generates vertices for the following IR constructs:
+\begin{itemize}
+  \item \textbf{Modules} ($\mathcal{M}$): Every module and sub-module in the hierarchy becomes a vertex of type \texttt{Module}.
+  \item \textbf{Structured Types} ($\mathcal{S}$): Every class, struct, interface, trait, enum, and enum variant becomes a vertex of type \texttt{StructuredType}. Nested types (inner classes, nested structs) are recursively flattened and promoted to independent vertices.
+  \item \textbf{Functions} ($\mathcal{F}$): Every free function and every method declared inside a structured type becomes a vertex of type \texttt{Function}.
+  \item \textbf{Fields} ($f$): Every field of a structured type and every free variable declared at module level becomes a vertex of type \texttt{Field}, carrying its qualified name and its type reference.
+  \item \textbf{Type Aliases} ($\mathcal{A}$): Every type alias becomes a vertex of type \texttt{TypeAlias}.
+  \item \textbf{Implementation Blocks} ($\mathcal{X}$): Methods, nested types, and type aliases declared inside an \texttt{ImplBlock} are re-scoped under the target type's qualified name and flattened as if they were directly declared inside the target type.
+\end{itemize}
+
+\subsection{Dynamic Node Synthesis}
+
+After the initial flattening, edges may reference types that are not present as vertices in the workspace. This occurs when a component depends on a primitive type (e.g., \texttt{int}, \texttt{bool}, \texttt{String}) or on an external type from a third-party library (e.g., \texttt{java.util.List}, \texttt{std::collections::HashMap}).
+
+To maintain graph integrity, the construction algorithm scans all generated edges and identifies targets that do not match any existing vertex. For each such target:
+\begin{itemize}
+  \item If the target is recognized as a primitive type by the \textit{Primitive Registry} (introduced in Chapter \ref{ch:ir_formalization}), a \texttt{Primitive} node is synthesized.
+  \item Otherwise, an \texttt{External} node is synthesized, representing a dependency on code outside the analyzed workspace.
+\end{itemize}
+
+This approach guarantees that every edge in the final graph connects two existing vertices, and that external dependencies are explicitly visible as nodes.
+
+\section{Edge Generation}
+\label{sec:edge_generation}
+
+The second sub-phase traverses the module tree recursively, inspecting every component and its resolved type references to generate directed dependency edges. Each edge $e \in E$ is a triple:
+$$e = \langle \pi_{from}, \pi_{to}, \text{kind} \rangle$$
+where $\pi_{from}$ identifies the source component, $\pi_{to}$ identifies the target component, and $\text{kind}$ specifies the nature of the dependency relationship.
+
+\subsection{Type Reference Filtering}
+
+A fundamental invariant governs edge generation: edges are produced \textbf{only} from type references in the terminal states \texttt{Resolved} and \texttt{External}. References in the states \texttt{Primitive}, \texttt{Unresolved}, and \texttt{Failed} are ignored by default. Primitive types can optionally generate edges (producing \texttt{Primitive} nodes), but they do not participate in architectural coupling metrics. Failed references are silently skipped, ensuring that unresolved symbols do not introduce spurious dependencies.
+
+For composite type references such as \texttt{Union($\vec{\tau}$)} and \texttt{EvaluatedAccess($\tau_{path}, \tau_{type}$)}, the algorithm recursively unpacks all inner references and generates edges for each resolved target independently.
+
+\subsection{Taxonomy of Dependency Edge Kinds}
+
+The system defines 15 distinct edge kinds, organized into five categories. Table \ref{tab:edge_taxonomy} provides a complete classification.
+
+\begin{table}[htpb]
+  \centering
+  \small
+  \begin{tabular}{|l|l|l|l|}
+    \hline
+    \textbf{Category} & \textbf{Edge Kind} & \textbf{Source} & \textbf{Target} \\ \hline
+    \multirow{2}{*}{\textit{Structural}} & \texttt{ModuleContainment} & Module & Direct child \\ \cline{2-4}
+    & \texttt{NestedIn} & StructuredType & Method or nested type \\ \hline
+
+    \multirow{2}{*}{\textit{Inheritance}} & \texttt{IsA} & StructuredType & Super type \\ \cline{2-4}
+    & \texttt{Implements} & ImplBlock / Type & Trait or interface \\ \hline
+
+    \multirow{5}{*}{\textit{Type-Level}} & \texttt{UsesFieldType} & StructuredType & Type of a field \\ \cline{2-4}
+    & \texttt{UsesLocalType} & Function & Type of a local variable \\ \cline{2-4}
+    & \texttt{UsesParamType} & Function & Type of a parameter \\ \cline{2-4}
+    & \texttt{UsesReturnType} & Function & Return type \\ \cline{2-4}
+    & \texttt{Aliases} & TypeAlias & Aliased target type \\ \hline
+
+    \multirow{3}{*}{\textit{Behavioral}} & \texttt{Calls} & Function & Invoked function/type \\ \cline{2-4}
+    & \texttt{Instantiates} & Function & Instantiated type \\ \cline{2-4}
+    & \texttt{AccessesField} & Function & Accessed component \\ \hline
+
+    \multirow{3}{*}{\textit{Auxiliary}} & \texttt{Imports} & Module / Type & Imported path \\ \cline{2-4}
+    & \texttt{CastsTo} & Function & Cast target type \\ \cline{2-4}
+    & \texttt{AnnotatedWith} & Any component & Annotation type \\ \hline
+  \end{tabular}
+  \caption{Complete taxonomy of the 15 dependency edge kinds, organized by category.}
+  \label{tab:edge_taxonomy}
+\end{table}
+
+\subsubsection{Structural Edges}
+Structural edges encode the hierarchical containment relationships of the original source code:
+\begin{itemize}
+  \item \textbf{ModuleContainment}: Generated from a module to each of its direct children (sub-modules, structured types, free functions, free variables, and type aliases). The traversal is recursive: when a sub-module is encountered, the current module's qualified name is passed as the parent identifier.
+  \item \textbf{NestedIn}: Generated from a structured type to each of its methods and nested types. This edge captures the fact that a method ``belongs to'' a class, or that an inner class is defined within the scope of an outer class.
+\end{itemize}
+
+\subsubsection{Inheritance Edges}
+These edges model sub-typing and trait/interface implementation:
+\begin{itemize}
+  \item \textbf{IsA}: Generated from a structured type to each of its resolved super-types ($\vec{\tau}_{sup}$). This covers class inheritance (\texttt{extends}), interface extension, and trait super-trait relationships.
+  \item \textbf{Implements}: Generated from an implementation block or its target type to the implemented trait or interface. In the case of Rust's \texttt{impl Trait for Type}, two edges are created: one from the module to the target type (\texttt{Implements}), and one from the target type to the trait (\texttt{Implements}).
+\end{itemize}
+
+\subsubsection{Type-Level Edges}
+Type-level edges capture static dependencies introduced through type declarations:
+\begin{itemize}
+  \item \textbf{UsesFieldType}: Generated from a structured type to the resolved type of each of its fields. For example, if class \texttt{Car} has a field \texttt{engine: Engine}, an edge \texttt{Car} $\to$ \texttt{Engine} is produced.
+  \item \textbf{UsesLocalType}: Generated from a function to the resolved type of each local variable declared in its body blocks. This edge kind was introduced to distinguish local variable dependencies from field-level dependencies.
+  \item \textbf{UsesParamType}: Generated from a function to the resolved type of each of its formal parameters.
+  \item \textbf{UsesReturnType}: Generated from a function to its resolved return type.
+  \item \textbf{Aliases}: Generated from a type alias to its resolved target type, capturing the semantic binding between the alias and its original type.
+\end{itemize}
+
+\subsubsection{Behavioral Edges}
+Behavioral edges model runtime interactions extracted from function bodies. The traversal of function bodies follows the recursive \texttt{Block} ($\mathcal{B}$) structure: the root block is inspected first, then all sub-blocks (corresponding to \texttt{if}, \texttt{while}, \texttt{for}, and similar control-flow constructs) are visited recursively. All behavioral edges are attributed to the enclosing function, regardless of the nesting depth of the block in which the dependency was found.
+
+\begin{itemize}
+  \item \textbf{Calls}: Generated for each resolved function invocation found in the block's $\vec{\tau}_{calls}$ vector.
+  \item \textbf{Instantiates}: Generated for each resolved type instantiation (e.g., \texttt{new}, struct expressions) found in the block's $\vec{\tau}_{inst}$ vector.
+  \item \textbf{AccessesField}: Generated for each resolved field access (read or write) found in the block's $\vec{\tau}_{accesses}$ vector.
+\end{itemize}
+
+\subsubsection{Auxiliary Edges}
+\begin{itemize}
+  \item \textbf{Imports}: Generated from a module or structured type to each explicitly imported path ($\vec{\delta}_{imp}$).
+  \item \textbf{CastsTo}: Generated from a function to the target type of each explicit type cast found in the block's $\vec{\tau}_{casts}$ vector.
+  \item \textbf{AnnotatedWith}: Generated from any annotated component (function, structured type, field) to the resolved type of each annotation or decorator.
+\end{itemize}
+
+\subsection{Edge Deduplication}
+After all edges have been generated, the complete edge set is sorted and deduplicated. Two edges are considered duplicates if and only if they share the same source, target, and edge kind. This prevents inflated coupling metrics that would arise from multiple syntactic occurrences of the same dependency (e.g., a function calling the same method multiple times within different blocks).
+
+\section{Cytoscape Export and Visualization}
+\label{sec:cytoscape_export}
+
+The generated dependency graph is exported in two formats: a raw JSON serialization of the \texttt{DependencyGraph} structure (for programmatic analysis), and a \textbf{Cytoscape.js}-compatible JSON format \cite{TODO:cytoscape_js} designed for interactive graph visualization. This section describes the Cytoscape export process and the companion web-based visualizer.
+
+\subsection{Cytoscape.js and Compound Nodes}
+
+Cytoscape.js is an open-source JavaScript library for graph visualization and analysis. A notable feature leveraged by this project is its support for \textbf{Compound Nodes}: nodes that visually contain other nodes, rendering hierarchical groupings as nested bounding boxes rather than as explicit edges.
+
+The Cytoscape export process transforms the flat \texttt{DependencyGraph} into an array of Cytoscape elements (nodes and edges) by applying three transformations:
+
+\begin{enumerate}
+  \item \textbf{Parent Assignment}: For each node, the qualified name is truncated to obtain the parent's identifier. If the parent exists in the node set and is not the root module, the node's \texttt{parent} property is set accordingly. This converts the structural containment information (previously encoded as \texttt{ModuleContainment} and \texttt{NestedIn} edges) into Cytoscape's native compound node hierarchy.
+  \item \textbf{Structural Edge Filtering}: Since containment is now represented spatially through compound nesting, all \texttt{ModuleContainment} and \texttt{NestedIn} edges are filtered out from the exported edge set. This reduces visual clutter and allows the viewer to focus on the architecturally meaningful dependencies (type-level, inheritance, and behavioral edges).
+  \item \textbf{External Node Synthesis}: If an edge references an endpoint that does not exist as a node in the graph (e.g., an external library type), a placeholder node of type \texttt{External} is automatically created.
+\end{enumerate}
+
+Each exported node carries the following data fields:
+\begin{itemize}
+  \item \texttt{id}: The fully qualified name, joined with \texttt{::} separators (e.g., \texttt{auth::User}).
+  \item \texttt{label}: The last segment of the qualified name (e.g., \texttt{User}).
+  \item \texttt{type}: The component category (\texttt{Module}, \texttt{Class}, \texttt{Struct}, \texttt{Function}, etc.).
+  \item \texttt{parent}: The \texttt{id} of the enclosing compound node, if applicable.
+\end{itemize}
+
+Each exported edge carries:
+\begin{itemize}
+  \item \texttt{source} and \texttt{target}: The \texttt{id}s of the source and target nodes.
+  \item \texttt{label}: The edge kind as a string (e.g., \texttt{Calls}, \texttt{IsA}).
+\end{itemize}
+
+Edges are deduplicated during export using a hash set that tracks the combination of source, target, and label to prevent visual duplication.
+
+\subsection{The Web-Based Graph Visualizer}
+
+To provide an interactive exploration environment for the generated graphs, a companion web application was developed using \textbf{SvelteKit} (Svelte 5) \cite{TODO:svelte} and the Cytoscape.js library. The application communicates with the Rust analyzer through local API endpoints that invoke the CLI binary and return the Cytoscape-formatted JSON.
+
+\subsubsection{Graph Layout}
+
+The visualizer employs the \textbf{fCoSE} (Fast Compound Spring Embedder) layout algorithm \cite{TODO:fcose}, a force-directed layout specifically designed for compound graphs with nested node hierarchies. The algorithm treats compound nodes as elastic containers and arranges child nodes within their parent boundaries while simultaneously optimizing the overall graph topology through spring-electric forces. Key parameters configured in the application include:
+\begin{itemize}
+  \item \texttt{quality: ``proof''}: Requests the highest quality layout computation.
+  \item \texttt{idealEdgeLength}: Controls the target distance between connected nodes.
+  \item \texttt{nodeRepulsion}: Controls the repulsive force between non-adjacent nodes.
+  \item \texttt{gravityCompound}: Controls how strongly child nodes are pulled toward the center of their parent compound node.
+  \item \texttt{packComponents}: Enables compact packing of disconnected graph components.
+\end{itemize}
+
+\subsubsection{Node and Edge Visual Encoding}
+
+Each node type is rendered with a distinct color and shape to enable immediate visual identification:
+\begin{itemize}
+  \item \textbf{Modules}: Orange, dashed border, rendered as compound bounding boxes.
+  \item \textbf{Classes and Structs}: Blue, solid border, also rendered as compound containers when they contain methods or nested types.
+  \item \textbf{Interfaces and Traits}: Green, distinguishing abstract contracts from concrete types.
+  \item \textbf{Enums}: Pink/magenta, rendered as compound containers for their variants.
+  \item \textbf{Functions}: Purple, rendered as ellipses to differentiate them from types.
+  \item \textbf{Fields}: Teal.
+  \item \textbf{External Types}: Slate grey, with reduced opacity.
+\end{itemize}
+
+Edge styles similarly encode the dependency category: inheritance edges are rendered in red (solid), implementation edges in orange (dashed), behavioral edges (\texttt{Calls}, \texttt{Instantiates}) in green and blue, and type-usage edges in grey (dotted, with reduced opacity).
+
+\subsubsection{Interactive Features}
+
+The visualizer provides the following interactive capabilities:
+
+\begin{itemize}
+  \item \textbf{Node Search}: A text input field filters the graph in real time. Nodes whose labels match the query (case-insensitive substring match) are highlighted, while all other nodes are visually dimmed. Matching nodes and their ancestor compound containers remain visible to preserve spatial context.
+  \item \textbf{Node Inspection}: Tapping a node opens a detail sidebar displaying the node's type, full qualified name, and a breakdown of its incoming and outgoing edges, grouped by edge kind. Each related node in the sidebar is clickable, allowing navigation through the graph.
+  \item \textbf{Neighborhood Focus}: When a node is tapped, the graph automatically dims all nodes and edges except the selected node, its direct neighborhood (connected nodes and their mutual edges), and its ancestor/descendant compound containers.
+  \item \textbf{Edge Filtering}: The control panel provides two groups of toggle switches for edge filtering:
+    \begin{itemize}
+      \item \textit{Structural filters}: \texttt{IsA}, \texttt{Implements}, \texttt{Imports}, \texttt{UsesFieldType}, \texttt{UsesParamType}, \texttt{UsesReturnType}, \texttt{UsesLocalType}, \texttt{NestedIn}, \texttt{ModuleContainment}, \texttt{AnnotatedWith}.
+      \item \textit{Behavioral filters}: \texttt{Calls}, \texttt{Instantiates}, \texttt{AccessesField}.
+    \end{itemize}
+    Each filter can be toggled independently, with a master toggle for each group. The filtering logic operates in batch mode: edges of disabled kinds are hidden, and edges whose source or target node is itself hidden are also suppressed.
+  \item \textbf{Node Type Filtering}: Separate toggles allow hiding or showing entire categories of nodes (e.g., all \texttt{Module} nodes, all \texttt{External} nodes, all \texttt{Primitive} nodes). By default, \texttt{Primitive} nodes are hidden to reduce noise.
+  \item \textbf{JSON Export}: Two export options are provided: exporting the Cytoscape-formatted elements (for re-importing into visualization tools) and exporting the raw analyzer JSON output (for programmatic consumption).
+\end{itemize}
+
+\section{Analysis Summary}
+\label{sec:analysis_summary}
+
+As a complement to the dependency graph, the system produces an \texttt{AnalysisSummary} structure containing aggregate statistics about the analyzed codebase:
+\begin{itemize}
+  \item \textbf{Total Modules}: The count of all modules and sub-modules.
+  \item \textbf{Total Structured Types}: The count of all classes, structs, enums, interfaces, and traits (including nested types, counted recursively).
+  \item \textbf{Total Free Functions}: The count of functions declared at module level (methods are not included in this count).
+  \item \textbf{Resolved References}: The number of type references that were successfully resolved to a \texttt{Resolved} or \texttt{External} state.
+  \item \textbf{Failed References}: The number of type references that ended in the \texttt{Failed} state.
+\end{itemize}
+
+The reference counting traverses the same recursive block structure used by the edge generation algorithm, ensuring consistency between the summary statistics and the actual graph. The ratio of resolved to total references provides a direct measure of the analyzer's \textit{Recall} on a given codebase.
