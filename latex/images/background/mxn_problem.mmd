@@ -1,0 +1,19 @@
+flowchart LR
+    subgraph mxn ["Without IR: M × N Complexity"]
+        direction LR
+        L1(Java) --> T1(Tool A)
+        L1 --> T2(Tool B)
+        L2(Rust) --> T1
+        L2 --> T2
+        L3(Python) --> T1
+        L3 --> T2
+    end
+
+    subgraph mpn ["With IR: M + N Complexity"]
+        direction LR
+        L4(Java) --> IR((IR))
+        L5(Rust) --> IR
+        L6(Python) --> IR
+        IR --> T3(Tool A)
+        IR --> T4(Tool B)
+    end

@@ -27,7 +27,7 @@ correctable, poorly designed structural dependencies
 \cite{garcia_identifying_2009}) are much more insidious
 \cite{arcelli_fontana_automatic_2012}.
 When components are highly coupled or burdened with cyclic
-dependencies, changing one module invariably breaks others in
+dependencies, changing one module could break others in
 unpredictable ways. To prevent this architectural degradation,
 developers increasingly rely on automated static analysis tools.
 These systems scan the codebase to map out dependencies between
@@ -43,7 +43,8 @@ however, are increasingly polyglot.
 Building architectural analyzers for multiple languages currently
 forces engineers to rewrite the complex parsing and dependency
 extraction logic from scratch for every single language, resulting in
-immense resource consumption and fragmented, difficult-to-maintain tooling.
+immense resource consumption and fragmented, heavyweight, difficult
+to maintain tooling.
 
 In recent years, the adoption of generic parsers based on unified
 formal grammars, such as Tree-sitter, has simplified the initial
@@ -127,8 +128,9 @@ Traditionally, developing cross-language analysis systems requires
 integrating disjointed tooling ecosystems, which significantly
 increases maintenance complexity. This project aims to bypass these
 limitations by processing the source code of heterogeneous
-languages through a single, unified pipeline to generate a
-standardized \textbf{Dependency Graph}.
+languages through a single unified pipeline by transorming it to a
+standardized Intermediate Representation, to generate a
+the final \textbf{Dependency Graph}.
 
 The nodes of this graph transcend simple text snippets, representing
 structured logical entities (e.g., Classes, Structs, Interfaces,
@@ -145,11 +147,11 @@ valid} within its own ecosystem. This allows the analyzer to focus
 entirely on structural extraction rather than syntax validation.
 
 \section{Methodological Approach}
-To ensure that the system is extensible, mathematically robust, and
+To ensure that the system is extensible, structurally robust, and
 entirely independent of the syntactic peculiarities of individual
-languages, the project adopts an approach rooted in type theory
-\cite{pierce_types_2002} and
-functional composition.
+languages, the project adopts an approach based on
+\textbf{algebraic data types} \cite{pierce_types_2002} and
+\textbf{functional composition}.
 
 \subsection{Type System and Intermediate Representation}
 The core of the system is the definition of a strongly typed
@@ -159,8 +161,8 @@ code (whether a function, a class, or a simple parameter) is converted
 into an abstract IR component. This structural normalization makes it
 possible to entirely "forget" how an entity was represented by the
 specific programming language in the original file, allowing the
-subsequent phases to operate exclusively on standardized
-architectural properties.
+subsequent phases to \textbf{operate} exclusively \textbf{on standardized
+architectural properties}.
 
 \subsection{Pipeline as Function Composition}
 The entire analysis process is modeled mathematically as a sequence
@@ -187,11 +189,8 @@ raw source code to the final dependency graph.
 
 \begin{figure}[htpb]
   \centering
-  \includegraphics[width=\textwidth]{images/analysis_pipeline.png}
-  \caption{The functional pipeline of the analyzer. Source code is
-    parsed into a CST, mapped to an unresolved IR (Phase 1),
-    semantically resolved (Phase 2), and finally flattened into a
-  Dependency Graph (Phase 3).}
+  \includegraphics[width=\textwidth]{images/introduction/analysis_pipeline.png}
+  \caption{The functional pipeline of the analyzer.}
   \label{fig:analysis_pipeline}
 \end{figure}
 
@@ -199,9 +198,15 @@ Modeling the system as a functional pipeline allows us to reason
 about its structural correctness: each phase receives a well-formed
 input and guarantees the production of an equally valid output
 (\textit{Type Safety}). This separation of concerns ensures the
-overall semantic consistency of the architecture, making it trivial
-to add support for new languages by simply plugging in new extraction
-heuristics for Phase 1, without touching the core resolution engine.
+overall semantic consistency of the architecture. In practice,
+adding support for a new language requires implementing only the
+extraction heuristics for Phase 1, without modifying the resolution
+engine, provided that the new language's semantic features (e.g.,
+module strategies, self-parameter conventions, import semantics) are
+already covered by the existing configuration parameters. If the new
+language introduces novel semantic patterns not yet modeled by the
+configuration, limited extensions to the resolution engine may be
+necessary\cite{vacchi_neverlang_2015}.
 
 \subsection{Scope and Limitations}
 It is important to emphasize that this tool is designed exclusively
@@ -214,17 +219,32 @@ architecture explicitly declared by the developer, offering a
 deterministic view of the codebase's structural dependencies.
 
 \section{Organization of the Thesis}
-\todo{Complete and refine the outline of the thesis
-chapters once the structure is finalized}
+\todo{Verify chapter structure matches final version}
 
-\todo[inline]{The remainder of this thesis is organized as follows:
-  Chapter 2 reviews the state of the art and the existing tools in
-  the context of static analysis and parsing.
-  Chapter 3 introduces the theoretical foundation of our
-  language-agnostic Intermediate Representation (IR).
-  Chapter 4 details the design and implementation of the extraction
-  and resolution pipelines.
-  Chapter 5 presents the evaluation of our tool across different
-  benchmark projects and programming languages.
-  Finally, Chapter 6 draws the conclusions and outlines potential
-directions for future work.}
+The remainder of this thesis is organized as follows:
+
+\begin{itemize}
+  \item \textbf{Chapter \ref{ch:background}} reviews the foundational concepts
+    of static analysis, code smells, dependency graphs, parsing
+    technologies, name resolution, and type systems.
+  \item \textbf{Chapter \ref{ch:ir_formalization}} formally defines the
+    language-agnostic Intermediate Representation (IR) that serves as the
+    central data model throughout the pipeline.
+  \item \textbf{Chapter \ref{ch:analysis_pipeline}} presents an overview of
+    the three-phase analysis pipeline, describing the input, output, and
+    key properties of each phase.
+  \item \textbf{Chapter \ref{ch:extraction}} details Phase 1 (Syntactic
+    Extraction): the heuristic-based classification and parsing of
+    Concrete Syntax Trees into the IR.
+  \item \textbf{Chapter \ref{ch:name_resolution}} details Phase 2 (Name
+    Resolution): the query algebra, Scope Tree construction, and lexical
+    scope climbing algorithm.
+  \item \textbf{Chapter \ref{ch:graph_construction}} details Phase 3 (Graph
+    Construction): the flattening of the resolved IR into a dependency
+    graph and its visualization.
+  \item \textbf{Chapter \ref{ch:evaluation_results}} presents the
+    evaluation of the
+    tool across multiple benchmark projects and programming languages.
+  \item \textbf{Chapter \ref{ch:conclusions}} draws conclusions and outlines
+    potential directions for future work.
+\end{itemize}
