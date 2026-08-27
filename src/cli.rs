@@ -1,34 +1,81 @@
-use clap::Parser;
+use clap::{Parser, Subcommand};
 use std::path::PathBuf;
 
-/// Defines the command-line interface for the `language-agnostic-analyzer`.
-///
-/// Uses `clap` to parse arguments for input files/directories,
-/// and optional paths for outputting JSON dependency graphs and CSV summaries.
 #[derive(Parser)]
 #[command(
+    name = "omnideps",
     author,
     version,
-    about = "Language-agnostic Architectural Dependency Analyzer"
+    about = "Omnideps: Language-agnostic Architectural Dependency Analyzer"
 )]
 pub struct Cli {
-    /// File o cartella da analizzare
-    #[arg(required = true)]
-    pub path: PathBuf,
+    #[command(subcommand)]
+    pub command: Commands,
+}
 
-    /// Output JSON (default: stdout)
-    #[arg(short, long)]
-    pub output: Option<PathBuf>,
+#[derive(Subcommand)]
+pub enum Commands {
+    /// Analyze a file or directory
+    Analyze {
+        /// File or directory to analyze
+        #[arg(required = true)]
+        path: PathBuf,
 
-    /// Output CSV summary
-    #[arg(short, long)]
-    pub csv: Option<PathBuf>,
+        /// Output JSON for graph
+        #[arg(short, long)]
+        output: Option<PathBuf>,
 
-    /// Print debug info for all resolved and failed references
-    #[arg(short = 'd', long)]
-    pub debug_refs: bool,
+        /// Output CSV summary
+        #[arg(short, long)]
+        csv: Option<PathBuf>,
 
-    /// Path to a JSON configuration file defining architectural strategies
-    #[arg(long)]
-    pub config: Option<PathBuf>,
+        /// Print debug info for all resolved and failed references
+        #[arg(short = 'd', long)]
+        debug_refs: bool,
+
+        /// Path to a JSON configuration file defining architectural strategies
+        #[arg(long)]
+        config: Option<PathBuf>,
+    },
+    /// Benchmark suite operations
+    Benchmark {
+        #[command(subcommand)]
+        cmd: BenchmarkCommands,
+    },
+    /// Convert JSON graph to Cytoscape format
+    ExportCyto {
+        /// Input JSON file
+        #[arg(required = true)]
+        input: PathBuf,
+
+        /// Output Cytoscape JSON file
+        #[arg(required = true)]
+        output: PathBuf,
+    },
+    /// Serve the interactive Web Visualizer
+    Serve {
+        /// Port to listen on (default: 3000)
+        #[arg(short, long, default_value_t = 3000)]
+        port: u16,
+    },
+}
+
+#[derive(Subcommand)]
+pub enum BenchmarkCommands {
+    /// Run benchmark on a single language directory
+    Run {
+        /// Directory containing the test benchmark (e.g. tests/benchmark-java)
+        #[arg(index = 1)]
+        testdir: PathBuf,
+
+        /// Output directory for the report (defaults to testdir)
+        #[arg(short, long)]
+        output: Option<PathBuf>,
+
+        /// Optional config file path
+        #[arg(short, long)]
+        config: Option<PathBuf>,
+    },
+    /// Run all benchmarks
+    All,
 }

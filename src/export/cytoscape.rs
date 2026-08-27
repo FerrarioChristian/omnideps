@@ -46,6 +46,13 @@ fn get_parent_id(qn: &QualifiedName) -> Option<String> {
 }
 
 pub fn export_graphs(graphs: &[DependencyGraph], out_path: &Path) -> anyhow::Result<()> {
+    let elements = convert_to_cyto_elements(graphs);
+    let json = serde_json::to_string_pretty(&elements)?;
+    fs::write(out_path, json)?;
+    Ok(())
+}
+
+pub fn convert_to_cyto_elements(graphs: &[DependencyGraph]) -> serde_json::Value {
     let mut elements = vec![];
     let mut added_nodes = std::collections::HashSet::new();
     let mut added_edges = std::collections::HashSet::new();
@@ -76,7 +83,6 @@ pub fn export_graphs(graphs: &[DependencyGraph], out_path: &Path) -> anyhow::Res
     };
 
     for graph in graphs {
-        // Build a map of node types to determine parent types
         let mut parent_types = std::collections::HashMap::new();
         for node in &graph.nodes {
             match node {
@@ -90,7 +96,6 @@ pub fn export_graphs(graphs: &[DependencyGraph], out_path: &Path) -> anyhow::Res
             }
         }
 
-        // 1. Export nodes
         for node in &graph.nodes {
             match node {
                 Component::Module(m) => {
@@ -191,13 +196,11 @@ pub fn export_graphs(graphs: &[DependencyGraph], out_path: &Path) -> anyhow::Res
             }
         }
 
-        // 2. Export edges
         for edge in &graph.edges {
             let source_id = qn_to_id(&edge.from);
             let target_id = qn_to_id(&edge.to);
             let label = format!("{:?}", edge.kind);
 
-            // Skip structural edges that are now implicitly represented by Compound Nodes
             if label == "ModuleContainment" || label == "NestedIn" {
                 continue;
             }
@@ -206,7 +209,6 @@ pub fn export_graphs(graphs: &[DependencyGraph], out_path: &Path) -> anyhow::Res
                 continue;
             }
 
-            // Ensure source node exists
             if !added_nodes.contains(&source_id) {
                 let node_label = source_id.split("::").last().unwrap_or("").to_string();
                 add_node(
@@ -218,7 +220,6 @@ pub fn export_graphs(graphs: &[DependencyGraph], out_path: &Path) -> anyhow::Res
                     None,
                 );
             }
-            // Ensure target node exists
             if !added_nodes.contains(&target_id) {
                 let node_label = target_id.split("::").last().unwrap_or("").to_string();
                 add_node(
@@ -247,7 +248,5 @@ pub fn export_graphs(graphs: &[DependencyGraph], out_path: &Path) -> anyhow::Res
         }
     }
 
-    let json = serde_json::to_string_pretty(&elements)?;
-    fs::write(out_path, json)?;
-    Ok(())
+    serde_json::to_value(elements).unwrap_or(serde_json::json!([]))
 }

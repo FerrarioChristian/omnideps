@@ -1,5 +1,5 @@
-use language_agnostic_analyzer::analyzer::{analyze_project, parse_source};
-use language_agnostic_analyzer::language::SupportedLanguage;
+use omnideps::analyzer::{analyze_project, parse_source};
+use omnideps::language::SupportedLanguage;
 use std::fs;
 use std::path::Path;
 use walkdir::WalkDir;
@@ -38,7 +38,7 @@ fn test_benchmarks_analysis() {
             };
 
             let source = fs::read_to_string(path).expect("Impossibile leggere il file");
-            let config = language_agnostic_analyzer::config::AnalyzerConfig::default();
+            let config = omnideps::config::AnalyzerConfig::default();
 
             // Verifica che l'analisi non vada in panico
             let parse_result = parse_source(lang, &source, path, &config);
@@ -74,7 +74,7 @@ fn test_benchmarks_analysis() {
 
             // Esporta anche la versione Cytoscape per i test
             let cyto_path = outputs_dir.join(format!("cyto_{}.json", filename));
-            language_agnostic_analyzer::export::cytoscape::export_graphs(
+            omnideps::export::cytoscape::export_graphs(
                 std::slice::from_ref(&graph),
                 &cyto_path,
             )

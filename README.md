@@ -1,64 +1,87 @@
-# Language Agnostic Analyzer
+# Omnideps (ex Language Agnostic Analyzer)
 
 Analizzatore architetturale multilingua progettato per estrarre il grafo delle
 dipendenze del codice sorgente (es. Java, Rust) tramite Tree-sitter. Il sistema
 estrae componenti e relazioni strutturali o comportamentali in modo
 language-agnostic e risolve i tipi per tracciare le reali dipendenze.
 
+## Architettura Unificata (Single Binary)
+
+Omnideps è distribuito come un singolo file eseguibile che contiene sia il motore di analisi (scritto in Rust) sia l'interfaccia web interattiva (scritta in SvelteKit e integrata staticamente nell'eseguibile). Non è necessario installare Node.js o altre dipendenze per visualizzare i grafi!
+
 ## Comandi Utili
 
-### 1. Testare l'Estrazione e Preparare il Visualizer
+Il comando principale è `omnideps`, che espone diverse funzionalità tramite sottocomandi (in stile Git o Cargo).
 
-Per validare l'estrazione e generare automaticamente i file JSON di input per
-il **Visualizer**, eseguire la suite di test standard:
+### 1. Analisi di una Cartella o Singolo File
 
-```bash cargo test```
+Per lanciare l'analizzatore su una cartella specifica o file del proprio progetto, estraendone i log e il JSON risultante, eseguire:
 
-*I test esportano l'analisi sotto la cartella `tests/outputs/` (inclusi i file
-`cyto_*.json`), i quali verranno poi consumati dal visualizer locale.*
-
-### 2. Eseguire l'Analizzatore su una Cartella Qualsiasi
-
-Per lanciare l'analizzatore su una cartella specifica o file del proprio
-progetto, estraendone i log e il JSON risultante, eseguire:
-
-```bash cargo run --bin language-agnostic-analyzer -- [PERCORSO]```
+```bash
+omnideps analyze [PERCORSO]
+```
 
 Opzioni utili:
-
-- `--json [FILE_OUT.json]`: Salva l'output in formato JSON standard (diverso
-dal file Cytoscape).
+- `--output [FILE_OUT.json]`: Salva l'output in formato JSON standard (e genera in automatico la versione Cytoscape).
 - `--csv [FILE_OUT.csv]`: Genera un report CSV riassuntivo.
-- `--config [FILE_CONFIG.json]`: Permette di utilizzare file di configurazione
-custom per l'analizzatore.
-- `--debug-refs`: Abilita il debug delle reference risolte/non risolte.
+- `--config [FILE_CONFIG.json]`: Permette di utilizzare file di configurazione custom per l'analizzatore.
+- `-d, --debug-refs`: Abilita il debug delle reference risolte/non risolte.
+
+### 2. Avviare il Visualizer Web Integrato
+
+Per avviare l'interfaccia web e interagire visivamente con i grafi:
+
+```bash
+omnideps serve
+```
+
+Questo avvierà un server HTTP locale ultraleggero (sulla porta 3000 di default). Aprendo `http://localhost:3000` nel browser, potrai accedere al visualizer, senza dover installare Node.js.
+(Puoi cambiare la porta con `omnideps serve --port 8080`).
 
 ### 3. Suite di Benchmark (Java / Rust / C / C++ / Python)
 
-Il progetto include benchmark custom per misurare accuratamente i falsi
-positivi/negativi sull'astrazione AST di tutti i linguaggi supportati. I
-risultati vengono salvati nelle rispettive sottocartelle di benchmark
-all'interno di `tests/benchmarks/` in formato `report.md` e `report.json`.
+Il progetto include benchmark custom per misurare accuratamente i falsi positivi/negativi sull'astrazione AST di tutti i linguaggi supportati.
 
-**Eseguire un Benchmark (es. Rust):**
+**Eseguire un Benchmark specifico (es. Rust):**
+```bash
+omnideps benchmark run tests/benchmarks/benchmark-rust
+```
+Di default, i file `report.md` e `report.json` verranno salvati all'interno della cartella specificata. È possibile specificare un'altra cartella di destinazione usando il flag `-o` (o `--output`):
+```bash
+omnideps benchmark run tests/benchmarks/benchmark-rust -o cartella_di_destinazione
+```
 
-```bash cargo run --release --bin benchmark_runner
-tests/benchmarks/benchmark-rust ```
+**Eseguire tutti i Benchmark:**
+```bash
+omnideps benchmark all
+```
+I risultati verranno salvati nelle rispettive sottocartelle in formato `report.md` e `report.json`, e un CSV aggregato in `tests/benchmarks/results.csv`.
 
-**Eseguire un Benchmark (es. Java):**
+### 4. Esportazione Cytoscape
 
-```bash cargo run --release --bin benchmark_runner
-tests/benchmarks/benchmark-java ```
+Per convertire un file JSON generato in precedenza in formato compatibile con Cytoscape:
 
-## Visualizer
+```bash
+omnideps export-cyto input.json output_cyto.json
+```
 
-Il visualizer web (ora basato su SvelteKit e Node.js) permette di esplorare in
-tempo reale i grafi e visualizzare in modo interattivo i report di benchmark e
-la documentazione del progetto.
+## Installazione (Sviluppatori)
 
-Per avviarlo, spostati nella cartella dedicata ed esegui i seguenti comandi (è
-richiesto Node.js e NPM):
+Se hai Rust installato, puoi compilare Omnideps dal codice sorgente. Il processo di build si occuperà automaticamente di compilare anche il frontend SvelteKit (è richiesto Node.js solo in fase di compilazione).
 
-```bash cd visualizer-svelte npm install npm run dev ```
+```bash
+# 1. Compila il frontend SvelteKit (genera i file statici in visualizer-svelte/build)
+cd visualizer-svelte
+npm install
+npm run build
+cd ..
 
-Dopodiché apri `http://localhost:5173` nel tuo browser.
+# 2. Compila l'eseguibile Rust (che includerà i file statici)
+cargo build --release
+```
+
+L'eseguibile finale si troverà in `target/release/omnideps`.
+
+## Integrazione Continua (CI/CD)
+
+Il progetto include una pipeline GitHub Actions (`.github/workflows/release.yml`) che compila automaticamente eseguibili ottimizzati per **Windows, macOS (Intel e Apple Silicon) e Linux** ad ogni nuova release (es. tag `v1.0.0`), gestendo il caching aggressivo per Rust e npm.

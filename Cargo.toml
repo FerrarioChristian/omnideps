@@ -1,9 +1,9 @@
 [package]
-name = "language-agnostic-analyzer"
+name = "omnideps"
 description = "A language-agnostic code analyzer using tree-sitter"
 version = "0.1.0"
 edition = "2024"
-default-run = "language-agnostic-analyzer"
+default-run = "omnideps"
 
 [dependencies]
 tree-sitter = "0.26.8"
@@ -20,15 +20,11 @@ walkdir = "2.5"
 anyhow = "1.0"
 serde_yaml = "0.9.34"
 csv = "1.3"
+axum = "0.8.9"
+tokio = { version = "1.53.1", features = ["full"] }
+rust-embed = "8.12.0"
+mime_guess = "2.0.5"
 
 [[bin]]
-name = "language-agnostic-analyzer"
+name = "omnideps"
 path = "src/main.rs"
-
-[[bin]]
-name = "benchmark_runner"
-path = "src/bin/benchmark_runner.rs"
-
-[[bin]]
-name = "benchmark_all"
-path = "src/bin/benchmark_all.rs"
