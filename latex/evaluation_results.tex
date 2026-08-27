@@ -1,0 +1,134 @@
+\chapter{Evaluation and Results}
+\label{ch:evaluation_results}
+
+\label{sec:evaluation_introduction}
+
+To evaluate the effectiveness of the proposed architectural analysis
+system, a comprehensive benchmark suite was designed. The primary
+goal of this suite is to objectively measure the analyzer's ability
+to correctly extract architectural entities (nodes) and dependency
+relationships (edges) across multiple programming languages. This
+chapter presents the validation methodology, details the internal
+architecture of the benchmark runner, and will subsequently discuss
+the aggregated results and provide a qualitative analysis of the
+encountered error categories.
+
+\section{Validation Methodology}
+\label{sec:validation_methodology}
+
+The validation process is fundamentally based on structural
+equivalence: the dependency graph automatically extracted by the
+system is programmatically compared against a manually defined
+\textit{ground truth} for each benchmark. To ensure robust testing
+across paradigms, a dedicated test project was constructed for each
+supported language (Rust, Java, Python, C, and C++). These projects
+purposefully exercise the core architectural constructs and edge
+cases of each language, including module definitions, structured
+types (classes, structs, interfaces, traits, enums), function
+declarations, inheritance hierarchies, method invocations,
+instantiations, and field accesses.
+
+\subsection{The Architectural Oracle (Manifest)}
+For each test project, the ground truth is formalized in a YAML
+manifest file (typically named \texttt{test.yml}). This manifest acts
+as the architectural oracle against which the extracted graph is
+verified. The manifest explicitly defines:
+
+\begin{itemize}
+  \item \textbf{Target Files}: The list of source code paths that
+    constitute the benchmark project, ensuring the analyzer parses
+    the exact subset of files required.
+  \item \textbf{Expected Nodes}: The architectural entities that the
+    system must recognize. Each node specifies a Fully Qualified Name
+    (FQN), such as \texttt{models.User.\_\_init\_\_}, and a
+    corresponding entity kind (e.g., \texttt{module}, \texttt{class},
+    \texttt{struct}, \texttt{function}).
+  \item \textbf{Expected Edges}: The semantic dependencies connecting
+    the entities. Each edge definition requires a unique identifier,
+    a \texttt{source} FQN, a \texttt{sink} (target) FQN, and the
+    specific relationship type (e.g., \texttt{calls},
+      \texttt{inherits}, \texttt{uses\_type}, \texttt{accesses\_field},
+    \texttt{imports}).
+\end{itemize}
+
+\subsection{The Benchmark Runner and Validation Logic}
+To automate the evaluation process, a dedicated test harness, the
+\texttt{benchmark\_runner}, was developed. The runner executes the
+full extraction pipeline (Parsing, Structural Extraction, Semantic
+Resolution, and Graph Construction) on the test files and
+programmatically verifies adherence to the YAML manifest.
+
+Because the analyzer generates a deeply nested, strongly typed
+Intermediate Representation (IR), while the YAML manifest uses flat
+string identifiers, the validation logic must bridge this structural
+gap. The validation algorithm operates through the following steps:
+
+\begin{enumerate}
+  \item \textbf{Graph Flattening and Indexing:} To optimize lookups
+    and resolve naming mismatches, the runner flattens the extracted
+    \texttt{DependencyGraph} into indexing maps. For nodes, it
+    traverses the hierarchy of modules and components, extracting the
+    nested paths (e.g., \texttt{["models", "User", "\_\_init\_\_"]})
+    and joining them into a flat string FQN
+    (\texttt{"models.User.\_\_init\_\_"}), associating it with the
+    original component instance. Similarly, it constructs an
+    adjacency map for the edges, mapping each flattened source string
+    to a set of valid sink strings.
+
+  \item \textbf{Node Validation:} The algorithm iterates through the
+    \textbf{expected nodes} in the manifest and queries the flattened
+    node index. The primary metric is the existence of the node based
+    on its FQN. While the system extracts rich typing information
+    (e.g., distinguishing between a \texttt{StructuredType(Class)}
+    and a \texttt{Function}), the validation relies primarily on
+    structural naming matches to maintain compatibility across
+    different language paradigms.
+
+  \item \textbf{Edge Validation (Dependency Checks):} For every
+    expected edge, the runner performs a two-step validation:
+    \begin{itemize}
+      \item \textit{Endpoint Verification}: It first ensures that
+        both the \texttt{source} and \texttt{sink} nodes were
+        successfully extracted. If either endpoint is missing from
+        the node index, the edge automatically fails validation due
+        to a "Missing Endpoint," isolating the root cause of the error.
+      \item \textit{Adjacency Verification}: If both endpoints exist,
+        the algorithm queries the adjacency map to determine if a
+        dependency relation was established from the source to the sink.
+    \end{itemize}
+    Currently, the runner focuses on verifying the existence of the
+    dependency edge rather than strictly enforcing the specific
+    \texttt{DependencyEdgeKind}. However, because the analyzer
+    natively extracts highly specific relationship types (such as
+    \texttt{UsesParamType} or \texttt{AccessesField}), the
+    infrastructure is fully prepared to support strict edge-kind
+    validation in future iterations. When an edge fails, the runner
+    outputs the list of available sinks for that specific source,
+    providing crucial contextual data for debugging the resolution heuristics.
+\end{enumerate}
+
+\subsection{Reporting and Metrics}
+Upon completing the validation, the runner serializes the results
+into both a JSON format (for potential CI/CD automation) and a
+human-readable Markdown report. The report dynamically models summary
+tables that classify the extraction outcomes into pass/fail statuses.
+
+The evaluation primarily tracks two key metrics:
+\begin{itemize}
+  \item \textbf{Node Accuracy}: The fraction of expected
+    architectural entities successfully identified by the analyzer.
+    \[
+      \text{Acc}_{nodes} = \frac{|\{n \in N_{expected} \mid n \in
+      N_{extracted}\}|}{|N_{expected}|}
+    \]
+  \item \textbf{Edge Accuracy}: The fraction of expected dependencies
+    successfully resolved.
+    \[
+      \text{Acc}_{edges} = \frac{|\{e \in E_{expected} \mid e \in
+      E_{extracted}\}|}{|E_{expected}|}
+    \]
+\end{itemize}
+
+These metrics provide a quantitative foundation for analyzing the
+strengths and limitations of the language-agnostic extraction
+heuristics, the results of which are discussed in the following sections.
