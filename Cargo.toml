@@ -1,9 +1,24 @@
 [package]
 name = "omnideps"
-description = "A language-agnostic code analyzer using tree-sitter"
 version = "0.1.0"
 edition = "2024"
+description = "A language-agnostic architectural dependency analyzer and visualizer based on tree-sitter"
+authors = ["Christian Ferrario <chri.fer.emi@gmail.com>"]
+license = "MIT"
+repository = "https://github.com/FerrarioChristian/omnideps"
+readme = "README.md"
+keywords = ["analyzer", "dependency-graph", "tree-sitter", "architecture", "visualization"]
+categories = ["development-tools"]
 default-run = "omnideps"
+
+# Important: We must explicitly include these files/folders because
+# visualizer-svelte/build is ignored by git, but we need it for rust-embed!
+include = [
+    "src/**/*",
+    "visualizer-svelte/build/**/*",
+    "Cargo.toml",
+    "README.md"
+]
 
 [dependencies]
 tree-sitter = "0.26.8"
