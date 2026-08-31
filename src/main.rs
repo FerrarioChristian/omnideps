@@ -4,7 +4,7 @@ use std::fs;
 
 mod cli;
 mod commands;
-use cli::{Cli, Commands, BenchmarkCommands};
+use cli::{Cli, Commands, BenchmarkCommands, ConfigCommands};
 
 fn main() -> Result<()> {
     let cli = Cli::parse();
@@ -40,6 +40,11 @@ fn main() -> Result<()> {
         Commands::Serve { port } => {
             commands::serve::execute(*port)?;
         }
+        Commands::Config { cmd } => match cmd {
+            ConfigCommands::Init { output } => {
+                commands::config::execute_init(output)?;
+            }
+        },
     }
 
     Ok(())

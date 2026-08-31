@@ -66,7 +66,13 @@ pub fn execute(port: u16) -> Result<()> {
                 .fallback(static_handler);
 
             let addr = SocketAddr::from(([127, 0, 0, 1], port));
-            println!("Avvio Web Visualizer all'indirizzo http://{}", addr);
+            let url = format!("http://{}", addr);
+            println!("Avvio Web Visualizer all'indirizzo {}", url);
+
+            // Tenta di aprire il browser automaticamente
+            if let Err(e) = open::that(&url) {
+                eprintln!("Impossibile aprire il browser automaticamente: {}", e);
+            }
 
             let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
             axum::serve(listener, app).await.unwrap();

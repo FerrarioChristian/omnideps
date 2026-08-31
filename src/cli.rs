@@ -58,6 +58,21 @@ pub enum Commands {
         #[arg(short, long, default_value_t = 3000)]
         port: u16,
     },
+    /// Manage configuration files
+    Config {
+        #[command(subcommand)]
+        cmd: ConfigCommands,
+    },
+}
+
+#[derive(Subcommand)]
+pub enum ConfigCommands {
+    /// Initialize a default configuration file
+    Init {
+        /// Output configuration file path (default: omnideps.json)
+        #[arg(default_value = "omnideps.json")]
+        output: PathBuf,
+    },
 }
 
 #[derive(Subcommand)]

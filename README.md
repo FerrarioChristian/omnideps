@@ -85,3 +85,12 @@ L'eseguibile finale si troverà in `target/release/omnideps`.
 ## Integrazione Continua (CI/CD)
 
 Il progetto include una pipeline GitHub Actions (`.github/workflows/release.yml`) che compila automaticamente eseguibili ottimizzati per **Windows, macOS (Intel e Apple Silicon) e Linux** ad ogni nuova release (es. tag `v1.0.0`), gestendo il caching aggressivo per Rust e npm.
+
+### 5. Generazione File di Configurazione
+
+Se vuoi personalizzare le regole e le strategie dell'analizzatore architetturale senza dover scrivere il file JSON da zero, puoi usare il comando:
+
+```bash
+omnideps config init
+```
+Questo genererà un file `omnideps.json` nella cartella corrente con tutti i valori predefiniti, pronto per essere modificato e passato al flag `--config` negli altri comandi. Puoi anche specificare un percorso diverso con `omnideps config init path/to/config.json`.
