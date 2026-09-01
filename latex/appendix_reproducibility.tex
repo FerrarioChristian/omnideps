@@ -1,0 +1,104 @@
+\chapter{Source Code and Reproducibility}
+\label{app:reproducibility}
+
+The complete source code of the \textit{Omnideps} framework,
+including the heuristic extraction engine, the resolution algebra,
+the embedded web visualizer, and the experimental benchmark suite
+developed for this thesis, is open-source and publicly available.
+
+\section{Repository Availability}
+The project repository can be accessed at the following URL:
+\begin{center}
+  \url{https://github.com/FerrarioChristian/omnideps}
+\end{center}
+
+\section{Installation for End Users}
+\textit{Omnideps} is distributed as a single standalone binary. The
+web visualizer (SvelteKit) is pre-compiled and embedded directly
+inside the Rust executable. To use the tool, it is not necessary to
+install Node.js, npm, or Rust.
+Users can simply:
+\begin{enumerate}
+  \item Navigate to the \textbf{Releases} page on the GitHub repository.
+  \item Download the executable for their Operating System (Windows
+    \texttt{.exe}, macOS, or Linux).
+  \item Run it directly from the terminal.
+\end{enumerate}
+
+\section{Command Line Interface}
+The framework provides several subcommands to orchestrate the
+analysis and visualization process.
+
+\subsection*{Analyze Code}
+To extract the dependency graph from a target project, use the
+\texttt{analyze} command:
+\begin{verbatim}
+omnideps analyze /path/to/project --output graph.json
+\end{verbatim}
+This command will parse the codebase, execute the extraction
+heuristics, run the resolution engine, and output the final
+dependency graph in standard JSON format.
+
+\subsection*{Custom Configuration}
+To initialize a default configuration file (\texttt{omnideps.json})
+that can be customized to override the default extraction rules and
+resolution strategies, run:
+\begin{verbatim}
+omnideps config init
+\end{verbatim}
+The generated configuration file can then be provided to the analyzer
+using the \texttt{--config} flag (e.g., \texttt{omnideps analyze
+/path --config omnideps.json}).
+
+\subsection*{Web Visualizer}
+To interactively explore the generated graphs, the embedded web
+interface can be launched via:
+\begin{verbatim}
+omnideps serve
+\end{verbatim}
+This starts an ultra-lightweight local HTTP server (defaulting to
+port 3000) and automatically opens the default web browser to the
+interactive UI.
+
+\subsection*{Benchmarking Suite}
+The project includes custom benchmarks to accurately measure false
+positives and false negatives on the AST abstraction across the
+supported languages.
+To run a specific benchmark:
+\begin{verbatim}
+omnideps benchmark run tests/benchmarks/benchmark-rust -o /output_dir
+\end{verbatim}
+To execute the entire suite and generate the aggregated CSV report:
+\begin{verbatim}
+omnideps benchmark all
+\end{verbatim}
+
+\section{Building from Source}
+For development and reproducibility purposes, the project can be
+built from source. This requires both \textbf{Node.js} and the
+\textbf{Rust Toolchain} (\texttt{cargo} and \texttt{rustc}).
+
+First, build the SvelteKit frontend, which generates static files in
+the \texttt{visualizer-svelte/build} directory:
+\begin{verbatim}
+cd visualizer-svelte
+npm install
+npm run build
+cd ..
+\end{verbatim}
+
+Next, compile the Rust executable. The \texttt{rust-embed} macro will
+automatically package the compiled Svelte web assets inside the
+binary during compilation:
+\begin{verbatim}
+cargo build --release
+\end{verbatim}
+The final executable will be located in \texttt{target/release/omnideps}.
+
+\section{Testing}
+The framework includes a comprehensive suite of unit and integration
+tests designed to validate the internal extraction and resolution
+logic. To execute the test suite, run:
+\begin{verbatim}
+cargo test
+\end{verbatim}
