@@ -1,6 +1,6 @@
-use language_agnostic_analyzer::analyzer::{analyze_project, parse_source};
-use language_agnostic_analyzer::config::AnalyzerConfig;
-use language_agnostic_analyzer::language::SupportedLanguage;
+use omnideps::analyzer::{analyze_project, parse_source};
+use omnideps::config::AnalyzerConfig;
+use omnideps::language::SupportedLanguage;
 use std::fs;
 use std::path::Path;
 use walkdir::WalkDir;
@@ -56,6 +56,6 @@ fn test_self_analysis() {
     fs::write(&json_path, json).expect("Unable to write self-analysis graph JSON.");
 
     let cyto_path = outputs_dir.join("cyto_self_analysis.json");
-    language_agnostic_analyzer::export::cytoscape::export_graphs(&all_graphs, &cyto_path)
+    omnideps::export::cytoscape::export_graphs(&all_graphs, &cyto_path)
         .expect("Unable to export Cytoscape graph for self-analysis.");
 }

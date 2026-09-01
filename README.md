@@ -1,64 +1,116 @@
-# Language Agnostic Analyzer
+# Omnideps (formerly Language Agnostic Analyzer)
 
-Analizzatore architetturale multilingua progettato per estrarre il grafo delle
-dipendenze del codice sorgente (es. Java, Rust) tramite Tree-sitter. Il sistema
-estrae componenti e relazioni strutturali o comportamentali in modo
-language-agnostic e risolve i tipi per tracciare le reali dipendenze.
+A language-agnostic architectural dependency analyzer designed to extract source code dependency graphs using Tree-sitter.
+Omnideps extracts components and structural or behavioral relationships (for languages like Rust, Java, Python, C, C++) and resolves types to trace actual code dependencies.
 
-## Comandi Utili
+## Architecture & Installation
 
-### 1. Testare l'Estrazione e Preparare il Visualizer
+Omnideps is distributed as a **Single Standalone Binary**. The web visualizer (SvelteKit) is pre-compiled and embedded directly inside the Rust executable.
 
-Per validare l'estrazione e generare automaticamente i file JSON di input per
-il **Visualizer**, eseguire la suite di test standard:
+**For End Users:**
+You **do not** need to install Node.js, npm, or even Rust to use Omnideps.
 
-```bash cargo test```
+1. Go to the GitHub **Releases** page.
+2. Download the executable for your Operating System (Windows `.exe`, macOS, or Linux).
+3. Open your terminal and run it directly!
 
-*I test esportano l'analisi sotto la cartella `tests/outputs/` (inclusi i file
-`cyto_*.json`), i quali verranno poi consumati dal visualizer locale.*
+---
 
-### 2. Eseguire l'Analizzatore su una Cartella Qualsiasi
+## Commands
 
-Per lanciare l'analizzatore su una cartella specifica o file del proprio
-progetto, estraendone i log e il JSON risultante, eseguire:
+Omnideps provides several subcommands (similar to Git or Cargo).
 
-```bash cargo run --bin language-agnostic-analyzer -- [PERCORSO]```
+### 1. Analyze Code
 
-Opzioni utili:
+Run the analyzer on a specific directory or file to extract the dependency graph:
 
-- `--json [FILE_OUT.json]`: Salva l'output in formato JSON standard (diverso
-dal file Cytoscape).
-- `--csv [FILE_OUT.csv]`: Genera un report CSV riassuntivo.
-- `--config [FILE_CONFIG.json]`: Permette di utilizzare file di configurazione
-custom per l'analizzatore.
-- `--debug-refs`: Abilita il debug delle reference risolte/non risolte.
+```bash
+omnideps analyze /path/to/project
+```
 
-### 3. Suite di Benchmark (Java / Rust / C / C++ / Python)
+**Options:**
 
-Il progetto include benchmark custom per misurare accuratamente i falsi
-positivi/negativi sull'astrazione AST di tutti i linguaggi supportati. I
-risultati vengono salvati nelle rispettive sottocartelle di benchmark
-all'interno di `tests/benchmarks/` in formato `report.md` e `report.json`.
+- `-o, --output <FILE>`: Save the output in standard JSON format (also automatically generates the Cytoscape version).
+- `-c, --csv <FILE>`: Generate a CSV summary report.
+- `--config <FILE>`: Use a custom JSON configuration file.
+- `-d, --debug-refs`: Enable debug output for resolved/unresolved references.
 
-**Eseguire un Benchmark (es. Rust):**
+### 2. Web Visualizer
 
-```bash cargo run --release --bin benchmark_runner
-tests/benchmarks/benchmark-rust ```
+Launch the embedded web interface to interactively explore your graphs:
 
-**Eseguire un Benchmark (es. Java):**
+```bash
+omnideps serve
+```
 
-```bash cargo run --release --bin benchmark_runner
-tests/benchmarks/benchmark-java ```
+This will start an ultra-lightweight local HTTP server (default port: `3000`) and will **automatically open your default web browser** to `http://127.0.0.1:3000`. You can analyze code and visualize graphs directly from the UI.
+*(Change the port with `omnideps serve --port 8080`).*
 
-## Visualizer
+### 3. Benchmarking Suite
 
-Il visualizer web (ora basato su SvelteKit e Node.js) permette di esplorare in
-tempo reale i grafi e visualizzare in modo interattivo i report di benchmark e
-la documentazione del progetto.
+The project includes custom benchmarks to accurately measure false positives/negatives on the AST abstraction across supported languages.
 
-Per avviarlo, spostati nella cartella dedicata ed esegui i seguenti comandi (è
-richiesto Node.js e NPM):
+**Run a specific Benchmark:**
 
-```bash cd visualizer-svelte npm install npm run dev ```
+```bash
+omnideps benchmark run tests/benchmarks/benchmark-rust -o /path/to/output_dir
+```
 
-Dopodiché apri `http://localhost:5173` nel tuo browser.
+*(By default, reports are saved in the benchmark's folder. Use `-o` to override the destination).*
+
+**Run all Benchmarks:**
+```bash
+omnideps benchmark all -o /path/to/results_dir
+```
+Generates aggregated results in `results.csv` and subfolders for each benchmark's report inside `/path/to/results_dir`. The `-o` flag is optional (defaults to `tests/benchmarks`).
+
+### 4. Configuration
+
+If you want to customize the architectural analyzer's rules and strategies, you can generate a default configuration file:
+
+```bash
+omnideps config init
+```
+
+This creates an `omnideps.json` file in your current directory. Edit it as needed, then pass it to the analyzer using the `--config` flag.
+
+### 5. Cytoscape Export
+
+To convert a previously generated standard JSON file into a Cytoscape-compatible format:
+
+```bash
+omnideps export-cyto input.json output_cyto.json
+```
+
+---
+
+## Development (Building from Source)
+
+The following instructions are **only for developers** who want to modify the source code. To compile the project yourself, you will need both **Node.js** and **Rust** installed.
+
+1. **Build the SvelteKit frontend** (Generates static files in `visualizer-svelte/build`):
+
+   ```bash
+   cd visualizer-svelte
+   npm install
+   npm run build
+   cd ..
+   ```
+
+2. **Compile the Rust executable** (The `rust-embed` macro will package the Svelte build inside the binary):
+
+   ```bash
+   cargo build --release
+   ```
+
+The final executable will be located in `target/release/omnideps`.
+
+## CI/CD Pipeline
+
+The project includes a GitHub Actions pipeline (`.github/workflows/release.yml`) that automatically builds optimized executables for **Windows, macOS (Intel & Apple Silicon), and Linux** whenever a new tag (e.g., `v1.0.0`) is pushed, using aggressive caching for both Rust and npm.
+To publish a new release, simply create a new tag and push it to the repository. The pipeline will handle the rest, including uploading the binaries to the GitHub Releases page.
+
+```bash
+git tag v0.x.y
+git push origin v0.x.y
+```
