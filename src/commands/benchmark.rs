@@ -56,11 +56,16 @@ pub fn execute_run(testdir: &Path, output: Option<&Path>, config: &AnalyzerConfi
     Ok(())
 }
 
-pub fn execute_all(config: &AnalyzerConfig) -> Result<()> {
+pub fn execute_all(output: Option<&Path>, config: &AnalyzerConfig) -> Result<()> {
     let benchmarks_dir = Path::new("tests/benchmarks");
 
     if !benchmarks_dir.exists() {
         anyhow::bail!("Directory tests/benchmarks does not exist.");
+    }
+
+    let out_dir = output.unwrap_or(benchmarks_dir);
+    if !out_dir.exists() {
+        fs::create_dir_all(out_dir)?;
     }
 
     let mut results = std::collections::BTreeMap::new();
@@ -75,11 +80,13 @@ pub fn execute_all(config: &AnalyzerConfig) -> Result<()> {
                 let lang = dir_name.strip_prefix("benchmark-").unwrap().to_string();
                 println!("Running benchmark for {}...", lang);
 
-                if let Err(e) = execute_run(&path, None, config) {
+                let sub_out_dir = output.map(|p| p.join(dir_name.as_ref()));
+                if let Err(e) = execute_run(&path, sub_out_dir.as_deref(), config) {
                     eprintln!("Warning: benchmark run failed on {:?}: {}", path, e);
                 }
 
-                let report_path = path.join("report.json");
+                let report_path = sub_out_dir.unwrap_or_else(|| path.join("report.json"));
+                let report_path = if report_path.is_dir() { report_path.join("report.json") } else { report_path };
                 if report_path.exists() {
                     let content = fs::read_to_string(&report_path)?;
                     let report: omnideps::model::TestReport = serde_json::from_str(&content)?;
@@ -98,7 +105,7 @@ pub fn execute_all(config: &AnalyzerConfig) -> Result<()> {
         }
     }
 
-    let csv_path = benchmarks_dir.join("results.csv");
+    let csv_path = out_dir.join("results.csv");
     let file_exists = csv_path.exists();
 
     let file = OpenOptions::new()

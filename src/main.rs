@@ -29,9 +29,14 @@ fn main() -> Result<()> {
                 };
                 commands::benchmark::execute_run(testdir, output.as_deref(), &config_val)?;
             }
-            BenchmarkCommands::All => {
-                let config_val = omnideps::config::AnalyzerConfig::default_strategies();
-                commands::benchmark::execute_all(&config_val)?;
+            BenchmarkCommands::All { output, config } => {
+                let config_val = if let Some(config_path) = config {
+                    let content = fs::read_to_string(config_path)?;
+                    serde_json::from_str(&content)?
+                } else {
+                    omnideps::config::AnalyzerConfig::default_strategies()
+                };
+                commands::benchmark::execute_all(output.as_deref(), &config_val)?;
             }
         },
         Commands::ExportCyto { input, output } => {

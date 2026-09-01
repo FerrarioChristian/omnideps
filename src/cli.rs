@@ -92,5 +92,13 @@ pub enum BenchmarkCommands {
         config: Option<PathBuf>,
     },
     /// Run all benchmarks
-    All,
+    All {
+        /// Output directory for all reports and results.csv (defaults to tests/benchmarks)
+        #[arg(short, long)]
+        output: Option<PathBuf>,
+
+        /// Optional config file path
+        #[arg(short, long)]
+        config: Option<PathBuf>,
+    },
 }

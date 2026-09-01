@@ -59,12 +59,10 @@ omnideps benchmark run tests/benchmarks/benchmark-rust -o /path/to/output_dir
 *(By default, reports are saved in the benchmark's folder. Use `-o` to override the destination).*
 
 **Run all Benchmarks:**
-
 ```bash
-omnideps benchmark all
+omnideps benchmark all -o /path/to/results_dir
 ```
-
-Generates aggregated results in `tests/benchmarks/results.csv`.
+Generates aggregated results in `results.csv` and subfolders for each benchmark's report inside `/path/to/results_dir`. The `-o` flag is optional (defaults to `tests/benchmarks`).
 
 ### 4. Configuration
 
