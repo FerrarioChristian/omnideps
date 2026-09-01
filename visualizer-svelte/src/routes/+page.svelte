@@ -171,7 +171,7 @@
 
 {#snippet controls()}
     <button class="open-modal-btn" onclick={() => isModalOpen = true}>
-        🔍 Cerca & Apri Benchmark...
+        🔍 Search & Open Benchmark...
     </button>
 {/snippet}
 
@@ -185,7 +185,7 @@
                 <input 
                     type="text" 
                     bind:value={searchQuery} 
-                    placeholder="Cerca file (es. DECL-1, structs.rs)..." 
+                    placeholder="Search file (e.g., DECL-1, structs.rs)..." 
                     autofocus
                 />
             </div>
@@ -202,7 +202,7 @@
                     </div>
                 {/each}
                 {#if filteredFiles.length === 0}
-                    <div style="padding: 15px 20px; color: #888; font-size: 14px; text-align: center;">Nessun risultato trovato</div>
+                    <div style="padding: 15px 20px; color: #888; font-size: 14px; text-align: center;">No results found</div>
                 {/if}
             </div>
         </div>

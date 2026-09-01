@@ -309,9 +309,9 @@
     {#if isSidebarOpen}
         <div class="sidebar" style="width: {sidebarWidth}px;">
             {#if isLoading}
-                <div style="text-align: center; margin-top: 20px; color: #888;">Caricamento...</div>
+                <div style="text-align: center; margin-top: 20px; color: #888;">Loading...</div>
             {:else if tree.length === 0}
-                <div style="text-align: center; margin-top: 20px; color: #888;">Nessun file trovato.</div>
+                <div style="text-align: center; margin-top: 20px; color: #888;">No files found.</div>
             {:else}
                 {@render renderTree(tree)}
             {/if}
@@ -336,7 +336,7 @@
                 {#if isContentLoading}
                     <div class="loading-center">
                         <div class="spinner"></div>
-                        Caricamento documento...
+                        Loading document...
                     </div>
                 {:else if isHtml}
                     <iframe 
@@ -360,10 +360,10 @@
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
                     {/if}
                 </button>
-                Documentazione
+                Documentation
             </div>
             <div class="loading-center" style="font-size: 1.2em;">
-                Seleziona un documento dalla barra laterale per visualizzarlo.
+                Select a document from the sidebar to view it.
             </div>
         {/if}
     </div>

@@ -253,12 +253,12 @@
     
     <div class="controls">
         <div class="form-group">
-            <label for="benchmark-select">Seleziona Suite di Benchmark</label>
+            <label for="benchmark-select">Select Benchmark Suite</label>
             <select id="benchmark-select" bind:value={selectedBenchmark} disabled={isFetchingSuites || isRunning}>
                 {#if isFetchingSuites}
-                    <option value="">Caricamento...</option>
+                    <option value="">Loading...</option>
                 {:else if benchmarkSuites.length === 0}
-                    <option value="">Nessun benchmark trovato</option>
+                    <option value="">No benchmarks found</option>
                 {:else}
                     {#each benchmarkSuites as suite}
                         <option value={suite}>{suite.split('/').pop().replace('benchmark-', 'Benchmark ')}</option>
@@ -278,7 +278,7 @@
 
     {#if error}
         <div class="error-msg">
-            <strong>Errore:</strong> {error}
+            <strong>Error:</strong> {error}
         </div>
     {/if}
 

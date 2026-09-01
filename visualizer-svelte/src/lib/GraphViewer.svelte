@@ -403,12 +403,12 @@
 <div id="info" class:collapsed={isPanelCollapsed}>
     <div class="panel-header">
         <h3>Control Panel</h3>
-        <button class="toggle-panel-btn" onclick={() => isPanelCollapsed = true} title="Nascondi Menu">
+        <button class="toggle-panel-btn" onclick={() => isPanelCollapsed = true} title="Hide Menu">
             ✕
         </button>
     </div>
     <div style="margin-bottom: 15px;">
-        <input type="text" id="node-search-box" bind:value={searchQuery} oninput={handleSearch} placeholder="Cerca nodo..." autocomplete="off" spellcheck="false" />
+        <input type="text" id="node-search-box" bind:value={searchQuery} oninput={handleSearch} placeholder="Search node..." autocomplete="off" spellcheck="false" />
     </div>
     {#if statusMessage}
         <div id="status">{statusMessage}</div>
@@ -432,11 +432,11 @@
 
         <div class="toggles-container" id="toggles-panel">
             <details class="filter-section">
-                <summary>Filtri Archi (Relazioni)</summary>
+                <summary>Edge Filters (Relationships)</summary>
                 <div class="filter-content">
                     <label class="toggle-row" style="font-weight:bold; border-bottom: 1px solid #555; padding-bottom: 5px; margin-bottom: 5px;">
                         <input type="checkbox" bind:checked={structChecked} onchange={toggleStructural}>
-                        <span>Strutturali (IsA, Uses, Imports...)</span>
+                        <span>Structural (IsA, Uses, Imports...)</span>
                     </label>
                     <div class="filters-grid" style="margin-bottom: 15px;">
                         {#each Object.keys(structFilters) as key}
@@ -449,7 +449,7 @@
 
                     <label class="toggle-row" style="font-weight:bold; border-bottom: 1px solid #555; padding-bottom: 5px; margin-bottom: 5px;">
                         <input type="checkbox" bind:checked={behavChecked} onchange={toggleBehavioral}>
-                        <span>Comportamentali (Calls, Instantiates...)</span>
+                        <span>Behavioral (Calls, Instantiates...)</span>
                     </label>
                     <div class="filters-grid">
                         {#each Object.keys(behavFilters) as key}
@@ -463,24 +463,24 @@
             </details>
 
             <details class="filter-section">
-                <summary>Filtri Nodi (Entità)</summary>
+                <summary>Node Filters (Entities)</summary>
                 <div class="filter-content">
                     <label class="toggle-row" style="font-weight:bold; border-bottom: 1px solid #555; padding-bottom: 5px; margin-bottom: 5px;">
                         <input type="checkbox" bind:checked={allNodesChecked} onchange={toggleAllNodes}>
-                        <span>Tutti i Nodi</span>
+                        <span>All Nodes</span>
                     </label>
                     <div class="filters-grid">
                         {#each Object.keys(nodeFilters) as key}
                             <label class="toggle-row">
                                 <input type="checkbox" bind:checked={nodeFilters[key]} onchange={onFilterChange}> 
-                                <span title={key === 'Module' || key === 'Enum' ? 'Nascondendo questo nodo si nasconderà anche il suo contenuto' : ''}>
+                                <span title={key === 'Module' || key === 'Enum' ? 'Hiding this node will also hide its content' : ''}>
                                     {key} {key === 'Module' || key === 'Enum' ? ' ⚠️' : ''}
                                 </span>
                             </label>
                         {/each}
                     </div>
                     <div style="font-size: 0.8em; color: #aaa; margin-top: 10px; line-height: 1.3; max-width: 300px;">
-                        ⚠️ Nascondere un nodo "contenitore" (es. Module, Enum) nasconderà automaticamente anche tutti i nodi contenuti al suo interno.
+                        ⚠️ Hiding a "container" node (e.g., Module, Enum) will automatically hide all nodes contained within it.
                     </div>
                 </div>
             </details>
@@ -494,7 +494,7 @@
         <h2 id="sb-name">{selectedNode.name}</h2>
         <!-- svelte-ignore a11y_click_events_have_key_events, a11y_interactive_supports_focus -->
         <div class="sidebar-stat" style="margin-top: 15px; cursor: pointer; display: flex; align-items: center;" onclick={() => inDegreeExpanded = !inDegreeExpanded} role="button">
-            <span style="display: flex; align-items: center; gap: 5px;">In-Degree (Riceve da) 
+            <span style="display: flex; align-items: center; gap: 5px;">In-Degree (Receives from) 
                 <span style="display: flex;">
                     {#if inDegreeExpanded}
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
@@ -509,7 +509,7 @@
             <div class="edge-list">
                 {#each selectedNode.inEdges as edge}
                     <div class="edge-item">
-                        <span class="edge-label">{edge.label}</span> da 
+                        <span class="edge-label">{edge.label}</span> from 
                         <span class="edge-node" title={edge.sourceId}>{edge.sourceLabel}</span>
                     </div>
                 {/each}
@@ -518,7 +518,7 @@
 
         <!-- svelte-ignore a11y_click_events_have_key_events, a11y_interactive_supports_focus -->
         <div class="sidebar-stat" style="cursor: pointer; display: flex; align-items: center;" onclick={() => outDegreeExpanded = !outDegreeExpanded} role="button">
-            <span style="display: flex; align-items: center; gap: 5px;">Out-Degree (Punta a) 
+            <span style="display: flex; align-items: center; gap: 5px;">Out-Degree (Points to) 
                 <span style="display: flex;">
                     {#if outDegreeExpanded}
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
@@ -533,22 +533,22 @@
             <div class="edge-list">
                 {#each selectedNode.outEdges as edge}
                     <div class="edge-item">
-                        <span class="edge-label">{edge.label}</span> verso 
+                        <span class="edge-label">{edge.label}</span> to 
                         <span class="edge-node" title={edge.targetId}>{edge.targetLabel}</span>
                     </div>
                 {/each}
             </div>
         {/if}
         <div id="sb-extra">
-            <strong>Percorso Assoluto:</strong><br/>{selectedNode.id}
+            <strong>Absolute Path:</strong><br/>{selectedNode.id}
             {#if selectedNode.parent}
-                <br/><br/><strong>Modulo Padre:</strong><br/>{selectedNode.parent}
+                <br/><br/><strong>Parent Module:</strong><br/>{selectedNode.parent}
             {/if}
         </div>
     {/if}
 </div>
 
-<button class="legendBtn" title="Mostra Legenda" onclick={() => isLegendOpen = true}>?</button>
+<button class="legendBtn" title="Show Legend" onclick={() => isLegendOpen = true}>?</button>
 
 {#if isLegendOpen}
     <LegendModal onClose={() => isLegendOpen = false} />
