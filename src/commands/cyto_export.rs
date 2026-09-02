@@ -20,6 +20,6 @@ pub fn execute(input: &std::path::Path, output: &std::path::Path) -> Result<()> 
     omnideps::export::cytoscape::export_graphs(&graphs, output)
         .with_context(|| "Errore durante l'esportazione del grafo Cytoscape")?;
 
-    println!("Grafo esportato con successo in {}", output.display());
+    println!("Graph successfully exported to {}", output.display());
     Ok(())
 }

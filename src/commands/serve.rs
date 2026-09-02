@@ -75,11 +75,11 @@ pub fn execute(port: u16) -> Result<()> {
 
             let addr = SocketAddr::from(([127, 0, 0, 1], port));
             let url = format!("http://{}", addr);
-            println!("Avvio Web Visualizer all'indirizzo {}", url);
+            println!("Starting Web Visualizer at {}", url);
 
             // Tenta di aprire il browser automaticamente
             if let Err(e) = open::that(&url) {
-                eprintln!("Impossibile aprire il browser automaticamente: {}", e);
+                log::warn!("Could not open browser automatically: {}", e);
             }
 
             let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
@@ -102,7 +102,7 @@ async fn api_analyze(Json(payload): Json<AnalyzeRequest>) -> impl IntoResponse {
                 None => {
                     return (
                         StatusCode::BAD_REQUEST,
-                        axum::Json(serde_json::json!({ "error": "Estensione non supportata" })),
+                        axum::Json(serde_json::json!({ "error": "Unsupported extension" })),
                     )
                         .into_response();
                 }
@@ -112,7 +112,7 @@ async fn api_analyze(Json(payload): Json<AnalyzeRequest>) -> impl IntoResponse {
                 Err(e) => {
                     return (
                         StatusCode::INTERNAL_SERVER_ERROR,
-                        axum::Json(serde_json::json!({ "error": format!("Errore di parsing: {}", e) })),
+                        axum::Json(serde_json::json!({ "error": format!("Parsing error: {}", e) })),
                     )
                         .into_response();
                 }
@@ -120,7 +120,7 @@ async fn api_analyze(Json(payload): Json<AnalyzeRequest>) -> impl IntoResponse {
         } else {
             return (
                 StatusCode::BAD_REQUEST,
-                axum::Json(serde_json::json!({ "error": "Estensione mancante" })),
+                axum::Json(serde_json::json!({ "error": "Missing extension" })),
             )
                 .into_response();
         }
@@ -150,7 +150,7 @@ async fn api_analyze(Json(payload): Json<AnalyzeRequest>) -> impl IntoResponse {
             if !extracted_any {
                 return (
                     StatusCode::BAD_REQUEST,
-                    axum::Json(serde_json::json!({ "error": "Percorso non trovato" })),
+                    axum::Json(serde_json::json!({ "error": "Path not found" })),
                 )
                     .into_response();
             }
@@ -159,7 +159,7 @@ async fn api_analyze(Json(payload): Json<AnalyzeRequest>) -> impl IntoResponse {
             if !path.exists() {
                 return (
                     StatusCode::BAD_REQUEST,
-                    axum::Json(serde_json::json!({ "error": "Percorso non trovato" })),
+                    axum::Json(serde_json::json!({ "error": "Path not found" })),
                 )
                     .into_response();
             }
@@ -201,7 +201,7 @@ async fn api_analyze(Json(payload): Json<AnalyzeRequest>) -> impl IntoResponse {
     } else {
         return (
             StatusCode::BAD_REQUEST,
-            axum::Json(serde_json::json!({ "error": "Fornire 'path' o 'code'+'extension'" })),
+            axum::Json(serde_json::json!({ "error": "Provide 'path' or 'code'+'extension'" })),
         )
             .into_response();
     };

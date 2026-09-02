@@ -12,7 +12,19 @@ use crate::model::*;
 /// # Arguments
 /// * `modules` - A slice of resolved `Module` components to inspect.
 pub fn print_references(modules: &[Module]) {
-    println!("\n=== ELENCO RIFERIMENTI ===");
+    println!("\n=== REFERENCES REPORT ===");
+    println!("LEGEND:");
+    println!("  🧱 PRIMITIVE   : Built-in language types (int, boolean, etc.)");
+    println!("  ⚠️ UNRESOLVED  : Type referenced but not yet resolved to a concrete definition");
+    println!("  🔍 QUERY       : Intermediate state during complex path resolution");
+    println!("  ✅ RESOLVED    : Successfully linked to a known internal component");
+    println!("  🌐 EXTERNAL    : Recognized as an external/library dependency");
+    println!("  ❌ FAILED      : Resolution completely failed (missing or unparseable)");
+    println!("  🎯 EVALUATED   : Access path fully evaluated to a concrete target");
+    println!("  🔀 UNION       : Multiple possible types (e.g. dynamic typing or overloaded)");
+    println!("");
+    println!("[{:^14}] {:<30} | {}", "STATE", "REFERENCE TYPE", "TARGET (CONTEXT)");
+    println!("{:-<16}{:-<31}|{:-<40}", "", "", "");
     for m in modules {
         visit_module(m);
     }
@@ -87,7 +99,7 @@ fn visit_block(b: &Block, context: &str) {
 /// Helper function that formats and prints a single `TypeRef` state to the standard output.
 fn print_ref(kind: &str, context: &str, tr: &TypeRef) {
     let (state, text) = match tr {
-        TypeRef::Primitive(p) => ("PRIMITIVE", format!("{:?}", p)),
+        TypeRef::Primitive(p) => ("🧱 PRIMITIVE", format!("{:?}", p)),
         TypeRef::Unresolved(q) => ("⚠️ UNRESOLVED", q.join("::")),
         TypeRef::ResolutionQuery(q) => ("🔍 QUERY", format!("{:?}", q)),
         TypeRef::Resolved(q) => ("✅ RESOLVED", q.join("::")),
@@ -98,5 +110,5 @@ fn print_ref(kind: &str, context: &str, tr: &TypeRef) {
         }
         TypeRef::Union(types) => ("🔀 UNION", format!("{} variants", types.len())),
     };
-    println!("[{:^12}] {:<30} | {} ({})", state, kind, text, context);
+    println!("[{:^14}] {:<30} | {} ({})", state, kind, text, context);
 }

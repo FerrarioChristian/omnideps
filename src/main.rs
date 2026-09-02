@@ -7,6 +7,8 @@ mod commands;
 use cli::{Cli, Commands, BenchmarkCommands, ConfigCommands};
 
 fn main() -> Result<()> {
+    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("warn")).init();
+
     let cli = Cli::parse();
 
     match &cli.command {
