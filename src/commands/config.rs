@@ -8,6 +8,6 @@ pub fn execute_init(output: &Path) -> Result<()> {
     let json = serde_json::to_string_pretty(&config)?;
     
     fs::write(output, json)?;
-    println!("File di configurazione creato con successo in: {}", output.display());
+    println!("Configuration file successfully created at: {}", output.display());
     Ok(())
 }

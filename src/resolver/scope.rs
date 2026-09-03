@@ -274,7 +274,7 @@ impl ScopeTree {
             }
         }
 
-        println!(
+        log::trace!(
             "register_impl_block target_name: {} resolved to: {:?}",
             target_name, target_scope_id
         );

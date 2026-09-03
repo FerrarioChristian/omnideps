@@ -91,8 +91,8 @@ pub fn try_parse_structured_type(
     }
 
     let annotations = super::annotation_extraction::extract_annotations(node, source);
-    println!("Type {:?} annotations: {:?}", name, annotations);
-    println!("FIELDS FOR {:?}: {:?}", name, fields);
+    log::trace!("Type {:?} annotations: {:?}", name, annotations);
+    log::trace!("FIELDS FOR {:?}: {:?}", name, fields);
 
     Some(StructuredType {
         name,
@@ -339,12 +339,12 @@ pub fn try_parse_type_alias(node: Node, source: &str) -> Option<crate::model::Ty
     }
 
     let name = extract_identifier(node, source);
-    println!("TypeAlias: name={:?} from node: {:?}", name, node.kind());
+    log::trace!("TypeAlias: name={:?} from node: {:?}", name, node.kind());
     let name = name?;
 
     // For type alias, we can typically extract the type ref right from the node
     let target = extract_type_ref(node, source);
-    println!("TypeAlias: name={:?} target={:?}", name, target);
+    log::trace!("TypeAlias: name={:?} target={:?}", name, target);
 
     Some(crate::model::TypeAlias {
         name: vec![name],

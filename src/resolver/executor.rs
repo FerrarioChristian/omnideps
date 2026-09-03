@@ -327,10 +327,10 @@ pub fn evaluate_typeref(
             if let Some(resolved) =
                 evaluate_query(ctx, &query, scope_id, resolve_type, &mut visited)
             {
-                println!("RESOLUTION QUERY {:?} EVALUATED TO: {:?}", query, resolved);
+                log::trace!("RESOLUTION QUERY {:?} EVALUATED TO: {:?}", query, resolved);
                 resolved
             } else {
-                println!("RESOLUTION QUERY {:?} FAILED", query);
+                log::trace!("RESOLUTION QUERY {:?} FAILED", query);
                 TypeRef::Failed(vec![extract_base_name(&query)])
             }
         }
@@ -348,12 +348,12 @@ pub fn evaluate_typeref(
                 evaluate_query(ctx, &query, scope_id, resolve_type, &mut visited)
             {
                 if qn[0] == "StructA" {
-                    println!("EVALUATED Unresolved StructA to: {:?}", resolved);
+                    log::trace!("EVALUATED Unresolved StructA to: {:?}", resolved);
                 }
                 resolved
             } else {
                 if qn[0] == "StructA" {
-                    println!("EVALUATED Unresolved StructA to NONE");
+                    log::trace!("EVALUATED Unresolved StructA to NONE");
                 }
                 TypeRef::Unresolved(qn.clone())
             }
@@ -363,7 +363,7 @@ pub fn evaluate_typeref(
                 .into_iter()
                 .map(|v| evaluate_typeref(ctx, v, scope_id, resolve_type))
                 .collect::<Vec<_>>();
-            println!("UNION EVALUATED TO: {:?}", evaluated);
+            log::trace!("UNION EVALUATED TO: {:?}", evaluated);
             TypeRef::Union(evaluated)
         }
         _ => tr,

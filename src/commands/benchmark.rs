@@ -21,7 +21,7 @@ pub fn execute_run(testdir: &Path, output: Option<&Path>, config: &AnalyzerConfi
     let manifest = TestManifest::load(&manifest_path.to_string_lossy())
         .with_context(|| format!("Failed to load test.yml in {}", testdir.display()))?;
 
-    println!("Analizzando directory test: {}", testdir.display());
+    println!("Analyzing test directory: {}", testdir.display());
     let graph = analyze_directory(testdir, config)?;
 
     let report = verify_graph_adherence(&graph, &manifest);
@@ -37,8 +37,8 @@ pub fn execute_run(testdir: &Path, output: Option<&Path>, config: &AnalyzerConfi
     report.save_to_markdown(&md_path.to_string_lossy())?;
     report.save_to_json(&json_path.to_string_lossy())?;
 
-    println!("Report Markdown salvato in {}", md_path.display());
-    println!("Report JSON salvato in {}", json_path.display());
+    println!("Markdown report saved to {}", md_path.display());
+    println!("JSON report saved to {}", json_path.display());
 
     println!(
         "Statistiche nodi: Trovati {}, Non Trovati {}, Totali {}",
@@ -82,7 +82,7 @@ pub fn execute_all(output: Option<&Path>, config: &AnalyzerConfig) -> Result<()>
 
                 let sub_out_dir = output.map(|p| p.join(dir_name.as_ref()));
                 if let Err(e) = execute_run(&path, sub_out_dir.as_deref(), config) {
-                    eprintln!("Warning: benchmark run failed on {:?}: {}", path, e);
+                    log::warn!(" benchmark run failed on {:?}: {}", path, e);
                 }
 
                 let report_path = sub_out_dir.unwrap_or_else(|| path.join("report.json"));
@@ -99,7 +99,7 @@ pub fn execute_all(output: Option<&Path>, config: &AnalyzerConfig) -> Result<()>
 
                     results.insert(lang, (nodes_found, total_nodes, edges_found, total_edges));
                 } else {
-                    eprintln!("Warning: report.json not found in {:?}", path);
+                    log::warn!(" report.json not found in {:?}", path);
                 }
             }
         }

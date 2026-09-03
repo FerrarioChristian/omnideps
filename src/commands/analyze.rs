@@ -21,7 +21,7 @@ pub fn execute(
     } else if path.is_dir() {
         analyze_directory(path, json_out, csv_out, debug_refs, config)
     } else {
-        println!("Percorso non valido!");
+        println!("Invalid path!");
         Ok(())
     }
 }
@@ -41,7 +41,7 @@ fn analyze_single_file(
     let (modules, primitives) = parse_source(lang, &source, rel_path, config)?;
     let (resolved_modules, graph, summary) = analyze_project(modules, primitives, config);
 
-    println!("=== ANALISI {} ===", path.display());
+    println!("=== ANALYSIS {} ===", path.display());
     print_summary(&summary);
 
     if debug_refs {
@@ -51,7 +51,7 @@ fn analyze_single_file(
     if let Some(out) = json_out {
         let json = serde_json::to_string_pretty(&graph)?;
         fs::write(out, json)?;
-        println!("Grafo salvato in {}", out.display());
+        println!("Graph saved to {}", out.display());
 
         if let Some(parent) = out.parent() {
             let file_name = out
@@ -63,7 +63,7 @@ fn analyze_single_file(
                 std::slice::from_ref(&graph),
                 &cyto_path,
             )?;
-            println!("Grafo Cytoscape salvato in {}", cyto_path.display());
+            println!("Cytoscape graph saved to {}", cyto_path.display());
         }
     }
 
@@ -101,7 +101,7 @@ fn analyze_directory(
     let (resolved_modules, graph, summary) =
         analyze_project(all_modules, combined_primitives, config);
 
-    println!("=== ANALISI CARTELLA {} ===", dir.display());
+    println!("=== ANALYSIS CARTELLA {} ===", dir.display());
     print_summary(&summary);
 
     if debug_refs {
@@ -111,7 +111,7 @@ fn analyze_directory(
     if let Some(out) = json_out {
         let json = serde_json::to_string_pretty(&graph)?;
         fs::write(out, json)?;
-        println!("Grafo dell'intero Workspace salvato in {}", out.display());
+        println!("Workspace graph saved to {}", out.display());
 
         if let Some(parent) = out.parent() {
             let file_name = out
@@ -123,7 +123,7 @@ fn analyze_directory(
                 std::slice::from_ref(&graph),
                 &cyto_path,
             )?;
-            println!("Grafo Cytoscape salvato in {}", cyto_path.display());
+            println!("Cytoscape graph saved to {}", cyto_path.display());
         }
     }
     if let Some(csv) = csv_out {
@@ -133,11 +133,11 @@ fn analyze_directory(
 }
 
 fn print_summary(s: &AnalysisSummary) {
-    println!("Moduli: {}", s.total_modules);
+    println!("Modules: {}", s.total_modules);
     println!("Structured types: {}", s.total_structured_types);
     println!("Free functions: {}", s.total_free_functions);
-    println!("Riferimenti risolti: {}", s.resolved_refs);
-    println!("Riferimenti sconosciuti: {}", s.failed_refs);
+    println!("Resolved references: {}", s.resolved_refs);
+    println!("Unknown references: {}", s.failed_refs);
 }
 
 fn save_summary_csv(s: &AnalysisSummary, path: &std::path::Path) -> Result<()> {
