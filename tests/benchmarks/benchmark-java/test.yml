@@ -1,4 +1,5 @@
 files:
+- src/domain/direct/allowed/GenericsTest.java
 - src/domain/direct/allowed/AccessClassVariable.java
 - src/domain/direct/allowed/AccessClassVariableConstant.java
 - src/domain/direct/allowed/AccessClassVariableInterface.java
@@ -317,3 +318,29 @@ edges:
   source: domain.imports.StaticImportTest
   sink: java.lang.Math.PI
   kind: includes
+
+- testid: JAVA-GEN-1
+  source: domain.direct.allowed.GenericsTest.profileRepo
+  sink: domain.direct.allowed.GenericsTest.Repository
+  kind: usesType
+- testid: JAVA-GEN-2
+  source: domain.direct.allowed.GenericsTest.profileRepo
+  sink: technology.direct.dao.ProfileDAO
+  kind: usesType
+- testid: JAVA-GEN-3
+  source: domain.direct.allowed.GenericsTest.profileList
+  sink: technology.direct.dao.ProfileDAO
+  kind: usesType
+- testid: JAVA-GEN-4
+  source: domain.direct.allowed.GenericsTest.groupedProfiles
+  sink: technology.direct.dao.ProfileDAO
+  kind: usesType
+- testid: JAVA-GEN-5
+  source: domain.direct.allowed.GenericsTest.executeDao
+  sink: technology.direct.dao.ProfileDAO
+  kind: usesType
+- testid: JAVA-GEN-6
+  source: domain.direct.allowed.GenericsTest.executeDao
+  sink: technology.direct.dao.ProfileDAO.getCampaignType
+  kind: calls
+

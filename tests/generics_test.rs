@@ -1,0 +1,441 @@
+use omnideps::analyzer::{analyze_project, parse_source};
+use omnideps::config::AnalyzerConfig;
+use omnideps::language::SupportedLanguage;
+use omnideps::model::*;
+use std::path::Path;
+
+fn analyze_snippet(lang: SupportedLanguage, source: &str, filename: &str) -> DependencyGraph {
+    let path = Path::new(filename);
+    let config = AnalyzerConfig::default();
+    let (modules, primitives) =
+        parse_source(lang, source, path, &config).expect("Failed to parse source snippet");
+    let (_resolved_modules, graph, _summary) = analyze_project(modules, primitives, &config);
+    graph
+}
+
+fn ends_with(full: &[String], suffix: &[&str]) -> bool {
+    if full.len() < suffix.len() {
+        return false;
+    }
+    let offset = full.len() - suffix.len();
+    full[offset..]
+        .iter()
+        .zip(suffix.iter())
+        .all(|(a, b)| a == *b)
+}
+
+fn has_edge(
+    graph: &DependencyGraph,
+    from_suffix: &[&str],
+    to_suffix: &[&str],
+    kind: DependencyEdgeKind,
+) -> bool {
+    graph.edges.iter().any(|e| {
+        ends_with(&e.from, from_suffix) && ends_with(&e.to, to_suffix) && e.kind == kind
+    })
+}
+
+// =========================================================================
+// RUST TESTS
+// =========================================================================
+
+#[test]
+fn test_rust_generic_struct_and_field_dependencies() {
+    let code = r#"
+        pub struct Item {
+            pub id: u32,
+        }
+
+        pub struct Tag {
+            pub label: String,
+        }
+
+        pub struct Container<T> {
+            pub value: T,
+        }
+
+        pub struct Pair<K, V> {
+            pub key: K,
+            pub val: V,
+        }
+
+        pub struct Warehouse {
+            pub single: Container<Item>,
+            pub entry: Pair<Item, Tag>,
+        }
+    "#;
+
+    let graph = analyze_snippet(SupportedLanguage::Rust, code, "src/lib.rs");
+
+    // Warehouse.single uses Container and Item
+    assert!(
+        has_edge(&graph, &["Warehouse", "single"], &["Container"], DependencyEdgeKind::UsesFieldType),
+        "Expected Warehouse.single -> Container (UsesFieldType)"
+    );
+    assert!(
+        has_edge(&graph, &["Warehouse", "single"], &["Item"], DependencyEdgeKind::UsesFieldType),
+        "Expected Warehouse.single -> Item (UsesFieldType)"
+    );
+
+    // Warehouse.entry uses Pair, Item, and Tag
+    assert!(
+        has_edge(&graph, &["Warehouse", "entry"], &["Pair"], DependencyEdgeKind::UsesFieldType),
+        "Expected Warehouse.entry -> Pair (UsesFieldType)"
+    );
+    assert!(
+        has_edge(&graph, &["Warehouse", "entry"], &["Item"], DependencyEdgeKind::UsesFieldType),
+        "Expected Warehouse.entry -> Item (UsesFieldType)"
+    );
+    assert!(
+        has_edge(&graph, &["Warehouse", "entry"], &["Tag"], DependencyEdgeKind::UsesFieldType),
+        "Expected Warehouse.entry -> Tag (UsesFieldType)"
+    );
+}
+
+#[test]
+fn test_rust_generic_trait_bound_dispatch() {
+    let code = r#"
+        pub trait Worker {
+            fn do_work(&self);
+        }
+
+        pub fn execute_inline_bound<T: Worker>(w: T) {
+            w.do_work();
+        }
+
+        pub fn execute_where_clause<T>(w: T) where T: Worker {
+            w.do_work();
+        }
+    "#;
+
+    let graph = analyze_snippet(SupportedLanguage::Rust, code, "src/lib.rs");
+
+    assert!(
+        has_edge(&graph, &["execute_inline_bound"], &["Worker", "do_work"], DependencyEdgeKind::Calls),
+        "Expected execute_inline_bound -> Worker.do_work (Calls)"
+    );
+
+    assert!(
+        has_edge(&graph, &["execute_where_clause"], &["Worker", "do_work"], DependencyEdgeKind::Calls),
+        "Expected execute_where_clause -> Worker.do_work (Calls)"
+    );
+}
+
+#[test]
+fn test_rust_generic_multiple_trait_bounds() {
+    let code = r#"
+        pub trait Printable {
+            fn print(&self);
+        }
+
+        pub trait Loggable {
+            fn log(&self);
+        }
+
+        pub fn execute_both_bounds<T: Printable + Loggable>(item: T) {
+            item.print();
+            item.log();
+        }
+    "#;
+
+    let graph = analyze_snippet(SupportedLanguage::Rust, code, "src/lib.rs");
+
+    assert!(
+        has_edge(&graph, &["execute_both_bounds"], &["Printable", "print"], DependencyEdgeKind::Calls),
+        "Expected execute_both_bounds -> Printable.print (Calls)"
+    );
+    assert!(
+        has_edge(&graph, &["execute_both_bounds"], &["Loggable", "log"], DependencyEdgeKind::Calls),
+        "Expected execute_both_bounds -> Loggable.log (Calls)"
+    );
+}
+
+// =========================================================================
+// C++ TESTS
+// =========================================================================
+
+#[test]
+fn test_cpp_template_class_and_concrete_usage() {
+    let code = r#"
+        class Car {
+        public:
+            int speed;
+        };
+
+        template <typename T>
+        class Box {
+        public:
+            T item;
+        };
+
+        template <typename K, typename V>
+        class KeyValue {
+        public:
+            K key;
+            V val;
+        };
+
+        class Garage {
+        public:
+            Box<Car> car_box;
+            KeyValue<int, Car> mapped_car;
+        };
+    "#;
+
+    let graph = analyze_snippet(SupportedLanguage::Cpp, code, "src/garage.cpp");
+
+    assert!(
+        has_edge(&graph, &["Garage", "car_box"], &["Box"], DependencyEdgeKind::UsesFieldType),
+        "Expected Garage.car_box -> Box (UsesFieldType)"
+    );
+    assert!(
+        has_edge(&graph, &["Garage", "car_box"], &["Car"], DependencyEdgeKind::UsesFieldType),
+        "Expected Garage.car_box -> Car (UsesFieldType)"
+    );
+    assert!(
+        has_edge(&graph, &["Garage", "mapped_car"], &["KeyValue"], DependencyEdgeKind::UsesFieldType),
+        "Expected Garage.mapped_car -> KeyValue (UsesFieldType)"
+    );
+    assert!(
+        has_edge(&graph, &["Garage", "mapped_car"], &["Car"], DependencyEdgeKind::UsesFieldType),
+        "Expected Garage.mapped_car -> Car (UsesFieldType)"
+    );
+}
+
+#[test]
+fn test_cpp_template_member_chain_call() {
+    let code = r#"
+        class Vehicle {
+        public:
+            void honk();
+        };
+
+        template <typename T>
+        class Holder {
+        public:
+            T value;
+            T get_value() { return value; }
+        };
+
+        void operate_holder(Holder<Vehicle>& h) {
+            h.get_value().honk();
+        }
+    "#;
+
+    let graph = analyze_snippet(SupportedLanguage::Cpp, code, "src/holder.cpp");
+
+    assert!(
+        has_edge(&graph, &["operate_holder"], &["Holder"], DependencyEdgeKind::UsesParamType),
+        "Expected operate_holder -> Holder (UsesParamType)"
+    );
+    assert!(
+        has_edge(&graph, &["operate_holder"], &["Vehicle"], DependencyEdgeKind::UsesParamType),
+        "Expected operate_holder -> Vehicle (UsesParamType)"
+    );
+    assert!(
+        has_edge(&graph, &["operate_holder"], &["Vehicle", "honk"], DependencyEdgeKind::Calls),
+        "Expected operate_holder -> Vehicle.honk (Calls)"
+    );
+}
+
+#[test]
+fn test_cpp_nested_template_vector_usage() {
+    let code = r#"
+        namespace std {
+            template <typename T>
+            class vector {};
+        }
+
+        class Engine {};
+
+        template <typename T>
+        class Container {
+        public:
+            T element;
+        };
+
+        class Fleet {
+        public:
+            std::vector<Container<Engine>> engines;
+        };
+    "#;
+
+    let graph = analyze_snippet(SupportedLanguage::Cpp, code, "src/fleet.cpp");
+
+    assert!(
+        has_edge(&graph, &["Fleet", "engines"], &["Container"], DependencyEdgeKind::UsesFieldType),
+        "Expected Fleet.engines -> Container (UsesFieldType)"
+    );
+    assert!(
+        has_edge(&graph, &["Fleet", "engines"], &["Engine"], DependencyEdgeKind::UsesFieldType),
+        "Expected Fleet.engines -> Engine (UsesFieldType)"
+    );
+}
+
+// =========================================================================
+// JAVA TESTS
+// =========================================================================
+
+#[test]
+fn test_java_generic_bound_method_call() {
+    let code = r#"
+        public interface Service {
+            void execute();
+        }
+
+        public class Runner {
+            public <T extends Service> void runService(T s) {
+                s.execute();
+            }
+        }
+    "#;
+
+    let graph = analyze_snippet(SupportedLanguage::Java, code, "src/Runner.java");
+
+    assert!(
+        has_edge(&graph, &["Runner", "runService"], &["Service", "execute"], DependencyEdgeKind::Calls),
+        "Expected Runner.runService -> Service.execute (Calls)"
+    );
+}
+
+#[test]
+fn test_java_generic_container_field_dependencies() {
+    let code = r#"
+        public class Entity {}
+
+        public class Repository<T> {
+            private T data;
+        }
+
+        public class Manager {
+            private Repository<Entity> repo;
+        }
+    "#;
+
+    let graph = analyze_snippet(SupportedLanguage::Java, code, "src/Manager.java");
+
+    assert!(
+        has_edge(&graph, &["Manager", "repo"], &["Repository"], DependencyEdgeKind::UsesFieldType),
+        "Expected Manager.repo -> Repository (UsesFieldType)"
+    );
+    assert!(
+        has_edge(&graph, &["Manager", "repo"], &["Entity"], DependencyEdgeKind::UsesFieldType),
+        "Expected Manager.repo -> Entity (UsesFieldType)"
+    );
+}
+
+#[test]
+fn test_java_multiple_type_parameters() {
+    let code = r#"
+        public class KeyType {}
+        public class ValType {}
+
+        public class Mapping<K, V> {
+            private K key;
+            private V value;
+        }
+
+        public class Cache {
+            private Mapping<KeyType, ValType> entry;
+        }
+    "#;
+
+    let graph = analyze_snippet(SupportedLanguage::Java, code, "src/Cache.java");
+
+    assert!(
+        has_edge(&graph, &["Cache", "entry"], &["Mapping"], DependencyEdgeKind::UsesFieldType),
+        "Expected Cache.entry -> Mapping (UsesFieldType)"
+    );
+    assert!(
+        has_edge(&graph, &["Cache", "entry"], &["KeyType"], DependencyEdgeKind::UsesFieldType),
+        "Expected Cache.entry -> KeyType (UsesFieldType)"
+    );
+    assert!(
+        has_edge(&graph, &["Cache", "entry"], &["ValType"], DependencyEdgeKind::UsesFieldType),
+        "Expected Cache.entry -> ValType (UsesFieldType)"
+    );
+}
+
+// =========================================================================
+// PYTHON TESTS
+// =========================================================================
+
+#[test]
+fn test_python_typevar_bound_method_call() {
+    let code = r#"
+        from typing import TypeVar, Generic
+
+        class Model:
+            def save(self):
+                pass
+
+        M = TypeVar('M', bound=Model)
+
+        def persist_entity(item: M):
+            item.save()
+    "#;
+
+    let graph = analyze_snippet(SupportedLanguage::Python, code, "src/app.py");
+
+    assert!(
+        has_edge(&graph, &["persist_entity"], &["Model", "save"], DependencyEdgeKind::Calls),
+        "Expected persist_entity -> Model.save (Calls)"
+    );
+}
+
+#[test]
+fn test_python_generic_class_and_nested_subscripts() {
+    let code = r#"
+        from typing import TypeVar, Generic
+
+        T = TypeVar('T')
+
+        class User:
+            pass
+
+        class Box(Generic[T]):
+            pass
+
+        class Storage:
+            def __init__(self, u: User) -> None:
+                self.single: Box[User] = Box()
+                self.nested: list[list[User]] = [[u]]
+                self.mapped: dict[str, User] = {"k": u}
+    "#;
+
+    let graph = analyze_snippet(SupportedLanguage::Python, code, "src/storage.py");
+
+    assert!(
+        has_edge(&graph, &["Storage", "single"], &["Box"], DependencyEdgeKind::UsesFieldType),
+        "Expected Storage.single -> Box (UsesFieldType)"
+    );
+    assert!(
+        has_edge(&graph, &["Storage", "single"], &["User"], DependencyEdgeKind::UsesFieldType),
+        "Expected Storage.single -> User (UsesFieldType)"
+    );
+    assert!(
+        has_edge(&graph, &["Storage", "nested"], &["User"], DependencyEdgeKind::UsesFieldType),
+        "Expected Storage.nested -> User (UsesFieldType)"
+    );
+    assert!(
+        has_edge(&graph, &["Storage", "mapped"], &["User"], DependencyEdgeKind::UsesFieldType),
+        "Expected Storage.mapped -> User (UsesFieldType)"
+    );
+}
+
+#[test]
+fn test_python_assignment_type_alias() {
+    let code = r#"
+        class Account:
+            pass
+
+        AccountList = list[Account]
+    "#;
+
+    let graph = analyze_snippet(SupportedLanguage::Python, code, "src/alias.py");
+
+    assert!(
+        has_edge(&graph, &["AccountList"], &["Account"], DependencyEdgeKind::Aliases),
+        "Expected AccountList -> Account (Aliases)"
+    );
+}

@@ -1,10 +1,5 @@
 #include "untested_features.hpp"
 
-Box::Box(int val) : value(val) {}
-
-int Box::getValue() {
-    return value;
-}
 
 namespace MathLib {
     int Calculator::add(int a, int b) {
@@ -14,6 +9,10 @@ namespace MathLib {
 
 void use_box(Box& b) {
     b.getValue();
+}
+
+void inspect_car_box(Box<Transport::Car>& b) {
+    b.getValue().displayInfo();
 }
 
 void use_math() {
