@@ -118,7 +118,7 @@ impl AnalyzerConfig {
                     inline_mod_based: false,
                 },
                 transitive_imports: false,
-                support_impl_blocks: true,
+                support_impl_blocks: false,
                 forward_declarations: true,
                 self_keyword: Some("this".to_string()),
                 self_type_keyword: None,
