@@ -133,6 +133,18 @@ fn execute_structured_type(
         .into_iter()
         .map(|m| execute_function(ctx, m, scope_id))
         .collect();
+    st.type_parameters = st
+        .type_parameters
+        .into_iter()
+        .map(|mut tp| {
+            tp.bounds = tp
+                .bounds
+                .into_iter()
+                .map(|b| evaluate_typeref(ctx, b, scope_id, true))
+                .collect();
+            tp
+        })
+        .collect();
     st.nested_types = st
         .nested_types
         .into_iter()
@@ -216,6 +228,18 @@ fn execute_function(ctx: &ExecutorContext, mut f: Function, parent_scope: ScopeI
         .annotations
         .into_iter()
         .map(|a| evaluate_typeref(ctx, a, func_scope_id, false))
+        .collect();
+    f.type_parameters = f
+        .type_parameters
+        .into_iter()
+        .map(|mut tp| {
+            tp.bounds = tp
+                .bounds
+                .into_iter()
+                .map(|b| evaluate_typeref(ctx, b, func_scope_id, true))
+                .collect();
+            tp
+        })
         .collect();
     f.body = f.body.map(|b| execute_block(ctx, b, func_scope_id, 0));
 
@@ -365,6 +389,27 @@ pub fn evaluate_typeref(
                 .collect::<Vec<_>>();
             log::trace!("UNION EVALUATED TO: {:?}", evaluated);
             TypeRef::Union(evaluated)
+        }
+        TypeRef::Generic { base, args } => {
+            let base_eval = evaluate_typeref(ctx, *base, scope_id, resolve_type);
+            let args_eval = args
+                .into_iter()
+                .map(|a| evaluate_typeref(ctx, a, scope_id, resolve_type))
+                .collect();
+            TypeRef::Generic {
+                base: Box::new(base_eval),
+                args: args_eval,
+            }
+        }
+        TypeRef::TypeVar { name, bounds } => {
+            let bounds_eval = bounds
+                .into_iter()
+                .map(|b| evaluate_typeref(ctx, b, scope_id, resolve_type))
+                .collect();
+            TypeRef::TypeVar {
+                name,
+                bounds: bounds_eval,
+            }
         }
         _ => tr,
     }
@@ -606,17 +651,22 @@ fn evaluate_query_extract(
         resolved_parent_ty = evaluate_typeref(ctx, resolved_parent_ty, scope_id, true);
     }
 
-    if let Some(target_scope) = find_scope_for_type(ctx.tree, &resolved_parent_ty) {
-        if let Some(res) =
+    let candidate_scopes = find_candidate_scopes_for_type(ctx.tree, &resolved_parent_ty);
+    for target_scope in candidate_scopes {
+        if let Some(mut res) =
             find_symbol_in_scope_and_supers(ctx, target_scope, member, resolve_type, visited)
         {
+            if let TypeRef::Generic { ref args, .. } = resolved_parent_ty {
+                res = instantiate_generic_member_type(ctx, target_scope, res, args);
+            }
+
             if let Some(base) = base_access {
                 return Some(TypeRef::EvaluatedAccess(base, Box::new(res)));
             } else {
                 return Some(TypeRef::EvaluatedAccess(Box::new(parent_ty.clone()), Box::new(res)));
             }
         }
-        
+
         // Transitive imports check
         if let Some(res) = resolve_via_transitive_imports(ctx, target_scope, member) {
             return Some(res);
@@ -672,6 +722,17 @@ fn symbol_to_typeref(
 ) -> TypeRef {
     match sym {
         Symbol::Module(id) | Symbol::Type(id) => {
+            if ctx.tree.arena[*id].is_phantom {
+                let bounds = ctx.tree.arena[*id]
+                    .super_types
+                    .iter()
+                    .map(|b| evaluate_typeref(ctx, b.clone(), scope_id, true))
+                    .collect();
+                return TypeRef::TypeVar {
+                    name: ctx.tree.arena[*id].name.clone(),
+                    bounds,
+                };
+            }
             let path = build_path_from_scope(ctx.tree, *id);
             if resolve_type {
                 TypeRef::EvaluatedAccess(
@@ -690,7 +751,11 @@ fn symbol_to_typeref(
                 let resolved_ty = match ty {
                     TypeRef::ResolutionQuery(q) => evaluate_query(ctx, q, scope_id, true, visited)
                         .unwrap_or_else(|| ty.clone()),
-                    TypeRef::Unresolved(_) => evaluate_typeref(ctx, ty.clone(), scope_id, true),
+                    TypeRef::Unresolved(_)
+                    | TypeRef::TypeVar { .. }
+                    | TypeRef::Generic { .. } => {
+                        evaluate_typeref(ctx, ty.clone(), scope_id, true)
+                    }
                     _ => ty.clone(),
                 };
                 TypeRef::EvaluatedAccess(Box::new(base_path), Box::new(resolved_ty))
@@ -702,6 +767,68 @@ fn symbol_to_typeref(
 }
 
 /// Given a resolved `TypeRef`, attempts to locate its corresponding `ScopeId` in the ScopeTree.
+/// Instantiates any type parameters of `target_scope` present in `res` with the concrete `type_args`.
+fn instantiate_generic_member_type(
+    ctx: &ExecutorContext,
+    target_scope: ScopeId,
+    res: TypeRef,
+    type_args: &[TypeRef],
+) -> TypeRef {
+    let param_names = &ctx.tree.arena[target_scope].type_parameters;
+    if param_names.is_empty() || type_args.is_empty() {
+        return res;
+    }
+
+    let map: std::collections::HashMap<String, TypeRef> = param_names
+        .iter()
+        .zip(type_args.iter())
+        .map(|(name, arg)| (name.clone(), arg.clone()))
+        .collect();
+
+    fn substitute_type_in_ref(
+        tr: TypeRef,
+        map: &std::collections::HashMap<String, TypeRef>,
+    ) -> TypeRef {
+        match tr {
+            TypeRef::Unresolved(ref qn) if qn.len() == 1 => {
+                if let Some(sub) = map.get(&qn[0]) {
+                    return sub.clone();
+                }
+                tr
+            }
+            TypeRef::Resolved(ref qn) => {
+                if let Some(last) = qn.last() {
+                    if let Some(sub) = map.get(last) {
+                        return sub.clone();
+                    }
+                }
+                tr
+            }
+            TypeRef::TypeVar { ref name, .. } => {
+                if let Some(sub) = map.get(name) {
+                    return sub.clone();
+                }
+                tr
+            }
+            TypeRef::Generic { base, args } => TypeRef::Generic {
+                base: Box::new(substitute_type_in_ref(*base, map)),
+                args: args
+                    .into_iter()
+                    .map(|a| substitute_type_in_ref(a, map))
+                    .collect(),
+            },
+            TypeRef::EvaluatedAccess(acc, inner) => TypeRef::EvaluatedAccess(
+                acc,
+                Box::new(substitute_type_in_ref(*inner, map)),
+            ),
+            _ => tr,
+        }
+    }
+
+    substitute_type_in_ref(res, &map)
+}
+
+/// Given a resolved `TypeRef`, attempts to locate its corresponding `ScopeId` in the ScopeTree.
 pub fn find_scope_for_type(tree: &ScopeTree, ty: &TypeRef) -> Option<ScopeId> {
     match ty {
         TypeRef::Resolved(qn) | TypeRef::External(qn) => {
@@ -710,16 +837,49 @@ pub fn find_scope_for_type(tree: &ScopeTree, ty: &TypeRef) -> Option<ScopeId> {
                 if part == "root" && i == 0 {
                     continue;
                 }
-                let sym = tree.arena[curr].symbols.get(part)?;
-                match sym {
-                    Symbol::Module(id) | Symbol::Type(id) => curr = *id,
-                    _ => return None,
+                if let Some(sym) = tree.arena[curr].symbols.get(part) {
+                    match sym {
+                        Symbol::Module(id) | Symbol::Type(id) => {
+                            curr = *id;
+                            continue;
+                        }
+                        _ => {}
+                    }
                 }
+                if let Some(child_scope) = tree
+                    .arena
+                    .iter()
+                    .find(|s| s.parent == Some(curr) && &s.name == part)
+                {
+                    curr = child_scope.id;
+                    continue;
+                }
+                return None;
             }
             Some(curr)
         }
         TypeRef::EvaluatedAccess(_, inner) => find_scope_for_type(tree, inner),
+        TypeRef::Generic { base, .. } => find_scope_for_type(tree, base),
+        TypeRef::TypeVar { bounds, .. } => {
+            for b in bounds {
+                if let Some(sid) = find_scope_for_type(tree, b) {
+                    return Some(sid);
+                }
+            }
+            None
+        }
         _ => None,
+    }
+}
+
+/// Locates all candidate `ScopeId`s for a `TypeRef` (e.g. multiple bounds for `TypeVar`).
+pub fn find_candidate_scopes_for_type(tree: &ScopeTree, ty: &TypeRef) -> Vec<ScopeId> {
+    match ty {
+        TypeRef::TypeVar { bounds, .. } => {
+            bounds.iter().filter_map(|b| find_scope_for_type(tree, b)).collect()
+        }
+        TypeRef::EvaluatedAccess(_, inner) => find_candidate_scopes_for_type(tree, inner),
+        _ => find_scope_for_type(tree, ty).into_iter().collect(),
     }
 }
 

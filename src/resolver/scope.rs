@@ -30,6 +30,8 @@ pub struct Scope {
     pub super_types: Vec<TypeRef>,
     pub is_module: bool,
     pub language: Option<String>,
+    pub type_parameters: Vec<String>,
+    pub is_phantom: bool,
 }
 
 /// L'albero gerarchico degli Scope Lexicali, implementato tramite Arena Pattern.
@@ -53,6 +55,8 @@ impl ScopeTree {
                 super_types: vec![],
                 is_module: true,
                 language: None,
+                type_parameters: vec![],
+                is_phantom: false,
             }],
             root: 0,
             pending_impl_blocks: vec![],
@@ -82,6 +86,8 @@ impl ScopeTree {
             super_types: vec![],
             is_module: false,
             language: None,
+            type_parameters: vec![],
+            is_phantom: false,
         });
         id
     }
@@ -199,6 +205,14 @@ impl ScopeTree {
 
         self.define_symbol(parent_id, name.clone(), Symbol::Type(class_scope));
 
+        for tp in &st.type_parameters {
+            self.arena[class_scope].type_parameters.push(tp.name.clone());
+            let phantom_scope = self.new_scope(class_scope, tp.name.clone());
+            self.arena[phantom_scope].is_phantom = true;
+            self.arena[phantom_scope].super_types = tp.bounds.clone();
+            self.define_symbol(class_scope, tp.name.clone(), Symbol::Type(phantom_scope));
+        }
+
         for field in &st.fields {
             self.define_symbol(
                 class_scope,
@@ -250,6 +264,13 @@ impl ScopeTree {
                 qn.last().cloned().unwrap_or_default()
             }
             TypeRef::ResolutionQuery(q) => crate::resolver::executor::extract_base_name(q),
+            TypeRef::Generic { base, .. } => match &**base {
+                TypeRef::Resolved(qn) | TypeRef::External(qn) | TypeRef::Unresolved(qn) => {
+                    qn.last().cloned().unwrap_or_default()
+                }
+                TypeRef::ResolutionQuery(q) => crate::resolver::executor::extract_base_name(q),
+                _ => "".to_string(),
+            },
             _ => "".to_string(),
         };
 
@@ -349,6 +370,14 @@ impl ScopeTree {
         let name = func.name.last().cloned().unwrap_or_default();
         let func_scope = self.new_scope(parent_id, name);
         let lang_config = config.get_for(lang);
+
+        for tp in &func.type_parameters {
+            self.arena[func_scope].type_parameters.push(tp.name.clone());
+            let phantom_scope = self.new_scope(func_scope, tp.name.clone());
+            self.arena[phantom_scope].is_phantom = true;
+            self.arena[phantom_scope].super_types = tp.bounds.clone();
+            self.define_symbol(func_scope, tp.name.clone(), Symbol::Type(phantom_scope));
+        }
 
         let mut params = func.signature.parameters.iter();
 

@@ -246,6 +246,18 @@ fn traverse_structured_type_edges(
         });
         traverse_structured_type_edges(nested, &st_name, edges);
     }
+
+    for tp in &st.type_parameters {
+        for bound in &tp.bounds {
+            for to in type_ref_targets(bound) {
+                edges.push(Dependency {
+                    from: st_name.clone(),
+                    to,
+                    kind: DependencyEdgeKind::UsesType,
+                });
+            }
+        }
+    }
 }
 
 fn type_ref_targets(tr: &TypeRef) -> Vec<QualifiedName> {
@@ -272,6 +284,16 @@ fn type_ref_targets(tr: &TypeRef) -> Vec<QualifiedName> {
             let mut targets = type_ref_targets(acc);
             targets.extend(type_ref_targets(ty));
             targets
+        }
+        TypeRef::Generic { base, args } => {
+            let mut targets = type_ref_targets(base);
+            for arg in args {
+                targets.extend(type_ref_targets(arg));
+            }
+            targets
+        }
+        TypeRef::TypeVar { bounds, .. } => {
+            bounds.iter().flat_map(type_ref_targets).collect()
         }
         _ => vec![],
     }
@@ -310,6 +332,17 @@ fn add_field_edges(st: &StructuredType, st_name: &QualifiedName, edges: &mut Vec
 }
 
 fn add_function_edges(ff: &Function, ff_name: &QualifiedName, edges: &mut Vec<Dependency>) {
+    for tp in &ff.type_parameters {
+        for bound in &tp.bounds {
+            for to in type_ref_targets(bound) {
+                edges.push(Dependency {
+                    from: ff_name.clone(),
+                    to,
+                    kind: DependencyEdgeKind::UsesType,
+                });
+            }
+        }
+    }
     for p in &ff.signature.parameters {
         for to in type_ref_targets(&p.ty) {
             edges.push(Dependency {

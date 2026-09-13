@@ -1,4 +1,4 @@
-use crate::model::{Function, ImplBlock, Import, Module, StructuredType};
+use crate::model::{Function, ImplBlock, Import, Module, StructuredType, TypeRef};
 use tree_sitter::Node;
 
 use super::body_extraction::*;
@@ -91,6 +91,7 @@ pub fn try_parse_structured_type(
     }
 
     let annotations = super::annotation_extraction::extract_annotations(node, source);
+    let type_parameters = extract_type_parameters(node, source);
     log::trace!("Type {:?} annotations: {:?}", name, annotations);
     log::trace!("FIELDS FOR {:?}: {:?}", name, fields);
 
@@ -103,6 +104,7 @@ pub fn try_parse_structured_type(
         nested_types,
         annotations,
         imports: vec![],
+        type_parameters,
     })
 }
 
@@ -131,6 +133,7 @@ pub fn try_parse_function(mut node: Node, source: &str) -> Option<Function> {
 
     let parameters = extract_parameters(node, source);
     let return_type = extract_return_type(node, source);
+    let type_parameters = extract_type_parameters(node, source);
 
     let body_node = node.child_by_field_name("body");
     let body = if let Some(b) = body_node {
@@ -162,6 +165,7 @@ pub fn try_parse_function(mut node: Node, source: &str) -> Option<Function> {
         body,
         is_constructor,
         annotations,
+        type_parameters,
     })
 }
 
@@ -181,11 +185,12 @@ pub fn try_parse_impl_block(
     let impl_for = extract_impl_for(node, source);
     let implements_trait = extract_implements_trait(node, source);
     let nested_types = extract_nested_types(node, source, lang_name, config);
+    let lang_config = config.get_for(lang_name);
     let type_aliases = crate::heuristics::structural_extraction::extract_list_of(
         node,
         source,
         false,
-        |child, src| try_parse_type_alias(child, src),
+        |child, src| try_parse_type_alias(child, src, lang_config),
     );
 
     Some(ImplBlock {
@@ -333,23 +338,96 @@ pub fn try_parse_free_variable(node: Node, source: &str) -> Option<crate::model:
     None
 }
 
-pub fn try_parse_type_alias(node: Node, source: &str) -> Option<crate::model::TypeAlias> {
-    if !is_type_alias(node) {
-        return None;
+pub fn try_parse_type_alias(
+    node: Node,
+    source: &str,
+    lang_config: &crate::config::LanguageConfig,
+) -> Option<crate::model::TypeAlias> {
+    if is_type_alias(node) {
+        let name = extract_identifier(node, source)?;
+        let target = extract_type_ref(node, source);
+        return Some(crate::model::TypeAlias {
+            name: vec![name],
+            target,
+        });
     }
 
-    let name = extract_identifier(node, source);
-    log::trace!("TypeAlias: name={:?} from node: {:?}", name, node.kind());
-    let name = name?;
+    if lang_config.assignment_type_aliases && node.kind() == "assignment" {
+        return try_parse_assignment_type_alias(node, source);
+    }
 
-    // For type alias, we can typically extract the type ref right from the node
-    let target = extract_type_ref(node, source);
-    log::trace!("TypeAlias: name={:?} target={:?}", name, target);
+    None
+}
+
+/// Parses an assignment statement into a type alias or type variable definition
+/// for languages supporting assignment-based type definitions.
+fn try_parse_assignment_type_alias(node: Node, source: &str) -> Option<crate::model::TypeAlias> {
+    let left = node.child_by_field_name("left")?;
+    let right = node.child_by_field_name("right")?;
+    let name = extract_identifier(left, source)?;
+
+    // Check if right side is a TypeVar factory call: e.g. TypeVar('T', bound=User)
+    if right.kind() == "call" {
+        if let Some(type_var) = try_extract_type_var_call(name.clone(), right, source) {
+            return Some(type_var);
+        }
+    }
+
+    // Otherwise, standard assignment type alias: e.g. MyType = List[int]
+    let target = extract_type_ref(right, source);
+    if matches!(target, TypeRef::Failed(_)) {
+        return None;
+    }
 
     Some(crate::model::TypeAlias {
         name: vec![name],
         target,
     })
+}
+
+/// Helper to parse a TypeVar factory instantiation call.
+fn try_extract_type_var_call(
+    name: String,
+    call_node: Node,
+    source: &str,
+) -> Option<crate::model::TypeAlias> {
+    let func = call_node.child_by_field_name("function")?;
+    let func_name = node_text(func, source);
+    if func_name.trim() != "TypeVar" {
+        return None;
+    }
+
+    let bounds = extract_keyword_argument_type(call_node, "bound", source)
+        .into_iter()
+        .collect();
+
+    Some(crate::model::TypeAlias {
+        name: vec![name.clone()],
+        target: TypeRef::TypeVar { name, bounds },
+    })
+}
+
+/// Extracts the TypeRef of a named keyword argument in a call expression.
+fn extract_keyword_argument_type(call_node: Node, arg_name: &str, source: &str) -> Option<TypeRef> {
+    let args = call_node.child_by_field_name("arguments")?;
+    let mut cursor = args.walk();
+    for arg in args.children(&mut cursor) {
+        if arg.kind() != "keyword_argument" {
+            continue;
+        }
+        let Some(key) = arg.child_by_field_name("name") else {
+            continue;
+        };
+        if node_text(key, source).trim() != arg_name {
+            continue;
+        }
+        let val = arg.child_by_field_name("value")?;
+        let tr = extract_type_ref(val, source);
+        if !matches!(tr, TypeRef::Failed(_)) {
+            return Some(tr);
+        }
+    }
+    None
 }
 
 #[cfg(test)]

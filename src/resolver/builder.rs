@@ -89,6 +89,19 @@ fn build_structured_type_queries(
             .define_symbol(kw.clone(), self_query.clone());
     }
 
+    st.type_parameters = st
+        .type_parameters
+        .into_iter()
+        .map(|mut tp| {
+            tp.bounds = tp
+                .bounds
+                .into_iter()
+                .map(|b| substitute_type(ctx, b, false))
+                .collect();
+            tp
+        })
+        .collect();
+
     st.super_types = st
         .super_types
         .into_iter()
@@ -142,6 +155,19 @@ fn build_function_queries(
 ) -> Function {
     ctx.stack.borrow_mut().push_scope();
 
+    ff.type_parameters = ff
+        .type_parameters
+        .into_iter()
+        .map(|mut tp| {
+            tp.bounds = tp
+                .bounds
+                .into_iter()
+                .map(|b| substitute_type(ctx, b, false))
+                .collect();
+            tp
+        })
+        .collect();
+
     let mut is_first = true;
     ff.signature.parameters = ff
         .signature
@@ -156,6 +182,10 @@ fn build_function_queries(
                             .borrow_mut()
                             .define_symbol(name.clone(), sq.clone());
                     }
+                } else if let TypeRef::Generic { .. } = p.ty {
+                    ctx.stack
+                        .borrow_mut()
+                        .define_symbol(name.clone(), Query::Find(name.clone()));
                 } else if let TypeRef::ResolutionQuery(ref q) = p.ty {
                     ctx.stack
                         .borrow_mut()
@@ -193,7 +223,11 @@ fn build_block_queries(ctx: &BuilderContext, mut block: Block) -> Block {
                 .into_iter()
                 .map(|a| substitute_type(ctx, a, false))
                 .collect();
-            if let TypeRef::ResolutionQuery(ref q) = decl.ty {
+            if let TypeRef::Generic { .. } = decl.ty {
+                ctx.stack
+                    .borrow_mut()
+                    .define_symbol(decl.name.clone(), Query::Find(decl.name.clone()));
+            } else if let TypeRef::ResolutionQuery(ref q) = decl.ty {
                 ctx.stack
                     .borrow_mut()
                     .define_symbol(decl.name.clone(), q.clone());
@@ -242,6 +276,13 @@ fn build_impl_block_queries(
         self_query = Some(q.clone());
         if let Some(kw) = &lang_config.self_keyword {
             ctx.stack.borrow_mut().define_symbol(kw.clone(), q.clone());
+        }
+    } else if let TypeRef::Generic { ref base, .. } = ib.impl_for {
+        if let TypeRef::ResolutionQuery(ref q) = **base {
+            self_query = Some(q.clone());
+            if let Some(kw) = &lang_config.self_keyword {
+                ctx.stack.borrow_mut().define_symbol(kw.clone(), q.clone());
+            }
         }
     }
     ib.implements_trait = ib.implements_trait.map(|t| substitute_type(ctx, t, false));
@@ -303,6 +344,20 @@ fn substitute_type(ctx: &BuilderContext, tr: TypeRef, is_call: bool) -> TypeRef 
                 .map(|v| substitute_type(ctx, v, is_call))
                 .collect(),
         ),
+        TypeRef::Generic { base, args } => TypeRef::Generic {
+            base: Box::new(substitute_type(ctx, *base, is_call)),
+            args: args
+                .into_iter()
+                .map(|a| substitute_type(ctx, a, false))
+                .collect(),
+        },
+        TypeRef::TypeVar { name, bounds } => TypeRef::TypeVar {
+            name,
+            bounds: bounds
+                .into_iter()
+                .map(|b| substitute_type(ctx, b, false))
+                .collect(),
+        },
         _ => tr,
     }
 }

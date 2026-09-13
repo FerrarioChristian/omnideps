@@ -4,7 +4,7 @@
 //! like fields, methods, parameters, and super-types. It heavily utilizes
 //! recursive traversal patterns to abstract away language-specific syntax trees.
 
-use crate::model::{Field, Function, Parameter, StructuredType, TypeRef};
+use crate::model::{Field, Function, Parameter, StructuredType, TypeParameter, TypeRef};
 use tree_sitter::Node;
 
 use super::text_parsing::{node_text, split_qualified_name};
@@ -107,7 +107,9 @@ pub fn extract_fields(
                     .or_else(|| left.child_by_field_name("field"))
                 && let Some(name) = super::text_parsing::extract_identifier(attr, src)
             {
-                let ty = if let Some(right) = child.child_by_field_name("right") {
+                let ty = if let Some(type_node) = child.child_by_field_name("type") {
+                    super::type_extraction::extract_type_ref(type_node, src)
+                } else if let Some(right) = child.child_by_field_name("right") {
                     crate::heuristics::body_extraction::infer_variable_type(right, src)
                 } else {
                     crate::model::TypeRef::Failed(vec![])
@@ -331,15 +333,33 @@ pub fn extract_super_types(node: Node, source: &str) -> Vec<TypeRef> {
             let kind = child.kind();
             if matches!(
                 kind,
-                "type_identifier" | "identifier" | "scoped_type_identifier"
+                "type_identifier"
+                    | "identifier"
+                    | "scoped_type_identifier"
+                    | "template_type"
+                    | "generic_type"
+                    | "subscript"
             ) {
+                if kind == "subscript" {
+                    if let Some(val) = child.child_by_field_name("value") {
+                        if node_text(val, source).trim() == "Generic" {
+                            continue;
+                        }
+                    }
+                }
                 supers.push(extract_type_ref(child, source));
             } else if kind == "type_list" {
                 let mut c2 = child.walk();
                 for c3 in child.children(&mut c2) {
+                    let k3 = c3.kind();
                     if matches!(
-                        c3.kind(),
-                        "type_identifier" | "identifier" | "scoped_type_identifier"
+                        k3,
+                        "type_identifier"
+                            | "identifier"
+                            | "scoped_type_identifier"
+                            | "template_type"
+                            | "generic_type"
+                            | "subscript"
                     ) {
                         supers.push(extract_type_ref(c3, source));
                     }
@@ -369,7 +389,7 @@ pub fn extract_impl_for(node: Node, source: &str) -> TypeRef {
             } else if found_trait
                 && matches!(
                     child.kind(),
-                    "type_identifier" | "scoped_type_identifier" | "identifier"
+                    "type_identifier" | "scoped_type_identifier" | "identifier" | "generic_type"
                 )
             {
                 return extract_type_ref(child, source);
@@ -398,4 +418,237 @@ pub fn extract_implements_trait(node: Node, source: &str) -> Option<TypeRef> {
         }
     }
     None
+}
+
+/// Extracts formal type parameters and their bounds from a function, struct, class, or method node.
+/// Operates language-agnostically by detecting CST type parameter containers, constraint clauses,
+/// and generic base class parameterizations.
+pub fn extract_type_parameters(node: Node, source: &str) -> Vec<TypeParameter> {
+    let mut params = extract_direct_type_parameters(node, source);
+    merge_clause_bounds(&mut params, node, source);
+
+    if params.is_empty() {
+        params = extract_generic_base_parameters(node, source);
+    }
+
+    params
+}
+
+/// Extracts type parameters declared in inline containers (e.g., `<T>`, `<T: Bound>`)
+/// directly on the node or on an enclosing template declaration.
+fn extract_direct_type_parameters(node: Node, source: &str) -> Vec<TypeParameter> {
+    let container = find_type_parameter_container(node);
+    let Some(tp_node) = container else {
+        return vec![];
+    };
+
+    let mut params = Vec::new();
+    let mut cursor = tp_node.walk();
+    for child in tp_node.children(&mut cursor) {
+        if matches!(
+            child.kind(),
+            "type_parameter" | "type_parameter_declaration" | "parameter_declaration"
+        ) {
+            if let Some(tp) = extract_single_type_parameter(child, source) {
+                if !params.iter().any(|p: &TypeParameter| p.name == tp.name) {
+                    params.push(tp);
+                }
+            }
+        }
+    }
+    params
+}
+
+/// Locates a type parameter list node on the element itself or in an enclosing template declaration.
+fn find_type_parameter_container(node: Node) -> Option<Node> {
+    if let Some(tp) = node.child_by_field_name("type_parameters") {
+        return Some(tp);
+    }
+    if let Some(p) = node.child_by_field_name("parameters") {
+        if p.kind().contains("template") || p.kind().contains("type") {
+            return Some(p);
+        }
+    }
+
+    let mut cursor = node.walk();
+    if let Some(c) = node.children(&mut cursor).find(|c| {
+        matches!(
+            c.kind(),
+            "type_parameters" | "type_parameter_list" | "template_parameter_list"
+        )
+    }) {
+        return Some(c);
+    }
+
+    // Check parent template declaration (e.g. C++ `template <typename T> class Foo`)
+    let parent = if node.kind() == "template_declaration" {
+        Some(node)
+    } else {
+        node.parent().filter(|p| p.kind() == "template_declaration")
+    };
+
+    if let Some(td) = parent {
+        if let Some(params) = td.child_by_field_name("parameters") {
+            return Some(params);
+        }
+        let mut td_cursor = td.walk();
+        return td
+            .children(&mut td_cursor)
+            .find(|c| c.kind() == "template_parameter_list");
+    }
+
+    None
+}
+
+/// Extracts the identifier and inline bounds for an individual type parameter node.
+fn extract_single_type_parameter(node: Node, source: &str) -> Option<TypeParameter> {
+    let name_node = node.child_by_field_name("name").or_else(|| {
+        let mut cursor = node.walk();
+        node.children(&mut cursor)
+            .find(|c| c.kind() == "type_identifier" || c.kind() == "identifier")
+    })?;
+
+    let name = node_text(name_node, source).trim().to_string();
+    if name.is_empty() {
+        return None;
+    }
+
+    let bounds_node = node.child_by_field_name("bounds").or_else(|| {
+        let mut cursor = node.walk();
+        node.children(&mut cursor).find(|c| {
+            matches!(c.kind(), "trait_bounds" | "type_bound" | "type_bounds")
+        })
+    });
+
+    let bounds = bounds_node
+        .map(|b| extract_bounds_from_node(b, source))
+        .unwrap_or_default();
+
+    Some(TypeParameter { name, bounds })
+}
+
+/// Extracts TypeRefs representing bounds from a bounds container node.
+fn extract_bounds_from_node(bounds_node: Node, source: &str) -> Vec<TypeRef> {
+    let mut bounds = Vec::new();
+    let mut cursor = bounds_node.walk();
+    for child in bounds_node.children(&mut cursor) {
+        let ck = child.kind();
+        if !matches!(ck, ":" | "+" | "&" | "extends" | ",") && !ck.is_empty() {
+            let tr = extract_type_ref(child, source);
+            if !matches!(tr, TypeRef::Failed(_)) {
+                bounds.push(tr);
+            }
+        }
+    }
+    bounds
+}
+
+/// Merges trailing constraint clauses (e.g. `where T: Bound` / constraint clauses)
+/// into the existing type parameters list.
+fn merge_clause_bounds(params: &mut Vec<TypeParameter>, node: Node, source: &str) {
+    let clause_node = node.child_by_field_name("where_clause").or_else(|| {
+        let mut cursor = node.walk();
+        node.children(&mut cursor)
+            .find(|c| c.kind() == "where_clause" || c.kind() == "constraint_clause")
+    });
+
+    let Some(clause) = clause_node else {
+        return;
+    };
+
+    let mut cursor = clause.walk();
+    for child in clause.children(&mut cursor) {
+        if child.kind() != "where_predicate" && child.kind() != "constraint_predicate" {
+            continue;
+        }
+
+        let left_node = child.child_by_field_name("left").or_else(|| {
+            let mut c2 = child.walk();
+            child
+                .children(&mut c2)
+                .find(|c| c.kind() == "type_identifier" || c.kind() == "identifier")
+        });
+
+        let Some(left_n) = left_node else {
+            continue;
+        };
+        let name = node_text(left_n, source).trim().to_string();
+        if name.is_empty() {
+            continue;
+        }
+
+        let bounds_node = child.child_by_field_name("bounds").or_else(|| {
+            let mut c2 = child.walk();
+            child.children(&mut c2).find(|c| {
+                matches!(c.kind(), "trait_bounds" | "type_bound" | "type_bounds")
+            })
+        });
+
+        let extra_bounds = bounds_node
+            .map(|b| extract_bounds_from_node(b, source))
+            .unwrap_or_default();
+
+        if let Some(existing) = params.iter_mut().find(|p| p.name == name) {
+            existing.bounds.extend(extra_bounds);
+        } else {
+            params.push(TypeParameter {
+                name,
+                bounds: extra_bounds,
+            });
+        }
+    }
+}
+
+/// Extracts type parameters from generic marker base types in superclasses (e.g. `class Container(Generic[T])`).
+fn extract_generic_base_parameters(node: Node, source: &str) -> Vec<TypeParameter> {
+    let mut params = Vec::new();
+    let mut cursor = node.walk();
+
+    for child in node.children(&mut cursor) {
+        if child.kind() != "argument_list" && child.kind() != "super_type" {
+            continue;
+        }
+        let mut arg_cursor = child.walk();
+        for arg in child.children(&mut arg_cursor) {
+            if arg.kind() != "subscript" {
+                continue;
+            }
+            let Some(val_node) = arg.child_by_field_name("value") else {
+                continue;
+            };
+            if node_text(val_node, source).trim() != "Generic" {
+                continue;
+            }
+            let Some(sub_node) = arg.child_by_field_name("subscript") else {
+                continue;
+            };
+            for name in extract_identifiers_from_container(sub_node, source) {
+                if !params.iter().any(|p: &TypeParameter| p.name == name) {
+                    params.push(TypeParameter {
+                        name,
+                        bounds: vec![],
+                    });
+                }
+            }
+        }
+    }
+    params
+}
+
+/// Extracts simple identifier names from a tuple or single identifier node.
+fn extract_identifiers_from_container(node: Node, source: &str) -> Vec<String> {
+    if node.kind() == "identifier" {
+        return vec![node_text(node, source).trim().to_string()];
+    }
+    let mut names = Vec::new();
+    let mut cursor = node.walk();
+    for child in node.children(&mut cursor) {
+        if child.kind() == "identifier" {
+            let name = node_text(child, source).trim().to_string();
+            if !name.is_empty() {
+                names.push(name);
+            }
+        }
+    }
+    names
 }

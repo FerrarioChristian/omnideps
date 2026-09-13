@@ -109,6 +109,14 @@ fn print_ref(kind: &str, context: &str, tr: &TypeRef) {
             ("🎯 EVALUATED", format!("{:?} ➡ {:?}", acc, ty))
         }
         TypeRef::Union(types) => ("🔀 UNION", format!("{} variants", types.len())),
+        TypeRef::Generic { base, args } => (
+            "🧬 GENERIC",
+            format!("{:?}<{:?}>", base, args),
+        ),
+        TypeRef::TypeVar { name, bounds } => (
+            "🏷️ TYPEVAR",
+            format!("{}: {:?}", name, bounds),
+        ),
     };
     println!("[{:^14}] {:<30} | {} ({})", state, kind, text, context);
 }

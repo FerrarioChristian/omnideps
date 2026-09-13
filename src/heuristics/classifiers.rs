@@ -156,5 +156,5 @@ pub fn is_type_alias(node: Node) -> bool {
     matches!(
         kind,
         "type_alias_declaration" | "alias_declaration" | "type_item" | "type_alias_statement"
-    ) || (kind == "type_definition" && !is_structured_type(node)) // C/C++ typedef can be struct or just alias
+    ) || (kind == "type_definition" && !is_structured_type(node))
 }
