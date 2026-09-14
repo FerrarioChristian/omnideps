@@ -257,9 +257,12 @@ fn apply_directory_strategy(
         *last = stem.to_string_lossy().to_string();
     }
 
-    if !path_components.is_empty() {
-        let mut current = modules.remove(0);
-        current.name = vec![path_components.pop().unwrap()];
+    if modules.is_empty() || path_components.is_empty() {
+        return;
+    }
+
+    let mut current = modules.remove(0);
+    current.name = vec![path_components.pop().unwrap()];
 
         for comp in path_components.into_iter().rev() {
             let outer = Module {
@@ -290,7 +293,6 @@ fn apply_directory_strategy(
             free_variables: vec![],
         };
         modules.push(global_root);
-    }
 }
 
 fn apply_package_strategy(

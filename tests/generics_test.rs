@@ -439,3 +439,58 @@ fn test_python_assignment_type_alias() {
         "Expected AccountList -> Account (Aliases)"
     );
 }
+
+#[test]
+fn test_python_empty_file() {
+    let code = "# Just a comment\n";
+    let _graph = analyze_snippet(SupportedLanguage::Python, code, "src/empty.py");
+}
+
+#[test]
+fn test_python_self_referential_assignment() {
+    let code = r#"
+        mergedParents = mergedParents[k]
+    "#;
+
+    let _graph = analyze_snippet(SupportedLanguage::Python, code, "src/cyclic.py");
+}
+
+#[test]
+fn test_python_wildcard_import_cycle() {
+    let code = r#"
+        from antlr4 import *
+
+        class TestLexer(Lexer):
+            pass
+    "#;
+
+    let _graph = analyze_snippet(SupportedLanguage::Python, code, "Python3/tests/TestLexer.py");
+}
+
+#[test]
+fn test_java_multiple_interfaces_resolution() {
+    let code = r#"
+        interface A { void a(); }
+        interface B { void b(); }
+        interface C { void c(); }
+        interface D { void d(); }
+
+        class MultiImpl implements A, B, C, D {
+            public void a() {}
+            public void b() {}
+            public void c() {}
+            public void d() {}
+        }
+    "#;
+
+    let graph = analyze_snippet(SupportedLanguage::Java, code, "MultiImpl.java");
+    assert!(
+        has_edge(&graph, &["MultiImpl"], &["A"], DependencyEdgeKind::IsA),
+        "Expected MultiImpl -> A (IsA)"
+    );
+    assert!(
+        has_edge(&graph, &["MultiImpl"], &["D"], DependencyEdgeKind::IsA),
+        "Expected MultiImpl -> D (IsA)"
+    );
+}
+
