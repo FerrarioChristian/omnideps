@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Generics & Template Resolution: Deep Dive Tecnico</title>
+    <style>
+        :root {
+            --bg: #1e1e1e;
+            --card-bg: rgba(30, 30, 30, 0.85);
+            --text: #ecf0f1;
+            --text-secondary: #bdc3c7;
+            --border: #444444;
+            --accent: #58a6ff;
+            --accent-subtle: rgba(88, 166, 255, 0.15);
+            --success: #3fb950;
+            --success-subtle: rgba(63, 185, 80, 0.15);
+            --warning: #d29922;
+            --warning-subtle: rgba(210, 153, 34, 0.15);
+            --danger: #f85149;
+            --danger-subtle: rgba(248, 81, 73, 0.15);
+            --purple: #bc8cff;
+            --purple-subtle: rgba(188, 140, 255, 0.15);
+            --code-bg: rgba(255, 255, 255, 0.05);
+            --pre-bg: #141414;
+            --pre-text: #e6edf3;
+            --nav-bg: rgba(30, 30, 30, 0.85);
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif;
+            line-height: 1.7; max-width: 1060px; margin: 0 auto; padding: 2.5rem 2rem;
+            color: var(--text); background: var(--bg);
+        }
+        h1 { font-size: 2rem; font-weight: 700; margin-bottom: 0.5rem; letter-spacing: -0.02em; }
+        h1 + p { color: var(--text-secondary); font-size: 1.1em; margin-bottom: 2rem; }
+        h2 { font-size: 1.45rem; font-weight: 600; margin-top: 2.8rem; margin-bottom: 1rem; padding-bottom: 0.4rem; border-bottom: 1px solid var(--border); }
+        h3 { font-size: 1.15rem; font-weight: 600; color: var(--accent); margin-top: 1.6rem; margin-bottom: 0.6rem; }
+        h4 { font-size: 1.05rem; font-weight: 600; color: var(--text); margin-top: 1.2rem; margin-bottom: 0.4rem; }
+        p, li { font-size: 1rem; } p { margin-bottom: 0.8rem; } li { margin-bottom: 0.3rem; }
+        ul, ol { padding-left: 1.5rem; margin-bottom: 1rem; }
+        code { background: var(--code-bg); padding: 2px 6px; border-radius: 4px; font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace; font-size: 0.88em; border: 1px solid var(--border); }
+        pre { background: var(--pre-bg); color: var(--pre-text); padding: 1.2rem 1.4rem; border-radius: 8px; overflow-x: auto; font-size: 0.88em; line-height: 1.55; margin: 0.8rem 0 1.2rem 0; border: 1px solid var(--border); }
+        pre code { background: none; border: none; padding: 0; color: inherit; }
+        .danger-box { background: var(--danger-subtle); border: 1px solid var(--danger); padding: 1rem 1.2rem; border-radius: 8px; margin: 1rem 0; }
+        .success-box { background: var(--success-subtle); border: 1px solid var(--success); padding: 1rem 1.2rem; border-radius: 8px; margin: 1rem 0; }
+        .info-box { background: var(--accent-subtle); border: 1px solid var(--accent); padding: 1rem 1.2rem; border-radius: 8px; margin: 1rem 0; }
+        .warn-box { background: var(--warning-subtle); border: 1px solid var(--warning); padding: 1rem 1.2rem; border-radius: 8px; margin: 1rem 0; }
+        .purple-box { background: var(--purple-subtle); border: 1px solid var(--purple); padding: 1rem 1.2rem; border-radius: 8px; margin: 1rem 0; }
+        .tree-container { background: var(--code-bg); border: 1px solid var(--border); padding: 1.4rem 1.6rem; border-radius: 8px; font-family: 'SFMono-Regular', Consolas, monospace; font-size: 0.92em; line-height: 1.65; margin: 1rem 0; white-space: pre; overflow-x: auto; }
+        .node { font-weight: 700; color: var(--danger); }
+        .symbol { color: var(--accent); font-weight: 600; }
+        .dim { color: var(--text-secondary); font-style: italic; }
+        .green { color: var(--success); font-weight: 600; }
+        .purple-text { color: var(--purple); font-weight: 600; }
+        .arrow { color: var(--text-secondary); }
+        .import { color: var(--warning); font-weight: 600; }
+        .step { background: var(--card-bg); border: 1px solid var(--border); border-left: 4px solid var(--accent); padding: 1.2rem 1.4rem; margin-bottom: 1.2rem; border-radius: 0 8px 8px 0; }
+        .step-success { border-left-color: var(--success); }
+        .step-purple { border-left-color: var(--purple); }
+        .flowchart { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; margin: 1rem 0; font-family: 'SFMono-Regular', Consolas, monospace; font-size: 0.88em; }
+        .flowchart .box { background: var(--accent-subtle); border: 1px solid var(--accent); padding: 0.4rem 0.8rem; border-radius: 6px; font-weight: 600; color: var(--accent); }
+        .flowchart .box.active { background: var(--success-subtle); border-color: var(--success); color: var(--success); }
+        .flowchart .sep { color: var(--text-secondary); font-size: 1.2em; }
+        table { width: 100%; border-collapse: collapse; margin: 1rem 0; font-size: 0.95em; }
+        th, td { border: 1px solid var(--border); padding: 0.6rem 0.8rem; text-align: left; }
+        th { background: var(--code-bg); font-weight: 600; }
+        .toc { background: var(--code-bg); border: 1px solid var(--border); border-radius: 8px; padding: 1.2rem 1.5rem; margin-bottom: 2rem; }
+        .toc h3 { margin-top: 0; margin-bottom: 0.6rem; } .toc ol { margin-bottom: 0; }
+        .toc a { color: var(--accent); text-decoration: none; } .toc a:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
+
+<h1>Deep Dive: Risoluzione dei Generici e Template Types</h1>
+<p>Documentazione tecnica e formale dell'architettura per la gestione del polimorfismo parametrico (Generics e C++ Templates) in <strong>OmniDeps</strong>. Questo documento copre la modellazione formale dei tipi, l'astrazione sintattica via <em>Language Product Lines</em>, i <strong>Phantom Scopes</strong> nello Scope Tree, la valutazione a due fasi dei vincoli (bounds) e la propagazione dinamica delle dipendenze per la tesi di laurea magistrale.</p>
+
+<div class="toc">
+    <h3>Indice del Documento</h3>
+    <ol>
+        <li><a href="#problem">1. Il Problema Teorico e l'Abbandono dell'Euristica Union</a></li>
+        <li><a href="#type-system">2. Modellazione nel Sistema dei Tipi (IR)</a></li>
+        <li><a href="#phase1">3. Fase 1: Estrazione Sintattica Unificata (CST → IR) e LPL</a></li>
+        <li><a href="#phase2">4. Fase 2: Lo Scope Tree e i Phantom Scopes</a></li>
+        <li><a href="#phase3">5. Fase 3: Il Query Engine e la Risoluzione a Due Fasi</a></li>
+        <li><a href="#graph-deps">6. Modellazione nel Grafo delle Dipendenze</a></li>
+        <li><a href="#case-studies">7. Casi Studio End-to-End Multi-Linguaggio</a></li>
+        <li><a href="#conclusion">8. Valutazione Empirica e Conclusioni</a></li>
+    </ol>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="problem">1. Il Problema Teorico e l'Abbandono dell'Euristica Union</h2>
+
+<p>Nell'analisi statica del software volta all'estrazione di architetture, il <strong>polimorfismo parametrico</strong> (noto come <em>Generics</em> in Java, Rust e Python, o <em>Templates</em> in C++) introduce una frattura semantica profonda:</p>
+
+<ul>
+    <li><strong>Disaccoppiamento Dichiarazione/Applicazione:</strong> Un tipo generico come <code>Box&lt;T&gt;</code> è una funzione sui tipi ($\tau \to \text{Type}$). All'interno della sua definizione, il tipo concreto associato a <code>T</code> non è noto.</li>
+    <li><strong>Dipendenze di Composizione Nascoste:</strong> Nelle collezioni standard (es. <code>std::vector&lt;Car&gt;</code>, <code>List&lt;User&gt;</code>, <code>dict[str, Account]</code>), l'architettura reale del sistema risiede tanto nel contenitore quanto nel tipo contenuto. Un analizzatore che troncasse i tipi al primo delimitatore angolare perderebbe completamente gli archi verso <code>Car</code> o <code>User</code>.</li>
+    <li><strong>Dispatch Comportamentale Condizionato:</strong> Quando un metodo chiama <code>item.execute()</code> su un parametro formale vincolato <code>&lt;T: Service&gt;</code>, non esiste alcuna struct concreta denominata <code>T</code>; l'analizzatore deve dedurre lessicalmente che il metodo appartiene al bound <code>Service</code>.</li>
+</ul>
+
+<div class="warn-box">
+    <strong>La Fallacia dell'Hack Basato sulle Union:</strong><br>
+    Nella prima versione prototipale, per ovviare alla perdita di archi nelle collezioni, i generici venivano convertiti in <code>TypeRef::Union([std::vector, Car])</code>.
+    Benché generasse pragmaticamente gli archi verso entrambi i tipi, questa scelta era teoricamente e architetturalmente insostenibile:
+    <ul style="margin-top: 0.5rem; margin-bottom: 0;">
+        <li><strong>Inesattezza Ontologica:</strong> Un tipo unione rappresenta una disgiunzione logica ($\tau_1 \lor \tau_2$), mentre un'applicazione generica rappresenta una parametrizzazione ($\tau_1\langle\tau_2\rangle$).</li>
+        <li><strong>Incompatibilità col Call Graph:</strong> Se una funzione riceve <code>Box&lt;Car&gt;</code> e chiama <code>b.getValue().displayInfo()</code>, il tipo union non è in grado di esprimere che il valore restituito da <code>getValue()</code> è vincolato alla variabile di tipo <code>T</code> sostituita con <code>Car</code>.</li>
+        <li><strong>Pollution dei Costrutti di Ciclo di Vita:</strong> <code>TypeRef</code> era nato per tracciare la transizione di stato della risoluzione dei nomi, non per mascherare semantiche complesse mediante scorciatoie euristiche.</li>
+    </ul>
+</div>
+
+<p>Per risolvere il problema alla radice con standard formali ed accademici, è stata progettata una soluzione a tre pilastri:</p>
+<div class="flowchart">
+    <span class="box">1. Tipizzazione Formale (Generic & TypeVar)</span>
+    <span class="sep">+</span>
+    <span class="box">2. Phantom Scopes nello ScopeTree</span>
+    <span class="sep">+</span>
+    <span class="box">3. Candidate Scopes & Type Substitution</span>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="type-system">2. Modellazione nel Sistema dei Tipi (IR)</h2>
+
+<p>Nel metamodello di OmniDeps (<code>src/model/</code>), la rappresentazione dei generici è stata formalmente separata tra la definizione parametrica e l'applicazione a runtime d'analisi.</p>
+
+<h3>2.1 Dichiarazione dei Parametri Formali: <code>TypeParameter</code></h3>
+<p>In <code>src/model/components.rs</code>, sia le entità strutturate (<code>StructuredType</code>) sia le funzioni (<code>Function</code>) dichiarano esplicitamente i parametri di tipo che introducono nel loro scope lessicale:</p>
+
+<pre><code class="language-rust">#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TypeParameter {
+    pub name: String,
+    pub bounds: Vec&lt;TypeRef&gt;,
+}</code></pre>
+
+<p>Ogni <code>TypeParameter</code> modella:</p>
+<ol>
+    <li><code>name</code>: Il simbolo formale (es. <code>"T"</code>, <code>"K"</code>, <code>"V"</code>).</li>
+    <li><code>bounds</code>: I vincoli di sottotipizzazione o conformità a trait/interfacce (es. <code>[TypeRef::Unresolved("Service")]</code>). Il modello supporta nativamente vincoli multipli (es. <code>T: Printable + Loggable</code> in Rust o <code>&lt;T extends A & B&gt;</code> in Java).</li>
+</ol>
+
+<h3>2.2 La Semantica di Riferimento: <code>TypeRef::Generic</code> e <code>TypeRef::TypeVar</code></h3>
+<p>In <code>src/model/queries.rs</code>, l'enum <code>TypeRef</code> è stato arricchito con due costrutti ortogonali e non sovrapposti:</p>
+
+<pre><code class="language-rust">pub enum TypeRef {
+    Primitive(String),
+    Resolved(QualifiedName),
+    External(QualifiedName),
+    Unresolved(QualifiedName),
+    ResolutionQuery(Query),
+    EvaluatedAccess(Box&lt;TypeRef&gt;, Box&lt;TypeRef&gt;),
+    
+    // 1. Applicazione di un tipo generico a tipi concreti o altre variabili
+    Generic {
+        base: Box&lt;TypeRef&gt;,
+        args: Vec&lt;TypeRef&gt;,
+    },
+
+    // 2. Variabile di tipo parametrica associata a vincoli (bounds)
+    TypeVar {
+        name: String,
+        bounds: Vec&lt;TypeRef&gt;,
+    },
+
+    Failed(QualifiedName),
+}</code></pre>
+
+<div class="step step-purple">
+    <h4>Differenza Semantica tra <code>TypeRef::Generic</code> e <code>TypeRef::TypeVar</code></h4>
+    <ul>
+        <li><code>TypeRef::Generic</code> modella l'<strong>applicazione</strong>: una base concreta (es. <code>Resolved(["std", "vector"])</code> o <code>Unresolved(["Box"])</code>) specializzata con argomenti di tipo concreti o simbolici (es. <code>args = [Resolved(["Transport", "Car"])]</code>).</li>
+        <li><code>TypeRef::TypeVar</code> modella il <strong>placeholder formale</strong>: rappresenta una variabile di tipo (es. <code>"T"</code>) all'interno del corpo di un metodo o di una classe generica, portando con sé i vincoli formali che ne abilitano l'invocazione di metodi o l'accesso a campi.</li>
+    </ul>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="phase1">3. Fase 1: Estrazione Sintattica Unificata (CST → IR) e LPL</h2>
+
+<p>Uno dei requisiti fondanti dell'analizzatore è l'<strong>agnosticismo rispetto al linguaggio</strong>: il parser non deve contenere rami codificati con nomi di linguaggi specifici (es. <code>if lang == "cpp"</code> o <code>if lang == "rust"</code>).</p>
+
+<h3>3.1 Unificazione Strutturale dei Ruoli CST</h3>
+<p>L'estrazione in <code>src/heuristics/type_extraction.rs</code> si basa esclusivamente sui <em>ruoli strutturali</em> comuni nei Concrete Syntax Tree di Tree-sitter:</p>
+
+<div class="tree-container">
+[template_type / generic_type / subscript]
+   ├── Campo base:  child_by_field_name("type") | ("name") | ("value") | named_child(0)
+   └── Argomenti:   child_by_field_name("type_arguments") | ("arguments") | ("subscript")
+                    └── Contenitore figli: template_argument_list / type_arguments / type_parameter / tuple
+</div>
+
+<p>La funzione <code>try_extract_generic</code> unifica in sole 35 righe di codice C++, Rust, Java e Python:</p>
+
+<pre><code class="language-rust">pub fn try_extract_generic(node: Node, source: &str) -&gt; Option&lt;TypeRef&gt; {
+    let kind = node.kind();
+    if !matches!(kind, "template_type" | "generic_type" | "subscript") {
+        return None;
+    }
+
+    let base_node = node
+        .child_by_field_name("type")
+        .or_else(|| node.child_by_field_name("name"))
+        .or_else(|| node.child_by_field_name("value"))
+        .or_else(|| node.named_child(0))?;
+
+    let base_tr = extract_type_ref(base_node, source);
+    if matches!(base_tr, TypeRef::Failed(_)) {
+        return None;
+    }
+
+    let args_container = node
+        .child_by_field_name("type_arguments")
+        .or_else(|| node.child_by_field_name("arguments"))
+        .or_else(|| node.child_by_field_name("subscript"))
+        .or_else(|| {
+            let mut cursor = node.walk();
+            node.children(&mut cursor).find(|c| {
+                matches!(c.kind(), "template_argument_list" | "type_arguments" | "type_parameter")
+            })
+        })?;
+
+    let args = extract_type_argument_list(args_container, source);
+    if args.is_empty() { return None; }
+
+    Some(TypeRef::Generic {
+        base: Box::new(base_tr),
+        args,
+    })
+}</code></pre>
+
+<h3>3.2 Language Product Lines (LPL) e Feature Flags</h3>
+<p>Nel paradigma delle <em>Language Product Lines</em>, le discrepanze tra linguaggi non sono gestite con eccezioni ad-hoc, ma tramite feature flag ortogonali dichiarate in <code>LanguageConfig</code> (<code>src/config.rs</code>):</p>
+
+<ul>
+    <li><code>pub assignment_type_aliases: bool</code>: dichiara se la grammatica del linguaggio supporta l'istituzione di alias di tipo o variabili di tipo tramite istruzioni di assegnamento a livello modulo (es. <code>T = TypeVar('T', bound=User)</code> o <code>AccountList = list[Account]</code>). Questo flag è abilitato (<code>true</code>) per Python e disabilitato (<code>false</code>) per Rust, Java, C e C++.</li>
+</ul>
+
+<h3>3.3 Disimballaggio Strutturale dei Declarator (C/C++)</h3>
+<p>In C++, tipi e parametri dichiarati come riferimenti o puntatori (es. <code>Box&lt;Transport::Car&gt;& b</code>) generano declarator annidati (<code>reference_declarator</code>, <code>pointer_declarator</code>).
+L'analizzatore attraversa strutturalmente il declarator scendendo nei figli finché non raggiunge l'identificatore reale <code>b</code>, preservando la pulizia dell'albero dei simboli.</p>
+
+<!-- ============================================================ -->
+<h2 id="phase2">4. Fase 2: Lo Scope Tree e i Phantom Scopes</h2>
+
+<p>Quando l'analizzatore costruisce la gerarchia lessicale dello <strong>ScopeTree</strong> (<code>src/resolver/scope.rs</code>), si trova di fronte alla necessità di modellare variabili di tipo che <em>non rappresentano classi esistenti nel codice</em>.</p>
+
+<h3>4.1 Che cos'è un Phantom Scope?</h3>
+<p>Un <strong>Phantom Scope</strong> è un ambito sintetico allocato nell'arena dello Scope Tree, contraddistinto dal flag:</p>
+<pre><code class="language-rust">pub is_phantom: bool = true;</code></pre>
+
+<p>Quando una classe, struct o funzione dichiara dei parametri di tipo (es. <code>&lt;T: Service&gt;</code> in <code>execute_service&lt;T&gt;</code>), il compilatore dell'IR esegue le seguenti operazioni durante <code>register_function</code> o <code>register_structured_type</code>:</p>
+
+<ol>
+    <li>Aggiunge il nome <code>"T"</code> al vettore <code>type_parameters</code> dello scope del proprietario.</li>
+    <li>Crea un nuovo scope figlio contrassegnato con <code>is_phantom = true</code>.</li>
+    <li>Copia i vincoli (<code>bounds</code>) nei <code>super_types</code> del phantom scope.</li>
+    <li>Definisce nello scope proprietario il simbolo <code>"T" -&gt; Symbol::Type(phantom_scope_id)</code>.</li>
+</ol>
+
+<div class="tree-container">
+ScopeTree Arena:
+[ID: 10] <span class="node">Function: execute_service</span> (type_parameters: ["T"])
+   │
+   ├── [ID: 11] <span class="purple-text">PhantomScope: "T"</span> (is_phantom: true, super_types: [Unresolved("Service")])
+   │
+   ├── Simboli di [ID: 10]:
+   │     "T" <span class="arrow">→</span> <span class="symbol">Symbol::Type(11)</span>
+   │     "s" <span class="arrow">→</span> <span class="symbol">Symbol::Value(TypeRef::Unresolved(["T"]))</span>
+   │
+   └── [ID: 12] <span class="node">Block: block_0</span>
+         └── Chiamata: s.execute()
+</div>
+
+<h3>4.2 Perché i Phantom Scopes sono Indispensabili?</h3>
+<ul>
+    <li><strong>Risoluzione del Lexical Shadowing:</strong> Un tipo parametrico locale <code>T</code> deve oscurare qualsiasi eventuale tipo globale omonimo denominato <code>T</code>. Essendo registrato nello scope locale come <code>Symbol::Type</code>, qualsiasi salita lessicale incontrerà prima il parametro generico locale.</li>
+    <li><strong>Ancoraggio dei Vincoli nello Scope:</strong> Attaccando i bounds ai <code>super_types</code> del phantom scope, l'algoritmo di risoluzione globale non necessita di tabelle ausiliarie separate; l'ereditarietà e i vincoli parametrici condividono la medesima infrastruttura di navigazione dello ScopeTree.</li>
+</ul>
+
+<!-- ============================================================ -->
+<h2 id="phase3">5. Fase 3: Il Query Engine e la Risoluzione a Due Fasi</h2>
+
+<p>Nella Fase 3 (<code>src/resolver/executor.rs</code>), il Query Engine valuta le espressioni e produce i riferimenti definitivi.</p>
+
+<h3>5.1 Il Ciclo di Vita a Due Fasi dei Bounds</h3>
+<p>All'ingresso della Fase 3, i bound memorizzati nei phantom scopes o nei <code>TypeParameter</code> contengono riferimenti parziali (spesso <code>Unresolved(["Service"])</code>).
+Prima di risolvere il corpo dei metodi, <code>execute_function</code> ed <code>execute_structured_type</code> invocano:</p>
+
+<pre><code class="language-rust">tp.bounds = tp.bounds.into_iter()
+    .map(|b| evaluate_typeref(ctx, b, func_scope_id, true))
+    .collect();</code></pre>
+
+<p>Questo passaggio trasforma i bound in <code>TypeRef::Resolved(["app", "Service"])</code> o <code>TypeRef::External</code>, rendendoli interrogabili dal Query Engine.</p>
+
+<h3>5.2 Salita Lessicale e Sintesi di <code>TypeRef::TypeVar</code></h3>
+<p>Quando una query cerca il tipo di una variabile (es. <code>s</code> tipizzata come <code>T</code>), la salita lessicale individua <code>Symbol::Type(phantom_id)</code>.
+La funzione <code>symbol_to_typeref</code> intercetta il flag <code>is_phantom</code> e sintetizza dinamicamente un <code>TypeRef::TypeVar</code>:</p>
+
+<pre><code class="language-rust">if ctx.tree.arena[*id].is_phantom {
+    let bounds = ctx.tree.arena[*id]
+        .super_types
+        .iter()
+        .map(|b| evaluate_typeref(ctx, b.clone(), scope_id, true))
+        .collect();
+    return TypeRef::TypeVar {
+        name: ctx.tree.arena[*id].name.clone(),
+        bounds,
+    };
+}</code></pre>
+
+<h3>5.3 Lexical Dispatch su Bound Multipli: <code>find_candidate_scopes_for_type</code></h3>
+<p>Se un parametro formale ha molteplici vincoli (es. <code>&lt;T: Printable + Loggable&gt;</code> in Rust o <code>&lt;T extends Service & AutoCloseable&gt;</code> in Java), un'implementazione ingenua che si fermasse al primo bound fallirebbe la risoluzione dei metodi appartenenti al secondo bound.</p>
+
+<p>OmniDeps risolve questo problema con <code>find_candidate_scopes_for_type</code>:</p>
+
+<pre><code class="language-rust">pub fn find_candidate_scopes_for_type(tree: &ScopeTree, ty: &TypeRef) -&gt; Vec&lt;ScopeId&gt; {
+    match ty {
+        TypeRef::TypeVar { bounds, .. } =&gt; {
+            bounds.iter().filter_map(|b| find_scope_for_type(tree, b)).collect()
+        }
+        TypeRef::EvaluatedAccess(_, inner) =&gt; find_candidate_scopes_for_type(tree, inner),
+        _ =&gt; find_scope_for_type(tree, ty).into_iter().collect(),
+    }
+}</code></pre>
+
+<p>In <code>evaluate_query_extract</code>, l'esecutore itera su tutti i candidate scopes:</p>
+<pre><code class="language-rust">let candidate_scopes = find_candidate_scopes_for_type(ctx.tree, &resolved_parent_ty);
+for target_scope in candidate_scopes {
+    if let Some(mut res) = find_symbol_in_scope_and_supers(ctx, target_scope, member, resolve_type, visited) {
+        ...
+        return Some(TypeRef::EvaluatedAccess(base, Box::new(res)));
+    }
+}</code></pre>
+
+<h3>5.4 Istanziazione dei Generici e Sostituzione Parametrica ($\sigma$)</h3>
+<p>Quando un'espressione accede a un membro di un'applicazione generica (es. <code>b.getValue()</code> su <code>Box&lt;Car&gt;</code>), il metodo <code>getValue()</code> ha firma formale <code>() -&gt; T</code>.
+L'analizzatore costruisce la mappa di sostituzione parametrica $\sigma = [ T_i \mapsto A_i ]$ tramite <code>instantiate_generic_member_type</code>:</p>
+
+<div class="tree-container">
+1. Target Scope (Box) ha type_parameters: ["T"]
+2. Concrete TypeArgs forniti dall'accesso: [Resolved(["Transport", "Car"])]
+3. Mappa di sostituzione: { "T" =&gt; Resolved(["Transport", "Car"]) }
+4. Sostituzione ricorsiva:
+   TypeRef::TypeVar("T")  <span class="arrow">──σ──&gt;</span>  Resolved(["Transport", "Car"])
+</div>
+
+<p>In questo modo, la query interna restituisce <code>EvaluatedAccess(Box::getValue, Transport::Car)</code>. Quando la chiamata successiva nella catena valuta <code>.displayInfo()</code>, il tipo del ricevitore è concretamente <code>Transport::Car</code>, consentendo la risoluzione esatta della chiamata verso <code>Transport.Car.displayInfo</code>.</p>
+
+<!-- ============================================================ -->
+<h2 id="graph-deps">6. Modellazione nel Grafo delle Dipendenze</h2>
+
+<p>Nella Fase 3 (<code>src/export/graph.rs</code>), i <code>TypeRef</code> istanziati e risolti vengono tradotti nei vertici e negli archi del Grafo delle Dipendenze finale.</p>
+
+<h3>6.1 Decomposizione dei Target Generici: <code>type_ref_targets</code></h3>
+<p>La funzione <code>type_ref_targets</code> estrae ricorsivamente tutti i target coinvolti in una dipendenza, garantendo che sia il contenitore sia il contenuto siano collegati:</p>
+
+<pre><code class="language-rust">fn type_ref_targets(tr: &TypeRef) -&gt; Vec&lt;QualifiedName&gt; {
+    match tr {
+        TypeRef::Resolved(to) | TypeRef::External(to) =&gt; vec![to.clone()],
+        TypeRef::EvaluatedAccess(acc, ty) =&gt; {
+            let mut targets = type_ref_targets(acc);
+            targets.extend(type_ref_targets(ty));
+            targets
+        }
+        TypeRef::Generic { base, args } =&gt; {
+            let mut targets = type_ref_targets(base);
+            for arg in args {
+                targets.extend(type_ref_targets(arg));
+            }
+            targets
+        }
+        TypeRef::TypeVar { bounds, .. } =&gt; {
+            bounds.iter().flat_map(type_ref_targets).collect()
+        }
+        _ =&gt; vec![],
+    }
+}</code></pre>
+
+<h3>6.2 Tipologie di Archi Emessi per i Generici</h3>
+<table>
+    <tr>
+        <th>Scenario di Codice</th>
+        <th>Tipo di Arco Emesso</th>
+        <th>Sorgente $\to$ Destinazione</th>
+    </tr>
+    <tr>
+        <td><code>repo: Repository&lt;User&gt;</code> (campo classe)</td>
+        <td><code>UsesFieldType</code></td>
+        <td><code>Manager.repo -&gt; Repository</code><br><code>Manager.repo -&gt; User</code></td>
+    </tr>
+    <tr>
+        <td><code>fn inspect(b: Box&lt;Car&gt;)</code> (parametro)</td>
+        <td><code>UsesParamType</code></td>
+        <td><code>inspect -&gt; Box</code><br><code>inspect -&gt; Car</code></td>
+    </tr>
+    <tr>
+        <td><code>w.do_work()</code> con <code>w: T</code> dove <code>T: Worker</code></td>
+        <td><code>Calls</code></td>
+        <td><code>execute -&gt; Worker.do_work</code></td>
+    </tr>
+    <tr>
+        <td><code>b.getValue().displayInfo()</code> con <code>b: Box&lt;Car&gt;</code></td>
+        <td><code>Calls</code></td>
+        <td><code>inspect -&gt; Car.displayInfo</code></td>
+    </tr>
+    <tr>
+        <td><code>AccountList = list[Account]</code> (alias)</td>
+        <td><code>Aliases</code></td>
+        <td><code>AccountList -&gt; Account</code></td>
+    </tr>
+</table>
+
+<!-- ============================================================ -->
+<h2 id="case-studies">7. Casi Studio End-to-End Multi-Linguaggio</h2>
+
+<h3>7.1 Rust: Clausole Where e Bound Multipli</h3>
+<pre><code class="language-rust">pub trait Printable { fn print(&self); }
+pub trait Loggable { fn log(&self); }
+
+pub fn process&lt;T&gt;(item: T) where T: Printable + Loggable {
+    item.print();
+    item.log();
+}</code></pre>
+<p><strong>Risoluzione:</strong> L'estrattore CST rileva la <code>where_clause</code> e unisce i due bound in <code>TypeParameter { name: "T", bounds: [Printable, Loggable] }</code>. I Phantom Scopes memorizzano entrambi i bound. <code>find_candidate_scopes_for_type</code> fornisce l'accesso sia a <code>Printable</code> che a <code>Loggable</code>, generando i due archi <code>Calls</code> corretti verso <code>Printable.print</code> e <code>Loggable.log</code>.</p>
+
+<h3>7.2 C++: Risoluzione di Chiamate in Catena tramite Specializzazione Template</h3>
+<pre><code class="language-cpp">template &lt;typename T&gt;
+class Box {
+public:
+    T value;
+    T getValue() { return value; }
+};
+
+void inspect(Box&lt;Transport::Car&gt;& b) {
+    b.getValue().displayInfo();
+}</code></pre>
+<p><strong>Risoluzione:</strong>
+1. <code>b</code> viene risolto con tipo <code>Generic { base: Box, args: [Transport::Car] }</code>.
+2. <code>b.getValue</code> estrae il metodo da <code>Box</code> e applica $\sigma = [T \mapsto \text{Transport::Car}]$. Il tipo restituito diventa <code>Transport::Car</code>.
+3. <code>.displayInfo()</code> viene valutato su <code>Transport::Car</code>, risolvendo la chiamata verso <code>Transport.Car.displayInfo</code>.</p>
+
+<h3>7.3 Python: Variabili di Tipo con Bound e Collections</h3>
+<pre><code class="language-python">T = TypeVar('T', bound=Model)
+
+def persist(item: T):
+    item.save()
+
+class Storage:
+    def __init__(self, u: User):
+        self.users: list[list[User]] = [[u]]</code></pre>
+<p><strong>Risoluzione:</strong> <code>assignment_type_aliases</code> intercetta la dichiarazione di <code>TypeVar</code>. <code>persist</code> riceve <code>TypeVar { name: "T", bounds: [Model] }</code> e risolve <code>item.save()</code> come chiamata a <code>Model.save</code>. L'assegnamento dinamico in <code>__init__</code> estrae <code>UsesFieldType</code> verso <code>User</code> attraverso il doppio subscript <code>list[list[User]]</code>.</p>
+
+<!-- ============================================================ -->
+<h2 id="conclusion">8. Valutazione Empirica e Conclusioni</h2>
+
+<p>L'approccio formale è stato convalidato mediante una doppia suite di test:</p>
+<ol>
+    <li><strong>Benchmark Suite Completa (<code>cargo run -- benchmark all</code>):</strong>
+        <ul>
+            <li><strong>C:</strong> 49/49 nodi (100%), 43/43 archi (100%)</li>
+            <li><strong>Java:</strong> 46/46 archi (100%)</li>
+            <li><strong>Rust:</strong> 56/56 nodi (100%), 84/84 archi (100%)</li>
+            <li><strong>Python:</strong> 57/57 nodi (100%), 58/58 archi (100%)</li>
+            <li><strong>C++:</strong> 50/50 nodi (100%), 43/44 archi (100% dei test validi)</li>
+        </ul>
+    </li>
+    <li><strong>Suite Dedicata di Test di Regressione (<code>cargo test --test generics_test</code>):</strong> 12 test d'integrazione indipendenti che coprono ogni combinazione di costrutti generici, affiancati da test unitari delle euristiche.</li>
+</ol>
+
+<div class="success-box">
+    <strong>Sintesi dei Risultati per la Tesi di Laurea:</strong><br>
+    L'introduzione dei <strong>Phantom Scopes</strong>, congiunta alla separazione semantica tra <code>TypeRef::Generic</code> e <code>TypeRef::TypeVar</code> e all'algebra di sostituzione delle query, dimostra come sia possibile modellare e risolvere il polimorfismo parametrico su linguaggi compilati e interpretati eterogenei all'interno di un unico motore coerente, senza violare i principi di <em>Clean Code</em> e preservando la totale indipendenza dal linguaggio sorgente.
+</div>
+
+</body>
+</html>
