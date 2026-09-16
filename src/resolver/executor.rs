@@ -474,7 +474,6 @@ pub fn find_symbol_in_scope_and_supers(
 fn get_or_resolve_super_scopes(
     ctx: &ExecutorContext,
     scope_id: ScopeId,
-    visited: &mut std::collections::HashSet<String>,
 ) -> Vec<ScopeId> {
     if let Some(supers) = ctx.resolved_super_scopes.borrow().get(&scope_id) {
         return supers.clone();
@@ -483,26 +482,26 @@ fn get_or_resolve_super_scopes(
     // Insert an empty entry first to break any circular inheritance cycles during resolution
     ctx.resolved_super_scopes.borrow_mut().insert(scope_id, Vec::new());
 
-    let parent_scope = ctx.tree.arena[scope_id].parent.unwrap_or(ctx.tree.root);
     let mut resolved_scopes = Vec::new();
+    let mut visited = std::collections::HashSet::new();
 
     for st in &ctx.tree.arena[scope_id].super_types {
         let resolved_st = match st {
             TypeRef::ResolutionQuery(q) => {
-                evaluate_query(ctx, q, parent_scope, true, visited).unwrap_or_else(|| st.clone())
+                evaluate_query(ctx, q, scope_id, true, &mut visited).unwrap_or_else(|| st.clone())
             }
             TypeRef::Unresolved(qn) => {
                 let query = Query::Find(qn.last().cloned().unwrap_or_default());
-                evaluate_query(ctx, &query, parent_scope, true, visited).unwrap_or_else(|| st.clone())
+                evaluate_query(ctx, &query, scope_id, true, &mut visited).unwrap_or_else(|| st.clone())
             }
             TypeRef::Generic { base, args } => {
                 let resolved_base = match base.as_ref() {
                     TypeRef::ResolutionQuery(q) => {
-                        evaluate_query(ctx, q, parent_scope, true, visited).unwrap_or_else(|| *base.clone())
+                        evaluate_query(ctx, q, scope_id, true, &mut visited).unwrap_or_else(|| *base.clone())
                     }
                     TypeRef::Unresolved(qn) => {
                         let query = Query::Find(qn.last().cloned().unwrap_or_default());
-                        evaluate_query(ctx, &query, parent_scope, true, visited).unwrap_or_else(|| *base.clone())
+                        evaluate_query(ctx, &query, scope_id, true, &mut visited).unwrap_or_else(|| *base.clone())
                     }
                     _ => *base.clone(),
                 };
@@ -548,7 +547,7 @@ fn find_symbol_in_scope_and_supers_internal(
         ));
     }
 
-    let super_scopes = get_or_resolve_super_scopes(ctx, scope_id, visited);
+    let super_scopes = get_or_resolve_super_scopes(ctx, scope_id);
     for super_scope in super_scopes {
         if let Some(res) = find_symbol_in_scope_and_supers_internal(
             ctx,
@@ -604,14 +603,13 @@ fn resolve_super_keyword(
         let scope = &ctx.tree.arena[id];
         if !scope.super_types.is_empty() {
             let st = &scope.super_types[0];
-            let parent_scope = scope.parent.unwrap_or(ctx.tree.root);
             return match st {
                 TypeRef::ResolutionQuery(q) => {
-                    evaluate_query(ctx, q, parent_scope, resolve_type, visited).or(Some(st.clone()))
+                    evaluate_query(ctx, q, id, resolve_type, visited).or(Some(st.clone()))
                 }
                 TypeRef::Unresolved(qn) => {
                     let query = Query::Find(qn.last().cloned().unwrap_or_default());
-                    evaluate_query(ctx, &query, parent_scope, resolve_type, visited).or(Some(st.clone()))
+                    evaluate_query(ctx, &query, id, resolve_type, visited).or(Some(st.clone()))
                 }
                 _ => Some(st.clone()),
             };

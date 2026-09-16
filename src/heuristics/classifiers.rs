@@ -77,6 +77,7 @@ pub fn is_function(node: Node) -> bool {
         || kind.contains("fn_item")
         || kind.contains("func")
         || kind.contains("constructor")
+        || kind.contains("destructor")
         || kind == "decorated_definition";
 
     is_func_kind && !kind.contains("class")

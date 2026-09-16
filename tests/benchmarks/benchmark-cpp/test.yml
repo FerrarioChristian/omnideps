@@ -9,8 +9,10 @@ files:
 - src/Fleet.h
 - src/Fleet.cpp
 - src/annotations.cpp
-- src/untested_features.hpp
-- src/untested_features.cpp
+- src/templates.hpp
+- src/templates.cpp
+- src/namespaces_and_macros.hpp
+- src/namespaces_and_macros.cpp
 nodes:
 - name: Transport
   kind: namespace

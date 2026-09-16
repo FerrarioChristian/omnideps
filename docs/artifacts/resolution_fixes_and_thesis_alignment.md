@@ -1,25 +1,32 @@
 # Ottimizzazioni della Name Resolution e Allineamento con la Tesi di Laurea
 
-
 ## 1. Executive Summary e Contesto Sperimentale
 
 Durante la fase di validazione empirica su repository open-source di grandi dimensioni (`evaluation/`):
+
 - **ANTLR4** (Python runtime + Java core, oltre 4.200 moduli);
-- **JUnit 5** (Java, oltre 9.400 compilation units, uso massiccio di interfacce multiple);
+- **JUnit 5** (Java, oltre 9.600 compilation units, uso massiccio di interfacce multiple);
 - **Fastjson** (Java, oltre 19.000 classi e tipi interni);
 - **JUnit 4** (Java, oltre 2.100 moduli);
+- **Benchmark Suite Multi-linguaggio** (`tests/benchmarks/` per C, C++, Java, Rust, Python);
 
-l'analizzatore ha evidenziato quattro ordini di problematiche architetturali e algoritmiche che ne impedivano il completamento:
+l'analizzatore ha evidenziato diverse problematiche architetturali, semantiche e algoritmiche:
+
 1. **Panic su moduli vuoti**: crash inatteso nell'adattamento della gerarchia di directory (`apply_directory_strategy`) in presenza di file senza statement (es. `__init__.py` vuoti).
 2. **Stack Overflow su assegnazioni/alias auto-referenziali**: cicli infiniti di valutazione del tipo su costrutti del tipo `mergedParents = mergedParents[k]`.
 3. **Ping-Pong ricorsivo su wildcard e import transitivi**: ricorsione mutua infinita tra la risoluzione globale dei cammini (`find_global`) e l'esplorazione dei re-export (`resolve_via_transitive_imports`).
 4. **Esplosione combinatoria esponenziale su ereditarietà multipla**: blocco indefinito (apparente loop infinito al 100% di CPU) durante l'analisi di classi che implementano molte interfacce (es. `KitchenSinkExtension.java` in JUnit 5 con 21 interfacce contemporanee).
+5. **Rottura dei parametri di tipo generici nelle classi base**: perdita del binding di `T` in estensioni del tipo `Box<T> extends Base<T>` qualora la risoluzione della super-classe non partisse dallo scope locale della classe.
+6. **Type Shadowing causato da costruttori e distruttori**: inquinamento del dizionario dei simboli di classe (`class_scope.symbols`), dove la registrazione del costruttore come `Symbol::Value` mascherava il tipo nominale della classe nelle sottoclassi C++, rompendo 4 archi di ereditarietà.
+7. **Collisione e perdita dei distruttori C++**: mancata estrazione del prefisso `~` da Tree-sitter, che causava la collisione tra distruttore e costruttore.
 
-Le soluzioni introdotte hanno garantito la **terminazione formale**, la **linearizzazione della complessità** e un drastico abbattimento dei tempi di esecuzione:
-- **JUnit 5**: da blocco infinito a completamento in **~8 secondi** (21.656 referenze risolte con successo);
+Le soluzioni introdotte hanno garantito la **terminazione formale**, la **linearizzazione della complessità** e il raggiungimento del **100% di precisione sui benchmark**:
+
+- **JUnit 5**: da blocco infinito a completamento in **5.79 secondi** (9.622 moduli, 21.967 referenze risolte con successo);
 - **Fastjson**: analisi completa di 19.188 moduli in **~15 secondi**;
-- **ANTLR4**: analisi completa in **~5 secondi** (15.766 referenze risolte);
-- **Suite di test**: 16/16 test unitari e di integrazione passati con successo.
+- **ANTLR4**: analisi completa in **4.8 secondi** (4.237 moduli, 15.834 referenze risolte);
+- **Benchmark Suite**: **100% di conformità** (C: 49/49, C++: 50/50, Java: 46/46, Rust: 56/56, Python: 57/57);
+- **Suite di test**: 17/17 test unitari e di integrazione passati con successo.
 
 ---
 
@@ -41,9 +48,15 @@ Le soluzioni introdotte hanno garantito la **terminazione formale**, la **linear
 | 3  | executor.rs                 | Ping-pong find_global <-> imports; | Insiemi di visita dedicati |
 |    | (find_global / trans_imp)   | token '*' passato letteralmente.   | e stripping del wildcard.  |
 +----+-----------------------------+------------------------------------+----------------------------+
-| 4  | executor.rs                 | Valutazione super-tipi nello scope | Risoluzione in parent_scope|
-|    | (get_or_resolve_super_scopes| figlio e assenza di memoizzazione: | e memoizzazione con        |
-|    |  / find_symbol_in_supers)   | albero O(b^d) con b=21, d=21.      | RefCell<HashMap>.          |
+| 4  | executor.rs                 | Ricorsione esponenziale su super   | Memoizzazione con sentinella|
+|    | (get_or_resolve_super_scopes| tipi e perdita generici se forzato | vuota ([]), lookup locale  |
+|    |  / resolve_super_keyword)   | a parent: albero O(b!).            | e fresh_visited disaccopp. |
++----+-----------------------------+------------------------------------+----------------------------+
+| 5  | scope.rs                    | Costruttori inseriti in symbols    | Esclusione di ctor/dtor dai|
+|    | (register_structured_type)  | mascherano il tipo nominale (C++). | Symbol::Value di classe.   |
++----+-----------------------------+------------------------------------+----------------------------+
+| 6  | classifiers.rs / parsing.rs | Distruttori non riconosciuti o     | Supporto a destructor_name |
+|    |                             | privati del prefisso '~'.          | e token terminale '~Class'.|
 +----+-----------------------------+------------------------------------+----------------------------+
 ```
 
@@ -52,15 +65,19 @@ Le soluzioni introdotte hanno garantito la **terminazione formale**, la **linear
 ### 2.1 Problema 1: Panic su Moduli Privi di Dichiarazioni (`src/analyzer.rs`)
 
 #### Sintomo
+
 Invocando l'analisi su repository Python (come ANTLR4 runtime), il processo andava in panic con:
+
 ```text
 thread 'main' panicked at src/analyzer.rs:261:32:
 index out of bounds: the len is 0 but the index is 0
 ```
 
 #### Causa Radice
+
 La funzione `apply_directory_strategy` converte la struttura delle cartelle del file system in una gerarchia di moduli annidati (`Module`). Per i file vuoti (come i tipici `__init__.py` usati solo come package marker o file composti esclusivamente da commenti), la fase di parsing produce un vettore `modules` vuoto.
 Il codice eseguiva:
+
 ```rust
 if !path_components.is_empty() {
     let mut current = modules.remove(0); // PANIC se modules.is_empty()
@@ -69,12 +86,15 @@ if !path_components.is_empty() {
 ```
 
 #### Soluzione Implementata
+
 È stato aggiunto un controllo di guardia preliminare in `src/analyzer.rs`:
+
 ```rust
 if modules.is_empty() || path_components.is_empty() {
     return;
 }
 ```
+
 Se il parsing del file sorgente non ha generato alcun modulo concreto, l'infrastruttura di directory non tenta estrazioni illegittime e termina la riorganizzazione in modo sicuro.
 
 ---
@@ -82,13 +102,17 @@ Se il parsing del file sorgente non ha generato alcun modulo concreto, l'infrast
 ### 2.2 Problema 2: Stack Overflow su Assegnazioni Auto-Referenziali (`src/resolver/executor.rs`)
 
 #### Sintomo
+
 Durante l'analisi del codice Python di ANTLR4 contenente costrutti come:
+
 ```python
 mergedParents = mergedParents[k]
 ```
+
 il thread andava in stack overflow terminando l'esecuzione con abort del processo.
 
 #### Causa Radice
+
 1. **Trattamento semantico dell'assegnazione**: Nelle euristiche di estrazione Python, l'assegnazione `mergedParents = ...` al livello di modulo viene registrata sia come variabile sia potenziale `Symbol::TypeAlias`.
 2. **Perdita dello stato di ricorsione**: Durante la risoluzione del tipo di `mergedParents`, la funzione `symbol_to_typeref` invocava `evaluate_typeref(ctx, ty.clone(), scope_id, true)`. Tuttavia, `evaluate_typeref` instanziava internamente un **nuovo** `HashSet::new()`, distruggendo la cronologia delle visite ricevuta dal chiamante.
 3. **Collisione delle chiavi di query**: In `evaluate_query`, il set `visited` memorizzava unicamente la stringa `extract_base_name(query)` (es. `"mergedParents"`), priva del contesto lessicale (`ScopeId`). Questo generava due anomalie opposte:
@@ -96,18 +120,22 @@ il thread andava in stack overflow terminando l'esecuzione con abort del process
    - Mancata rilevazione del ciclo nello stesso scope quando il pattern passava attraverso tipi composti (`Index`, `Generic`, `Union`).
 
 #### Soluzione Implementata
+
 1. **Unificazione del ciclo di valutazione (`evaluate_typeref_inner`)**:
    È stata creata la funzione interna `evaluate_typeref_inner` che propaga per riferimento mutable `visited: &mut HashSet<String>` a tutti i livelli dell'AST dei tipi (`TypeRef::Union`, `TypeRef::Generic`, `TypeRef::TypeVar`, `TypeRef::ResolutionQuery`, `TypeRef::Unresolved`).
 2. **Scope-Aware Query Keys**:
    La chiave di tracciamento delle query è stata resa sensibile allo scope corrente:
+
    ```rust
    let q_str = format!("{}:{}", scope_id, extract_base_name(query));
    if !visited.insert(q_str.clone()) {
        return None;
    }
    ```
+
 3. **Guardia sui Simboli**:
    In `symbol_to_typeref`, per prevenire alias o valori ciclici nello stesso scope, è stata aggiunta la guardia:
+
    ```rust
    let sym_key = format!("sym:{}:{}", scope_id, name);
    if !visited.insert(sym_key.clone()) {
@@ -122,14 +150,19 @@ il thread andava in stack overflow terminando l'esecuzione con abort del process
 ### 2.3 Problema 3: Loop Ricorsivo su Wildcard e Import Transitivi (`src/resolver/executor.rs`)
 
 #### Sintomo
+
 In presenza di file come `Python3/tests/TestLexer.py` con direttive:
+
 ```python
 from antlr4 import *
 ```
+
 il risolutore entrava in un ciclo ricorsivo infinito consumando l'intero stack.
 
 #### Causa Radice
+
 La risoluzione globale dei percorsi e quella degli import transitivi cooperano per risolvere simboli riesportati:
+
 - `find_global(ctx, &["antlr4", "Lexer"])` interroga lo scope `antlr4`. Se il simbolo non è presente direttamente, consulta `resolve_via_transitive_imports`.
 - `resolve_via_transitive_imports` scandiva gli import del modulo `antlr4`. Quando incontrava un import wildcard, generava una nuova query per `Lexer` invocando a sua volta `find_global`.
 - **Due difetti concomitanti**:
@@ -137,18 +170,22 @@ La risoluzione globale dei percorsi e quella degli import transitivi cooperano p
   2. Mancava un meccanismo di rilevamento del ciclo tra `find_global` e `resolve_via_transitive_imports`. Se due moduli si importavano mutuamente o importavano a stella lo stesso package radice, l'algoritmo rimbalzava all'infinito tra le due funzioni.
 
 #### Soluzione Implementata
+
 1. **Guardia globale sui path**:
    In `find_global_internal` è stato introdotto il tracciamento `global:{path.join("::")}`:
+
    ```rust
    let path_key = format!("global:{}", path.join("::"));
    if !visited.insert(path_key.clone()) {
        return None;
    }
    ```
+
 2. **Guardia locale sulle riesportazioni transitive**:
    In `resolve_via_transitive_imports` è stato introdotto il tracciamento `trans:{scope_id}:{member}`.
 3. **Normalizzazione corretta dei wildcard**:
    Il token wildcard `*` viene esplicitamente eliminato prima di concatenare il simbolo puntuale ricercato:
+
    ```rust
    let mut target_path = imp.path.clone();
    if target_path.last().map(|s| s.as_str()) == Some("*") {
@@ -160,74 +197,38 @@ La risoluzione globale dei percorsi e quella degli import transitivi cooperano p
 
 ---
 
-### 2.4 Problema 4: Esplosione Combinatoria nell'Ereditarietà Multipla (`KitchenSinkExtension.java`)
+### 2.4 Problema 4: Esplosione Combinatoria nell'Ereditarietà Multipla e Risoluzione dei Generici
 
 #### Sintomo
+
 Durante l'analisi di **JUnit 5**, l'esecuzione si arrestava indefinitamente sul modulo 872:
 `jupiter-tests/src/test/java/org/junit/jupiter/api/extension/KitchenSinkExtension.java`.
 Il processo impegnava una CPU al 100% senza produrre output, simulando un loop infinito.
 
 #### Causa Radice: L'Albero Combinatorio Esponenziale
+
 `KitchenSinkExtension` è una classe di test che implementa contemporaneamente **21 interfacce Java**:
 `BeforeAllCallback`, `BeforeEachCallback`, `BeforeTestExecutionCallback`, `TestWatcher`, `AfterTestExecutionCallback`, `AfterEachCallback`, `AfterAllCallback`, `ParameterResolver`, `ExecutionCondition`, ecc.
 
 Nel codice precedente di `find_symbol_in_scope_and_supers_internal`:
-```rust
-for st in &ctx.tree.arena[scope_id].super_types {
-    let resolved_st = match st {
-        TypeRef::ResolutionQuery(q) => {
-            evaluate_query(ctx, q, scope_id, true, visited).unwrap_or_else(|| st.clone())
-        }
-        ...
-    };
-    if let Some(super_scope) = find_scope_for_type(ctx.tree, &resolved_st) {
-        if scope_id != super_scope {
-            find_symbol_in_scope_and_supers_internal(ctx, super_scope, name, ...)
-        }
-    }
-}
-```
-Due gravissimi errori architetturali cooperavano nel generare un'esplosione combinatoria:
 
-1. **Risoluzione nello Scope Errato (`scope_id` anziché `parent_scope`)**:
-   La query per risolvere `BeforeAllCallback` veniva valutata passando come punto di partenza `scope_id` (la classe `KitchenSinkExtension` stessa!).
-   Poiché `evaluate_query_find` esegue una risalita lessicale (*lexical climbing*), per valutare `BeforeAllCallback` a partire da `KitchenSinkExtension`, invocava `find_symbol_in_scope_and_supers` sulla stessa `KitchenSinkExtension`!
-2. **Re-iterazione e Reset dei Visitati**:
-   Ad ogni chiamata annidata di `find_symbol_in_scope_and_supers`, veniva allocato un nuovo insieme `visited_scopes`.
-   La ricerca del primo super-tipo portava la funzione a scandire di nuovo le 21 interfacce per verificare se il simbolo fosse contenuto nel secondo super-tipo; quest'ultimo a sua volta rieseguiva la scansione per il terzo, e così via.
+- Ogni ricerca di simbolo in `KitchenSinkExtension` causava la rivalutazione da zero di tutti i 21 super-tipi non ancora risolti.
+- La valutazione di ogni interfaccia a partire dallo scope della classe risaliva lessicalmente re-invocando la ricerca sulla classe stessa, che a sua volta valutava le restanti 20 interfacce, ciascuna delle quali ne valutava 19, e così via.
+- Con un fattore di ramificazione $b = 20$ e una profondità $d = 21$, il numero di chiamate ricorsive generate era di ordine fattoriale:
+  $$\mathcal{O}(b!) \approx 20! \approx 2.43 \times 10^{18} \text{ operazioni}$$
+  rendendo il completamento impossibile (tempo stimato: decine di anni di CPU).
 
-**Analisi di Complessità**:
-Con un fattore di ramificazione $b = 20$ e una profondità di ricorsione $d = 21$, il numero di chiamate ricorsive generate era di ordine fattoriale/esponenziale:
-$$\mathcal{O}(b!) \approx 20! \approx 2.43 \times 10^{18} \text{ operazioni}$$
-Anche eseguendo 1 miliardo di controlli al secondo, la risoluzione di quella singola classe avrebbe richiesto **oltre 70 anni** di calcolo.
+#### L'Evoluzione della Soluzione: Dallo Scope Forzato alla Sentinella di Memoizzazione
 
-```
-PRIMA (Esplosione Combinatoria O(b!)):
-KitchenSinkExtension (eval query 1 in KitchenSinkExtension)
- └── KitchenSinkExtension (eval query 2 in KitchenSinkExtension)
-      └── KitchenSinkExtension (eval query 3 in KitchenSinkExtension)
-           └── ... (profondità 21, ramificazione 20) -> BLOCCO COMPLETO (~10^18 chiamate)
+Inizialmente si era ipotizzato di risolvere i super-tipi forzando la ricerca direttamente nel `parent_scope` (il package esterno). Tuttavia, questa forzatura causava una regressione sui tipi generici:
 
-DOPO (Risoluzione nel Parent Scope + Memoizzazione O(V + E)):
-KitchenSinkExtension
- ├── super_scopes non in cache?
- │    ├── parent_scope (package org.junit...): valuta BeforeAllCallback    -> ScopeId(101)  [O(1)]
- │    ├── parent_scope (package org.junit...): valuta BeforeEachCallback   -> ScopeId(102)  [O(1)]
- │    └── ... (21 valutazioni nel parent_scope, mai discendendo nel figlio)
- └── Salva in ctx.resolved_super_scopes -> [101, 102, ..., 121]             [Cached]
- Qualsiasi lookup successivo: accesso O(1) all'array precalcolato!
-```
+- In classi generiche come `class MyList<T> extends AbstractList<T>`, il tipo formale `T` è registrato **nello scope locale della classe**, non nel package genitore. Valutando solo in `parent_scope`, `T` non veniva trovato.
 
-#### Soluzione Implementata: Separazione degli Scope e Memoizzazione
-1. **Regola Semantica dello Scope del Super-Tipo**:
-   I nomi che compaiono nelle clausole `extends` e `implements` di una dichiarazione di classe appartengono lessicalmente allo **scope genitore** (`parent_scope`, ovvero il file o package contenitore), **mai** al corpo interno della classe stessa.
-   Valutando le query con:
-   ```rust
-   let parent_scope = ctx.tree.arena[scope_id].parent.unwrap_or(ctx.tree.root);
-   ```
-   la risalita lessicale si muove unicamente verso l'esterno/radice, senza mai rientrare nella classe figlia.
-2. **Memoizzazione degli Scope Ereditati (`resolved_super_scopes`)**:
-   In `ExecutorContext` è stato introdotto un container con *interior mutability*:
+La soluzione definitiva e corretta si basa su tre pilastri:
+
+1. **Memoizzazione degli Scope Ereditati (`resolved_super_scopes`)**:
+   In `ExecutorContext` è stato introdotto un contenitore con *interior mutability*:
+
    ```rust
    pub struct ExecutorContext<'a> {
        pub tree: &'a ScopeTree,
@@ -236,16 +237,74 @@ KitchenSinkExtension
        pub resolved_super_scopes: RefCell<HashMap<ScopeId, Vec<ScopeId>>>,
    }
    ```
-3. **Funzione Dedicata `get_or_resolve_super_scopes`**:
-   - Se `scope_id` è già presente nella cache, restituisce immediatamente il `Vec<ScopeId>` in $O(1)$.
-   - Per neutralizzare a monte eventuali grafi di ereditarietà ciclica, inserisce immediatamente una entry vuota nella cache:
-     ```rust
-     ctx.resolved_super_scopes.borrow_mut().insert(scope_id, Vec::new());
-     ```
-   - Risolve ciascun `super_type` (inclusi i generici con parametrizzazione) nel contesto di `parent_scope`.
-   - Popola la cache definitiva con i `ScopeId` univoci trovati.
-4. **Ispezione Lineare e Visita dei Grafi**:
-   `find_symbol_in_scope_and_supers_internal` scorre i `ScopeId` già risolti senza più effettuare alcuna valutazione di query algebriche. Un set `visited_scopes` locale al lookup garantisce che l'esplorazione di strutture a diamante visiti ciascun'interfaccia antenata al più una volta sola ($O(V + E)$).
+
+2. **Pre-allocazione della Sentinella Vuota (`[]`)**:
+   Prima di avviare la risoluzione delle super-classi di uno `scope_id`, la funzione `get_or_resolve_super_scopes` inserisce un vettore vuoto provvisorio nella cache:
+
+   ```rust
+   ctx.resolved_super_scopes.borrow_mut().insert(scope_id, Vec::new());
+   ```
+
+   **Perché questo risolve sia l'esplosione combinatoria sia i generici?**
+   - La valutazione delle super-classi parte da `scope_id`, consentendo a parametri come `T` di essere risolti nello scope locale.
+   - Quando la risalita lessicale del nome della classe base (es. `BeforeAllCallback`) interroga `find_symbol_in_scope_and_supers(scope_id)`, quest'ultima chiama `get_or_resolve_super_scopes(scope_id)`.
+   - `get_or_resolve_super_scopes` trova subito la sentinella `Vec::new()` già presente in cache e termina in $\mathcal{O}(1)$ senza riesplorare le super-classi!
+   - Di conseguenza, la risalita lessicale prosegue istantaneamente verso il `parent_scope` (il package o namespace contenitore), trovando l'interfaccia senza ricorsione.
+3. **Disaccoppiamento con `fresh_visited`**:
+   `get_or_resolve_super_scopes` non riceve più il set `visited` della query del chiamante (che tracciava un metodo/campo specifico), ma utilizza un autonomo `let mut fresh_visited = HashSet::new();`. Questo previene qualsiasi inquinamento della cronologia dello stack e impedisce falsi blocchi di ciclo.
+
+---
+
+### 2.5 Problema 5: Type Shadowing Causato da Costruttori e Distruttori nello ScopeTree
+
+#### Sintomo
+
+Nei benchmark C++, 4 archi di dipendenza di ereditarietà risultavano mancanti. In particolare, quando una sottoclasse tentava di ereditare dalla classe base `Vehicle`, l'arco `Car -> Vehicle` non veniva formato e le invocazioni dei metodi ereditati fallivano.
+
+#### Causa Radice
+
+Durante la costruzione dello `ScopeTree`, per ogni metodo di una classe veniva eseguito:
+
+```rust
+self.define_symbol(class_scope, m_name, Symbol::Value(return_type));
+```
+
+In C++, il costruttore ha lo stesso nome della classe (`Vehicle`). Registrandolo come `Symbol::Value` dentro `Vehicle.symbols["Vehicle"]`, accadeva che:
+
+1. Quando la sottoclasse `Car` cercava la propria classe base `Vehicle`, la ricerca lessicale trovava il simbolo valore del costruttore (`Symbol::Value`) dentro la classe base prima di salire al namespace genitore `Transport`.
+2. Il risolutore interpretava il tipo come `Transport.Vehicle.Vehicle` anziché `Transport.Vehicle`.
+3. Trattandosi di un valore/metodo e non di un tipo strutturato (`Symbol::Type`), la risoluzione della classe base falliva.
+
+#### Soluzione Implementata
+
+Nei linguaggi orientati agli oggetti, i costruttori e distruttori **non sono membri di istanza ordinari** invocabili con dot-notation (`obj.Vehicle()` è illegale) e **non vengono ereditati** come metodi virtuali dalle sottoclassi.
+In `src/resolver/scope.rs`:
+
+```rust
+if !method.is_constructor && m_name != name && !m_name.starts_with('~') {
+    self.define_symbol(
+        class_scope,
+        m_name,
+        Symbol::Value(method.signature.return_type.clone()),
+    );
+}
+```
+
+**Importante**: I costruttori e distruttori vengono comunque registrati tramite `self.register_function(...)`. Mantengono il proprio scope, i tipi dei parametri (`UsesParamType`) e l'intero corpo viene analizzato (`Calls`, `AccessesField`, `Instantiates`), venendo emessi fedelmente nel grafo finale con archi `NestedIn`.
+
+---
+
+### 2.6 Problema 6: Estrazione dei Distruttori C++ (`~Class`)
+
+#### Causa del Problema
+
+1. `is_function` in `classifiers.rs` non contemplava il tipo `destructor`, ignorando i nodi `destructor_definition` di Tree-sitter.
+2. In `extract_identifier_from_declarator` (`text_parsing.rs`), l'estrazione dell'identificatore scendeva fino al nodo terminale `identifier`, estraendo il nome senza tilde (`"Server"` anziché `"~Server"`), provocando una collisione tra distruttore e costruttore.
+
+#### Soluzione Implementata
+
+- In `is_function` aggiunto `|| kind.contains("destructor")`.
+- In `extract_identifier_from_declarator` aggiunto `"destructor_name"` tra i tipi di identificatore terminale accettati. Ora i distruttori mantengono il prefisso `~` e compaiono nel grafo come entità distinte.
 
 ---
 
@@ -257,69 +316,67 @@ Questa sezione fornisce la mappatura puntuale delle modifiche rispetto ai capito
 
 ### 3.1 Allineamento Capitolo 5 (`5_analysis_process.tex`) e Capitolo 6 (`6_extraction.tex`)
 
-#### Sezione di Riferimento: Creazione dei Moduli e Mapping del File System
-- **File Tesi**: `chapters/5_analysis_process.tex` (Sezione Pipeline Overview) e `chapters/6_extraction.tex` (Sezione Moduli e Packaging).
+#### 1. Creazione dei Moduli e File Vacui (Capitolo 5 & 6)
+
 - **Aspetto da Aggiornare**:
-  Nella descrizione del mapping topologico tra il file system reale e la gerarchia di `Module` (strategie `Directory` e `Package`), è necessario documentare esplicitamente l'invariante di **gestione dei file vuoti o vacui**:
-  > *Nota per la Tesi*: In linguaggi modulari (in particolare Python con i file marker `__init__.py`, ma anche file di pure costanti o commenti in C/Java), la fase di estrazione sintattica può produrre una sequenza vuota di dichiarazioni ($\vec{\mathcal{M}} = \emptyset$). La pipeline non assume la presenza garantita di un modulo radice per ogni path analizzato. L'omissione di nodi vacui preserva la compattezza dello Scope Tree globale senza alterare le regole di visibilità degli import.
+  Nella descrizione del mapping topologico tra il file system reale e la gerarchia di `Module` (strategie `Directory` e `Package`), documentare l'invariante di gestione dei file vuoti:
+  > *Invariante di Vacuità*: Nei linguaggi con package markers (come i file `__init__.py` di Python o file composti esclusivamente da commenti/direttive), l'estrazione sintattica può produrre $\vec{\mathcal{M}} = \emptyset$. Il motore di aggregazione non assume l'esistenza a priori di un modulo radice per ogni path, preservando la compattezza dello ScopeTree ed evitando accessi out-of-bounds.
+
+#### 2. Modellazione Semantica di Costruttori e Distruttori (Capitolo 6)
+
+- **Aspetto da Aggiornare**:
+  Chiarire la distinzione tra membri di istanza e costruttori/distruttori:
+  > *Distinzione Semantica nello Scope*: Costruttori e distruttori non appartengono al dizionario di lookup dinamico dei membri ($\text{symbols}(\Sigma_C)$) per evitare lo shadowing del tipo nominale della classe durante le risalite di ereditarietà. Essi sono invece collegati topologicamente alla classe tramite archi strutturali $\texttt{NestedIn}$, mantenendo intatta l'analisi intra-procedurale dei parametri ($\texttt{UsesParamType}$) e delle invocazioni interne ($\texttt{Calls}$).
 
 ---
 
 ### 3.2 Allineamento Capitolo 7 (`7_name_resolution.tex`)
 
-Il Capitolo 7 è il cuore teorico e implementativo interessato da queste modifiche. Di seguito le sezioni specifiche da integrare.
-
 #### 1. Sezione 7.4.1: The Execution Context ($\Gamma$)
-- **Stato Attuale nella Tesi**:
-  Il testo attuale (righe 478-485) recita:
-  $$\Gamma = \langle \mathcal{E}, \mathcal{P}, \mathcal{K} \rangle$$
-  definendo $\Gamma$ come un contesto *strettamente immutabile*.
+
 - **Aggiornamento Consigliato**:
-  È opportuno arricchire la formalizzazione includendo lo stato di memoizzazione:
+  Arricchire la formalizzazione includendo la componente di memoizzazione:
   $$\Gamma = \langle \mathcal{E}, \mathcal{P}, \mathcal{K}, \mathcal{M} \rangle$$
   dove $\mathcal{M} : \Sigma \to 2^{\Sigma}$ rappresenta la mappa di memoizzazione dei super-scope risolti.
-  > *Spiegazione Teorica per la Tesi*:  
-  > Sebbene $\mathcal{M}$ sia implementato tramite *interior mutability* (`RefCell<HashMap<ScopeId, Vec<ScopeId>>>`) per motivi di efficienza runtime in Rust, la funzione di risoluzione rimane **referenzialmente trasparente** e **idempotente**.  
-  > Poiché la struttura dell'albero $\mathcal{E}$ e le definizioni dei simboli sono congelate al termine della fase $\rho_{\text{build}}$, il calcolo degli antenati di uno scope $\Sigma$ produce un insieme immutabile e deterministico di identificatori $\vec{\Sigma}_{\text{supers}}$. L'aggiornamento di $\mathcal{M}$ costituisce una pura ottimizzazione algoritmica (*lazy evaluation with memoization*) che non introduce effetti collaterali osservabili né dipende dall'ordine di visita delle compilation unit.
+  > *Trasparenza Referenziale*:  
+  > Sebbene $\mathcal{M}$ sia implementato tramite *interior mutability* (`RefCell<HashMap<ScopeId, Vec<ScopeId>>>`) per motivi di efficienza runtime in Rust, la funzione di risoluzione rimane **referenzialmente trasparente** e **idempotente**. Poiché la struttura dell'albero $\mathcal{E}$ è congelata dopo la fase $\rho_{\text{build}}$, il calcolo degli antenati di uno scope produce un insieme immutabile e deterministico di identificatori $\vec{\Sigma}_{\text{supers}}$, privo di effetti collaterali sull'ordine di valutazione delle compilation units.
 
 #### 2. Sezione 7.4.2: Lexical Scope Climbing e Chiavi di Visita
-- **Stato Attuale nella Tesi**:
-  Viene menzionato genericamente l'uso di un insieme `visited` per prevenire cicli.
+
 - **Aggiornamento Consigliato**:
-  Specificare la formalizzazione della chiave di disambiguazione della query.
-  La valutazione di una query $q \in \mathcal{Q}$ a partire da uno scope $\Sigma$ definisce la transizione di visita:
+  Formalizzare la chiave di disambiguazione delle query sensibile allo scope:
   $$k_{\text{query}} = \langle \Sigma, \text{base}(q) \rangle \in \Sigma \times \mathcal{I}$$
-  > *Motivazione Teorica*:  
-  > L'indicizzazione unicamente basata sul nome del simbolo $\text{base}(q)$ collassava erroneamente la ricerca di membri omonimi in classi disgiunte. L'inclusione di $\Sigma$ garantisce la correttezza del principio di *lexical shadowing* e consente di identificare con precisione cicli di auto-assegnazione (es. $x = x[k]$) senza compromettere la risoluzione di variabili omonime in altri contesti.
+  L'inclusione di $\Sigma$ garantisce la correttezza del principio di *lexical shadowing* e consente di identificare cicli di auto-assegnazione (es. $x = x[k]$) senza bloccare simboli omonimi presenti in altri contesti.
 
 #### 3. Sezione 7.4.4: Member Extraction and Inheritance Resolution
-- **Stato Attuale nella Tesi**:
-  Le righe 559-579 descrivono l'algoritmo di visita dei super-tipi.
+
 - **Aggiornamento Consigliato**:
-  Sostituire la formulazione precedente con la distinzione formale dello scope di risoluzione del super-tipo e l'algoritmo memoizzato a due stadi:
-  1. **Regola di Scope Disjointness per Super-Tipi**:
-     Sia $C$ una classe con scope $\Sigma_C$, e sia $\tau_{\text{super}} \in \text{supers}(C)$ una clausola di derivazione (`extends` o `implements`). La valutazione del tipo $\tau_{\text{super}}$ è definita sullo scope genitore:
-     $$\text{resolve}(\tau_{\text{super}}, \text{parent}(\Sigma_C)) \quad \text{con } \text{parent}(\Sigma_C) \neq \Sigma_C$$
-     Questo assioma impedisce che le dichiarazioni interne della classe figlia interferiscano o inneschino risalite lessicali spurie durante la determinazione della sua stessa classe base.
-  2. **Complessità Algoritmica**:
-     - *Senza memoizzazione e con scope errato*: la risoluzione nel corpo della classe genera un albero di ricorsione con fattore di ramificazione $b = |\text{supers}(C)|$ e profondità $d = |\text{supers}(C)|$, conducendo a una complessità combinatoria di $\mathcal{O}(b!)$ o $\mathcal{O}(b^d)$.
-     - *Con memoizzazione e risoluzione in parent*: il calcolo dei super-scope per ciascun tipo strutturato richiede al più $\mathcal{O}(b)$ interrogazioni all'avvio. Una volta popolata la cache, la ricerca dei membri su gerarchie ad ereditarietà multipla si riduce a una visita in profondità (DFS) lineare sul grafo orientato aciclico (DAG) delle classi:
+  Sostituire la precedente formulazione descrivendo la risoluzione basata su sentinella:
+  1. **Risoluzione con Sentinella dei Super-Tipi**:
+     Per risolvere i super-tipi di una classe $C$ con scope $\Sigma_C$, la valutazione delle clausole di derivazione ($\tau_{\text{super}} \in \text{supers}(C)$) inizia all'interno dello scope locale $\Sigma_C$. Questo consente l'immediato binding dei parametri di tipo generici formali ($T \in \text{type\_params}(C)$).
+  2. **Prevenzione della Ricorsione tramite Sentinella**:
+     La divergenza viene prevenuta inizializzando la tabella di memoizzazione con una sentinella vuota prima della scansione ricorsiva:
+     $$\mathcal{M}(\Sigma_C) \leftarrow \emptyset$$
+     Qualsiasi invocazione rientrante a $\texttt{find\_symbol\_in\_scope\_and\_supers}(\Sigma_C)$ durante la valutazione delle classi base trova immediatamente l'insieme vuoto, collassando a costo $\mathcal{O}(1)$ e consentendo alla risalita lessicale di procedere naturalmente verso $\text{parent}(\Sigma_C)$.
+  3. **Complessità Algoritmica**:
+     - *Senza memoizzazione*: complessità combinatoria esponenziale $\mathcal{O}(b!)$ con $b = |\text{supers}(C)|$ (es. $20! \approx 2.4 \times 10^{18}$ operazioni in presenze di implementazioni multiple estensive).
+     - *Con memoizzazione a sentinella*: la ricerca dei membri si riduce a una visita in profondità (DFS) lineare sul DAG delle classi antenate:
        $$\mathcal{O}(|V_{\text{supers}}| + |E_{\text{supers}}|)$$
-     garantendo la scalabilità anche su pattern architetturali estremi (come l'aggregazione di 20+ interfacce in pattern Extension/Plugin).
+     abbattendo il tempo di calcolo su classi complesse da decine di anni a meno di un millisecondo.
 
 #### 4. Sezione 7.4.5: Transitive Import Resolution
-- **Stato Attuale nella Tesi**:
-  Descrizione qualitativa dei re-export.
-- **Aggiornamento Consigliato**:
-  Aggiungere le condizioni di non-divergenza per gli import a stella (`*`):
-  > *Precisazione per la Tesi*:  
-  > Nel risolvere $\text{Extract}(M, \iota)$ attraverso re-export wildcard, il resolver mappa formalmente la richiesta nel cammino esteso $\pi = M \mathbin{\Vert} \langle \iota \rangle$, escludendo il token metalinguistico `*` dalla stringa di ricerca.  
-  > La mutua ricorsione tra $\texttt{find\_global}(\pi)$ e $\texttt{resolve\_via\_transitive\_imports}(M, \iota)$ è rigorosamente troncata tramite due set di terminazione:
-  > - $V_{\text{global}} \subseteq \mathcal{P}(\mathcal{I}^*)$: traccia le sequenze di identificatori globali già in corso di espansione;
-  > - $V_{\text{trans}} \subseteq \Sigma \times \mathcal{I}$: traccia le coppie $\langle \text{modulo}, \text{membro} \rangle$ già interrogate nella catena di delega.
 
-#### 5. Nuova Sottosezione Proposta: "Termination and Convergence Guarantees" (Sezione 7.6)
-Si consiglia di inserire un breve paragrafo formale al termine del Capitolo 7 che riassuma le garanzie di convergenza del sistema:
+- **Aggiornamento Consigliato**:
+  Specificare le condizioni di non-divergenza per i re-export wildcard:
+  - Espansione rigorosa del cammino $\pi = M \mathbin{\Vert} \langle \iota \rangle$ con eliminazione del token `*`;
+  - Mutua ricorsione tra $\texttt{find\_global}$ e $\texttt{resolve\_via\_transitive\_imports}$ interrotta da insiemi di visita dedicati:
+    - $V_{\text{global}} \subseteq \mathcal{P}(\mathcal{I}^*)$ per i cammini globali;
+    - $V_{\text{trans}} \subseteq \Sigma \times \mathcal{I}$ per le coppie modulo-membro.
+
+#### 5. Sezione 7.6 (Nuova Proposta): "Termination and Convergence Guarantees"
+
+Testo LaTeX pronto per l'inserimento alla fine del Capitolo 7:
+
 ```latex
 \section{Termination and Convergence Guarantees}
 \label{sec:resolution_termination}
@@ -336,7 +393,7 @@ For any finite workspace module set $\vec{\mathcal{M}}$ and any query $q \in \ma
 The state space of resolution is bounded by the finite size of the Scope Tree: $|\mathcal{E}| = N < \infty$ scopes and $|\text{Sym}| = S < \infty$ distinct symbols. Potential divergence is restricted to three recursive structures, each governed by an explicit cycle guard:
 \begin{enumerate}
   \item \textbf{Lexical Climbing}: Lexical climbing is strictly monotonic with respect to scope depth: $\text{depth}(\text{parent}(\Sigma)) = \text{depth}(\Sigma) - 1$. Since the tree has finite depth and terminates at the unique root scope $\Sigma_{\text{root}}$ (where $\text{parent}(\Sigma_{\text{root}}) = \text{None}$), climbing terminates in at most $\text{depth}(\Sigma)$ iterations.
-  \item \textbf{Inheritance Traversal}: Super-scope resolution is memoized in $\mathcal{M}$. Circular derivation ($A \extends B \extends A$) is broken upon re-entry by initializing $\mathcal{M}(\Sigma) = \emptyset$ prior to recursive descent. Graph traversal over resolved super-scopes is protected by the scope set $V_{\text{scopes}} \subseteq \Sigma$, ensuring that each ancestor scope is visited at most once ($|V_{\text{scopes}}| \le N$).
+  \item \textbf{Inheritance Traversal}: Super-scope resolution is memoized in $\mathcal{M}$. Circular derivation ($A \extends B \extends A$) and re-entrant expansion are broken upon entry by initializing $\mathcal{M}(\Sigma) = \emptyset$ prior to recursive descent. Graph traversal over resolved super-scopes is protected by the scope set $V_{\text{scopes}} \subseteq \Sigma$, ensuring that each ancestor scope is visited at most once ($|V_{\text{scopes}}| \le N$).
   \item \textbf{Transitive and Alias Recursion}: Re-export chains and nested type assignments are indexed by composite keys $\langle \Sigma, \iota \rangle \in \Sigma \times \mathcal{I}$. Because the set of distinct symbols across the workspace is finite, the visited set $V_{\text{visited}}$ monotonically increases until either a terminal type reference is produced or the cycle is detected, yielding $\texttt{None}$ or $\texttt{TypeRef::Failed}$.
 \end{enumerate}
 Therefore, every execution branch either converges to a resolved reference or encounters a visited guard within finite steps, establishing termination.
@@ -347,45 +404,43 @@ Therefore, every execution branch either converges to a resolved reference or en
 
 ### 3.3 Allineamento Capitolo 9 (`9_evaluation_results.tex`)
 
-I risultati ottenuti su ANTLR4, JUnit 5 e Fastjson rappresentano una validazione quantitativa cruciale per la tesi, dimostrando che OmniDeps è in grado di gestire repository di livello industriale senza degradazione delle prestazioni.
+I risultati ottenuti su ANTLR4, JUnit 5, Fastjson e sulla suite di benchmark multi-linguaggio validano empiricamente la scalabilità lineare di OmniDeps:
 
 #### Tabella dei Risultati Empirici dei Benchmark Enterprise
 
-Inserire nel Capitolo 9 la tabella di sintesi delle metriche estratte dai repository reali:
-
 | Repository Target | Linguaggio Principale | Moduli Analizzati | Tipi Strutturati | Funzioni Libere | Riferimenti Risolti | Riferimenti Esterni / Non Risolti | Tempo di Esecuzione (Release) |
-|---|---|---|---|---|---|---|---|
-| **JUnit 5** | Java | 9.411 | 4.034 | 430 | 21.656 | 42.319 | **~8 s** |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| **JUnit 5** | Java | 9.622 | 4.102 | 436 | 21.967 | 42.151 | **5.79 s** |
 | **Fastjson** | Java | 19.188 | 6.302 | 0 | 21.179 | 44.517 | **~15 s** |
-| **ANTLR4** (completo) | Java / Python | 4.237 | 1.280 | 613 | 15.766 | 11.685 | **~5 s** |
+| **ANTLR4** (completo) | Java / Python | 4.237 | 1.280 | 613 | 15.834 | 11.299 | **4.8 s** |
 | **ANTLR4 Runtime** | Java / Python | 2.053 | 709 | 601 | 2.549 | 10.348 | **~3 s** |
 | **JUnit 4** | Java | 2.131 | 1.359 | 0 | 3.880 | 7.463 | **~2 s** |
 
-#### Punti di Discussione da Enfatizzare nel Testo della Tesi:
-1. **Throughput di Risoluzione**:
-   Su JUnit 5 e Fastjson, l'analizzatore raggiunge un throughput compreso tra **1.000 e 1.300 moduli al secondo**, confermando che l'approccio *Two-Phase Name Resolution* (separazione tra sostituzione lessicale intra-procedurale ed esecuzione topologica globale) mantiene un overhead computazionale trascurabile rispetto al costo di parsing Tree-sitter.
-2. **Eliminazione dei Falsi Blocchi**:
-   Senza le ottimizzazioni di memoizzazione e separazione degli scope descritte, l'analisi di JUnit 5 risultava intrattabile ($> 10^{18}$ operazioni su `KitchenSinkExtension`). Con la linearizzazione introdotta, il tempo dedicato a quella specifica classe è passato da non misurabile ($\infty$) a **meno di 1 millisecondo**.
-3. **Accuratezza e Classificazione delle Dipendenze Esterne**:
-   Il rapporto tra riferimenti risolti e sconosciuti riflette fedelmente la natura di progetti di libreria che consumano intensamente le Java Standard Library (es. `java.util.*`, `java.lang.reflect.*`, non incluse nel workspace di analisi). Tali riferimenti vengono correttamente etichettati come `External`, prevenendo archi spuri nel grafo finale.
+#### Risultati della Benchmark Suite Standardizzata (`tests/benchmarks/`)
+
+| Linguaggio | Nodi Attesi / Trovati | Archi Attesi / Trovati | Conformità Globale |
+| --- | --- | --- | --- |
+| **C** | 49 / 49 | 43 / 43 | **100%** |
+| **C++** | 50 / 50 | 44 / 44 | **100%** |
+| **Java** | N/A (archi-based) | 46 / 46 | **100%** |
+| **Rust** | 56 / 56 | 84 / 84 | **100%** |
+| **Python** | 57 / 57 | 58 / 58 | **100%** |
 
 ---
 
 ## 4. Riepilogo dei File Modificati nel Repository
 
-A futura memoria e per facilitare la tracciabilità nei commit e nelle appendici della tesi:
-
 - [`src/analyzer.rs`](file:///Users/ferra/Developing/tesi-magistrale/omnideps/src/analyzer.rs):
   - Aggiunto guard check per vettori vuoti in `apply_directory_strategy`.
 - [`src/resolver/executor.rs`](file:///Users/ferra/Developing/tesi-magistrale/omnideps/src/resolver/executor.rs):
   - Aggiunto `resolved_super_scopes: RefCell<HashMap<ScopeId, Vec<ScopeId>>>` in `ExecutorContext`.
-  - Implementata la funzione memoizzata `get_or_resolve_super_scopes` che valuta le derivazioni in `parent_scope`.
-  - Refactoring di `find_symbol_in_scope_and_supers_internal` per scorrere i `ScopeId` precalcolati.
+  - Implementata la funzione memoizzata `get_or_resolve_super_scopes` con sentinella iniziale `Vec::new()` e `fresh_visited` autonomo.
+  - Risoluzione dei super-tipi a partire da `scope_id` per garantire il binding dei type parameters generici.
   - Implementata `evaluate_typeref_inner` con propagazione referenziale del set `visited`.
   - Normalizzato il trattamento dei wildcard `*` ed introdotte le guardie `global:{path}` e `trans:{scope_id}:{member}` in `find_global_internal` e `resolve_via_transitive_imports`.
+- [`src/resolver/scope.rs`](file:///Users/ferra/Developing/tesi-magistrale/omnideps/src/resolver/scope.rs):
+  - Esclusi costruttori e distruttori da `class_scope.symbols` per eliminare lo shadowing del tipo nominale nelle classi base C++.
+- [`src/heuristics/classifiers.rs`](file:///Users/ferra/Developing/tesi-magistrale/omnideps/src/heuristics/classifiers.rs) e [`src/heuristics/text_parsing.rs`](file:///Users/ferra/Developing/tesi-magistrale/omnideps/src/heuristics/text_parsing.rs):
+  - Riconoscimento del tipo `destructor` e conservazione del prefisso `~` (`destructor_name`).
 - [`tests/generics_test.rs`](file:///Users/ferra/Developing/tesi-magistrale/omnideps/tests/generics_test.rs):
-  - Aggiunti test di regressione dedicati:
-    - `test_python_empty_file`
-    - `test_python_self_referential_assignment`
-    - `test_python_wildcard_import_cycle`
-    - `test_java_multiple_interfaces_resolution`
+  - Aggiunti test di regressione dedicati per file vuoti, alias ciclici, import a stella, classi multi-interfaccia, costruttori e distruttori.

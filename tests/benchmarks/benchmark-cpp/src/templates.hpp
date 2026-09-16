@@ -1,5 +1,5 @@
-#ifndef UNTESTED_FEATURES_HPP
-#define UNTESTED_FEATURES_HPP
+#ifndef TEMPLATES_HPP
+#define TEMPLATES_HPP
 
 #include "Car.h"
 #include <vector>
@@ -28,17 +28,7 @@ public:
     KeyValue<int, Transport::Car> indexed_car;
 };
 
+void use_box(Box& b);
 void inspect_car_box(Box<Transport::Car>& b);
-
-// 2. Namespaces
-namespace MathLib {
-    class Calculator {
-    public:
-        int add(int a, int b);
-    };
-}
-
-// 3. Macros
-#define MULTIPLY(a, b) ((a) * (b))
 
 #endif
