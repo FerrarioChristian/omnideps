@@ -60,6 +60,7 @@ fn extract_identifier_from_declarator(mut decl: Node, source: &str) -> Option<St
                             | "type_identifier"
                             | "scoped_identifier"
                             | "qualified_identifier"
+                            | "destructor_name"
                     )
             })
         })
@@ -74,6 +75,7 @@ fn extract_identifier_from_declarator(mut decl: Node, source: &str) -> Option<St
                 | "type_identifier"
                 | "scoped_identifier"
                 | "qualified_identifier"
+                | "destructor_name"
         ) {
             break;
         }

@@ -234,11 +234,13 @@ impl ScopeTree {
         
         for method in &st.methods {
             let m_name = method.name.last().cloned().unwrap_or_default();
-            self.define_symbol(
-                class_scope,
-                m_name,
-                Symbol::Value(method.signature.return_type.clone()),
-            );
+            if !method.is_constructor && m_name != name && !m_name.starts_with('~') {
+                self.define_symbol(
+                    class_scope,
+                    m_name,
+                    Symbol::Value(method.signature.return_type.clone()),
+                );
+            }
             self.register_function(method, class_scope, config, lang, Some(type_ref.clone()));
         }
 
@@ -317,11 +319,13 @@ impl ScopeTree {
 
         for method in &ib.methods {
             let m_name = method.name.last().cloned().unwrap_or_default();
-            self.define_symbol(
-                class_scope,
-                m_name,
-                Symbol::Value(method.signature.return_type.clone()),
-            );
+            if !method.is_constructor && m_name != target_name && !m_name.starts_with('~') {
+                self.define_symbol(
+                    class_scope,
+                    m_name,
+                    Symbol::Value(method.signature.return_type.clone()),
+                );
+            }
             self.register_function(method, class_scope, config, lang, Some(ib.impl_for.clone()));
         }
 

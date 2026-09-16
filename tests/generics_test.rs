@@ -494,3 +494,49 @@ fn test_java_multiple_interfaces_resolution() {
     );
 }
 
+#[test]
+fn test_constructor_and_destructor_dependencies() {
+    let code = r#"
+        class Config {};
+        class Logger {
+        public:
+            void log();
+        };
+
+        class Server {
+        private:
+            Logger logger;
+        public:
+            Server(Config c) {
+                logger.log();
+            }
+            ~Server() {
+                logger.log();
+            }
+        };
+    "#;
+
+    let graph = analyze_snippet(SupportedLanguage::Cpp, code, "Server.cpp");
+    assert!(
+        has_edge(&graph, &["Server"], &["Server", "Server"], DependencyEdgeKind::NestedIn),
+        "Expected Server -> Server.Server (NestedIn)"
+    );
+    assert!(
+        has_edge(&graph, &["Server", "Server"], &["Config"], DependencyEdgeKind::UsesParamType),
+        "Expected Server.Server -> Config (UsesParamType)"
+    );
+    assert!(
+        has_edge(&graph, &["Server", "Server"], &["Logger", "log"], DependencyEdgeKind::Calls),
+        "Expected Server.Server -> Logger.log (Calls)"
+    );
+    assert!(
+        has_edge(&graph, &["Server"], &["Server", "~Server"], DependencyEdgeKind::NestedIn),
+        "Expected Server -> Server.~Server (NestedIn)"
+    );
+    assert!(
+        has_edge(&graph, &["Server", "~Server"], &["Logger", "log"], DependencyEdgeKind::Calls),
+        "Expected Server.~Server -> Logger.log (Calls)"
+    );
+}
+
+
