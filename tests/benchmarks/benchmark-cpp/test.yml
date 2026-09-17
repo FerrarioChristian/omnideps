@@ -9,8 +9,10 @@ files:
 - src/Fleet.h
 - src/Fleet.cpp
 - src/annotations.cpp
-- src/untested_features.hpp
-- src/untested_features.cpp
+- src/templates.hpp
+- src/templates.cpp
+- src/namespaces_and_macros.hpp
+- src/namespaces_and_macros.cpp
 nodes:
 - name: Transport
   kind: namespace
@@ -86,6 +88,22 @@ nodes:
   kind: field
 - name: Box.getValue
   kind: method
+- name: KeyValue
+  kind: class
+- name: KeyValue.key
+  kind: field
+- name: KeyValue.value
+  kind: field
+- name: CarStorage
+  kind: class
+- name: CarStorage.single_car
+  kind: field
+- name: CarStorage.history
+  kind: field
+- name: CarStorage.indexed_car
+  kind: field
+- name: inspect_car_box
+  kind: function
 - name: MathLib.Calculator
   kind: class
 - name: MathLib.Calculator.add
@@ -242,3 +260,36 @@ edges:
   source: use_math
   sink: MULTIPLY
   kind: calls
+- testid: CPP-GEN-1
+  source: CarStorage.single_car
+  sink: Box
+  kind: uses_type
+- testid: CPP-GEN-2
+  source: CarStorage.single_car
+  sink: Transport.Car
+  kind: uses_type
+- testid: CPP-GEN-3
+  source: CarStorage.history
+  sink: Transport.Car
+  kind: uses_type
+- testid: CPP-GEN-4
+  source: CarStorage.indexed_car
+  sink: KeyValue
+  kind: uses_type
+- testid: CPP-GEN-5
+  source: CarStorage.indexed_car
+  sink: Transport.Car
+  kind: uses_type
+- testid: CPP-GEN-6
+  source: inspect_car_box
+  sink: Box
+  kind: uses_param_type
+- testid: CPP-GEN-7
+  source: inspect_car_box
+  sink: Transport.Car
+  kind: uses_param_type
+- testid: CPP-GEN-8
+  source: inspect_car_box
+  sink: Transport.Car.displayInfo
+  kind: calls
+

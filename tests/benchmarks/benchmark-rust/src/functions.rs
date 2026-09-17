@@ -61,3 +61,20 @@ pub fn function_with_inherited_trait_methods<T: TraitB>(tb: T) {
   let sb = StructB {x: sa.clone(), y: EnumA::FIRST};
   tb.new_trait_method(&sb);
 }
+
+pub fn function_with_nested_generics(data: Vec<Option<StructA>>) {
+  for item in data {
+    if let Some(sa) = item {
+      println!("{}", sa.x);
+    }
+  }
+}
+
+pub fn function_with_where_clause<T>(item: T)
+where
+  T: TraitA,
+{
+  let sa: StructA = StructA::static_method();
+  item.trait_method(&sa);
+}
+

@@ -37,4 +37,15 @@ pub enum TypeRef {
     /// Tracks an access to a variable and its resolved type (used for preserving dependency paths).
     /// First element is the accessed path, second is its resolved type.
     EvaluatedAccess(Box<TypeRef>, Box<TypeRef>),
+    /// A generic type application: base container/class and its type arguments.
+    Generic {
+        base: Box<TypeRef>,
+        args: Vec<TypeRef>,
+    },
+    /// A generic type variable / parameter, with optional bounds.
+    TypeVar {
+        name: String,
+        bounds: Vec<TypeRef>,
+    },
 }
+

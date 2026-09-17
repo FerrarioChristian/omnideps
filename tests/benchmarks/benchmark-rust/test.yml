@@ -56,6 +56,22 @@ nodes:
   kind: method
 - name: structs.StructC.deref
   kind: method
+- name: structs.Container
+  kind: struct
+- name: structs.Container.item
+  kind: field
+- name: structs.Pair
+  kind: struct
+- name: structs.Pair.first
+  kind: field
+- name: structs.Pair.second
+  kind: field
+- name: structs.Warehouse
+  kind: struct
+- name: structs.Warehouse.entry
+  kind: field
+- name: structs.Warehouse.pair
+  kind: field
 - name: traits.TraitA
   kind: trait
 - name: traits.TraitA.trait_method
@@ -85,6 +101,10 @@ nodes:
 - name: functions.MyAlias
   kind: class
 - name: functions.function_with_inherited_trait_methods
+  kind: method
+- name: functions.function_with_nested_generics
+  kind: method
+- name: functions.function_with_where_clause
   kind: method
 - name: functions.STATIC_SA
   kind: field
@@ -400,3 +420,41 @@ edges:
   source: "annotations.my_func"
   sink: "inline"
   kind: "annotated_with"
+
+- testid: RS-GEN-1
+  source: structs.Warehouse.entry
+  sink: structs.Container
+  kind: uses_type
+- testid: RS-GEN-2
+  source: structs.Warehouse.entry
+  sink: structs.StructA
+  kind: uses_type
+- testid: RS-GEN-3
+  source: structs.Warehouse.pair
+  sink: structs.Pair
+  kind: uses_type
+- testid: RS-GEN-4
+  source: structs.Warehouse.pair
+  sink: structs.StructA
+  kind: uses_type
+- testid: RS-GEN-5
+  source: structs.Warehouse.pair
+  sink: enums.EnumA
+  kind: uses_type
+- testid: RS-GEN-6
+  source: functions.function_with_nested_generics
+  sink: structs.StructA
+  kind: uses_type
+- testid: RS-GEN-7
+  source: functions.function_with_where_clause
+  sink: traits.TraitA
+  kind: uses_type
+- testid: RS-GEN-8
+  source: functions.function_with_where_clause
+  sink: traits.TraitA.trait_method
+  kind: method_invocation
+- testid: RS-GEN-9
+  source: functions.function_with_where_clause
+  sink: structs.StructA.static_method
+  kind: method_invocation
+

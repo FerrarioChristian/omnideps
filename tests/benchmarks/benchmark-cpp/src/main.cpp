@@ -8,6 +8,7 @@ using namespace automotive;
 
 int main() {
     Car myCar("Toyota", 120, 4);
+    Vehicle* vehiclePtr = &myCar;
     myCar.accelerate();
     myCar.displayInfo();
     

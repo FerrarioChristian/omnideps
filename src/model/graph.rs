@@ -19,6 +19,7 @@ pub enum DependencyEdgeKind {
     CastsTo,
     Aliases,
     AnnotatedWith,
+    UsesType,
 }
 
 #[derive(

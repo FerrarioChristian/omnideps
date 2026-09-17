@@ -1,19 +1,9 @@
-#include "untested_features.hpp"
-
-Box::Box(int val) : value(val) {}
-
-int Box::getValue() {
-    return value;
-}
+#include "namespaces_and_macros.hpp"
 
 namespace MathLib {
     int Calculator::add(int a, int b) {
         return a + b;
     }
-}
-
-void use_box(Box& b) {
-    b.getValue();
 }
 
 void use_math() {

@@ -40,3 +40,18 @@ impl Deref for StructC {
     &self.0
   }
 }
+
+pub struct Container<T> {
+  pub item: T,
+}
+
+pub struct Pair<T, U> {
+  pub first: T,
+  pub second: U,
+}
+
+pub struct Warehouse {
+  pub entry: Container<StructA>,
+  pub pair: Pair<StructA, EnumA>,
+}
+

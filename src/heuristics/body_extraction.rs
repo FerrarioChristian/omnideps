@@ -409,27 +409,62 @@ fn extract_call_dependency(
     accesses: &mut Vec<TypeRef>,
 ) {
     if let Some(f) = node.child_by_field_name("function") {
-        let f_kind = f.kind();
-        if matches!(
-            f_kind,
-            "qualified_identifier"
-                | "scoped_identifier"
-                | "field_expression"
-                | "attribute"
-                | "identifier"
-                | "type_identifier"
-        ) {
-            calls.push(extract_type_ref(f, source));
-            
-            // Also extract the base object of the method call as an access (e.g. `self.permissions` in `self.permissions.append()`)
-            if let Some(obj) = f.child_by_field_name("object")
-                .or_else(|| f.child_by_field_name("value"))
-                .or_else(|| f.child_by_field_name("left"))
-                .or_else(|| f.child_by_field_name("argument")) // C++ field_expression uses "argument"
-            {
-                accesses.push(extract_type_ref(obj, source));
+        let path = extract_call_path(f, source);
+        if !path.is_empty() {
+            calls.push(TypeRef::Unresolved(path));
+        }
+
+        // Also extract the base object of the method call as an access
+        if let Some(obj) = f
+            .child_by_field_name("object")
+            .or_else(|| f.child_by_field_name("value"))
+            .or_else(|| f.child_by_field_name("left"))
+            .or_else(|| f.child_by_field_name("argument"))
+        {
+            accesses.push(extract_type_ref(obj, source));
+        }
+    }
+}
+
+/// Recursively extracts a call path, cleanly unwrapping any inner call expressions
+/// (e.g. `b.getValue().displayInfo` -> `["b", "getValue", "displayInfo"]`).
+fn extract_call_path(node: Node, source: &str) -> Vec<String> {
+    match node.kind() {
+        "identifier" | "field_identifier" | "type_identifier" => {
+            let t = node_text(node, source).trim().to_string();
+            if t.is_empty() {
+                vec![]
+            } else {
+                vec![t]
             }
         }
+        "scoped_identifier" | "qualified_identifier" => {
+            split_qualified_name(&node_text(node, source))
+        }
+        "field_expression" | "member_expression" | "attribute" => {
+            let mut path = vec![];
+            if let Some(obj) = node
+                .child_by_field_name("argument")
+                .or_else(|| node.child_by_field_name("object"))
+                .or_else(|| node.child_by_field_name("value"))
+            {
+                if matches!(obj.kind(), "call_expression" | "call") {
+                    if let Some(inner_f) = obj.child_by_field_name("function") {
+                        path.extend(extract_call_path(inner_f, source));
+                    }
+                } else {
+                    path.extend(extract_call_path(obj, source));
+                }
+            }
+            if let Some(field) = node
+                .child_by_field_name("field")
+                .or_else(|| node.child_by_field_name("attribute"))
+            {
+                path.extend(extract_call_path(field, source));
+            }
+            path
+        }
+        _ => split_qualified_name(&node_text(node, source)),
     }
 }
 

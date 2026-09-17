@@ -37,6 +37,11 @@ fn count_nested_types(st: &StructuredType) -> usize {
 }
 
 fn count_refs_in_st(st: &StructuredType, resolved: &mut usize, failed: &mut usize) {
+    for tp in &st.type_parameters {
+        for b in &tp.bounds {
+            tally_ref(b, resolved, failed);
+        }
+    }
     for sup in &st.super_types {
         tally_ref(sup, resolved, failed);
     }
@@ -52,6 +57,11 @@ fn count_refs_in_st(st: &StructuredType, resolved: &mut usize, failed: &mut usiz
 }
 
 fn count_refs_in_func(f: &Function, resolved: &mut usize, failed: &mut usize) {
+    for tp in &f.type_parameters {
+        for b in &tp.bounds {
+            tally_ref(b, resolved, failed);
+        }
+    }
     for p in &f.signature.parameters {
         tally_ref(&p.ty, resolved, failed);
     }
@@ -84,6 +94,17 @@ fn tally_ref(tr: &TypeRef, resolved: &mut usize, failed: &mut usize) {
         TypeRef::Union(variants) => {
             for v in variants {
                 tally_ref(v, resolved, failed);
+            }
+        }
+        TypeRef::Generic { base, args } => {
+            tally_ref(base, resolved, failed);
+            for a in args {
+                tally_ref(a, resolved, failed);
+            }
+        }
+        TypeRef::TypeVar { bounds, .. } => {
+            for b in bounds {
+                tally_ref(b, resolved, failed);
             }
         }
         _ => {}

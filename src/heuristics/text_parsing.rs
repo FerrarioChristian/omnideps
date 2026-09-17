@@ -47,8 +47,38 @@ pub fn extract_name_from_text(text: &str) -> Option<QualifiedName> {
 
 /// Helper to extract an identifier from a declarator node, unwrapping nested declarators (typical of C/C++).
 fn extract_identifier_from_declarator(mut decl: Node, source: &str) -> Option<String> {
-    while let Some(next) = decl.child_by_field_name("declarator") {
+    while let Some(next) = decl
+        .child_by_field_name("declarator")
+        .or_else(|| decl.child_by_field_name("pattern"))
+        .or_else(|| {
+            let mut c = decl.walk();
+            decl.children(&mut c).find(|ch| {
+                ch.kind().contains("declarator")
+                    || matches!(
+                        ch.kind(),
+                        "identifier"
+                            | "type_identifier"
+                            | "scoped_identifier"
+                            | "qualified_identifier"
+                            | "destructor_name"
+                    )
+            })
+        })
+    {
+        if next.id() == decl.id() || next.byte_range() == decl.byte_range() {
+            break;
+        }
         decl = next;
+        if matches!(
+            decl.kind(),
+            "identifier"
+                | "type_identifier"
+                | "scoped_identifier"
+                | "qualified_identifier"
+                | "destructor_name"
+        ) {
+            break;
+        }
     }
 
     if decl.kind() == "scoped_identifier" || decl.kind() == "qualified_identifier" {

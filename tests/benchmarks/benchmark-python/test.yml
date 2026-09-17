@@ -1,4 +1,5 @@
 files:
+- src/generics_test.py
 - src/main.py
 - src/models.py
 - src/utils.py
@@ -102,6 +103,28 @@ nodes:
   kind: method
 - name: test_constructors.Dog.speak
   kind: method
+- name: generics_test
+  kind: module
+- name: generics_test.Container
+  kind: class
+- name: generics_test.Container.item
+  kind: field
+- name: generics_test.Container.__init__
+  kind: method
+- name: generics_test.UserStorage
+  kind: class
+- name: generics_test.UserStorage.container
+  kind: field
+- name: generics_test.UserStorage.users
+  kind: field
+- name: generics_test.UserStorage.admin_map
+  kind: field
+- name: generics_test.UserStorage.nested_users
+  kind: field
+- name: generics_test.UserStorage.__init__
+  kind: method
+- name: generics_test.inspect_user_generic
+  kind: function
 
 edges:
 - testid: PY-ANNO-1
@@ -309,3 +332,33 @@ edges:
   source: unions_test.process_legacy
   sink: unions_test.Cat
   kind: UsesParamType
+
+- testid: PY-GEN-1
+  source: generics_test.UserStorage.users
+  sink: models.User
+  kind: uses_type
+- testid: PY-GEN-2
+  source: generics_test.UserStorage.admin_map
+  sink: advanced_models.SuperAdmin
+  kind: uses_type
+- testid: PY-GEN-3
+  source: generics_test.UserStorage.nested_users
+  sink: models.User
+  kind: uses_type
+- testid: PY-GEN-4
+  source: generics_test.UserStorage.container
+  sink: generics_test.Container
+  kind: uses_type
+- testid: PY-GEN-5
+  source: generics_test.UserStorage.container
+  sink: models.User
+  kind: uses_type
+- testid: PY-GEN-6
+  source: generics_test.inspect_user_generic
+  sink: models.User
+  kind: uses_type
+- testid: PY-GEN-7
+  source: generics_test.inspect_user_generic
+  sink: models.User.get_info
+  kind: calls
+

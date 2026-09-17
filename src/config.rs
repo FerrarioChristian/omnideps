@@ -21,6 +21,7 @@ pub struct LanguageConfig {
     pub implicit_first_param_as_self: bool,
     pub extract_dynamic_fields: bool,
     pub deref_coercion_target_name: Option<String>,
+    pub assignment_type_aliases: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -59,6 +60,7 @@ impl AnalyzerConfig {
                 implicit_first_param_as_self: true,
                 extract_dynamic_fields: true,
                 deref_coercion_target_name: None,
+                assignment_type_aliases: true,
             },
         );
 
@@ -81,6 +83,7 @@ impl AnalyzerConfig {
                 implicit_first_param_as_self: false,
                 extract_dynamic_fields: false,
                 deref_coercion_target_name: Some("Target".to_string()),
+                assignment_type_aliases: false,
             },
         );
 
@@ -103,6 +106,7 @@ impl AnalyzerConfig {
                 implicit_first_param_as_self: false,
                 extract_dynamic_fields: false,
                 deref_coercion_target_name: None,
+                assignment_type_aliases: false,
             },
         );
 
@@ -125,6 +129,7 @@ impl AnalyzerConfig {
                 implicit_first_param_as_self: false,
                 extract_dynamic_fields: false,
                 deref_coercion_target_name: None,
+                assignment_type_aliases: false,
             },
         );
 
@@ -147,6 +152,7 @@ impl AnalyzerConfig {
                 implicit_first_param_as_self: false,
                 extract_dynamic_fields: false,
                 deref_coercion_target_name: None,
+                assignment_type_aliases: false,
             },
         );
 
@@ -167,6 +173,7 @@ impl AnalyzerConfig {
                 implicit_first_param_as_self: false,
                 extract_dynamic_fields: false,
                 deref_coercion_target_name: None,
+                assignment_type_aliases: false,
             },
             languages,
         }

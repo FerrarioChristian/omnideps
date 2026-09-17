@@ -77,6 +77,7 @@ pub fn is_function(node: Node) -> bool {
         || kind.contains("fn_item")
         || kind.contains("func")
         || kind.contains("constructor")
+        || kind.contains("destructor")
         || kind == "decorated_definition";
 
     is_func_kind && !kind.contains("class")
@@ -156,5 +157,5 @@ pub fn is_type_alias(node: Node) -> bool {
     matches!(
         kind,
         "type_alias_declaration" | "alias_declaration" | "type_item" | "type_alias_statement"
-    ) || (kind == "type_definition" && !is_structured_type(node)) // C/C++ typedef can be struct or just alias
+    ) || (kind == "type_definition" && !is_structured_type(node))
 }

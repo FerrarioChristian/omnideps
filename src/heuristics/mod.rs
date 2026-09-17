@@ -48,7 +48,7 @@ pub fn dispatch_node(
     {
         return Some(ParsedItem::ImplBlock(implb));
     }
-    if let Some(ta) = parsers::try_parse_type_alias(node, source) {
+    if let Some(ta) = parsers::try_parse_type_alias(node, source, config.get_for(lang_name)) {
         return Some(ParsedItem::Component(Component::TypeAlias(ta)));
     }
     if let Some(fv) = parsers::try_parse_free_variable(node, source) {

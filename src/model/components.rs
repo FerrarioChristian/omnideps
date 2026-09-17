@@ -6,6 +6,16 @@ pub type QualifiedName = Vec<Identifier>;
 #[derive(
     Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
 )]
+pub struct TypeParameter {
+    pub name: Identifier,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub bounds: Vec<TypeRef>,
+}
+
+
+#[derive(
+    Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
+)]
 pub enum StructuredTypeKind {
     Class,
     Struct,
@@ -75,6 +85,8 @@ pub struct Function {
     pub is_constructor: bool,
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub annotations: Vec<TypeRef>,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub type_parameters: Vec<TypeParameter>,
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -106,6 +118,8 @@ pub struct StructuredType {
     pub annotations: Vec<TypeRef>,
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub imports: Vec<Import>,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub type_parameters: Vec<TypeParameter>,
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
