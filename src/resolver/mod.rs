@@ -15,10 +15,6 @@ pub fn resolve_type_refs(
     primitives: &PrimitiveRegistry,
     config: &crate::config::AnalyzerConfig,
 ) -> Vec<Module> {
-    // Phase 1: Substitution
     let modules_with_queries = builder::build_queries(modules, config);
-
-    // Phase 2: Navigation
-
     executor::execute_queries(modules_with_queries, primitives, config)
 }
