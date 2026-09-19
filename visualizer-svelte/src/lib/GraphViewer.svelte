@@ -57,7 +57,7 @@
         'ClassField': true,
         'Field': true,
         'Primitive': false,
-        'External': true
+        'External': false
     });
 
     let searchQuery = $state('');

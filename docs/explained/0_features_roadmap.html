@@ -108,16 +108,17 @@ fn run(user: User) -> bool // Rust</pre>
         </tr>
         <tr>
             <td>Generics / Template</td>
-            <td><span class="status-no">No</span></td>
+            <td><span class="status-yes">Sì</span></td>
             <td>
                 <pre>Map&lt;K, V&gt; map; // Java
-vector&lt;int&gt; vec; // C++</pre>
+vector&lt;int&gt; vec; // C++
+Box&lt;Car&gt; b; // C++, Rust
+dict[str, User] d; // Python</pre>
             </td>
             <td>
-                Attualmente estratti come tipo base grezzo (<code>Map</code> o <code>vector</code>).
-                <div class="implementation-idea"><strong>Idea di implementazione:</strong> Aggiungere <code>pub type_arguments: Vec&lt;TypeRef&gt;</code> al <code>TypeRef</code> nell'IR. In `extract_type_ref`, intercettare nodi come `type_arguments` o `template_argument_list`, estrarne i figli e generare archi <code>UsesGenericType</code> verso `K` e `V`.</div>
+                Modellati formalmente con <code>TypeRef::Generic { base, args }</code>. Le dipendenze collegano sia il contenitore sia gli argomenti di tipo concreti (es. <code>UsesFieldType</code>, <code>UsesParamType</code>). Consultare <a href="4_generics_resolution_explained.html">4_generics_resolution_explained.html</a>.
             </td>
-            <td>-</td>
+            <td><span class="function-ref">try_extract_generic</span>, <span class="function-ref">instantiate_generic_member_type</span></td>
         </tr>
         <tr>
             <td>Type Alias</td>
@@ -160,15 +161,17 @@ Union[str, int] // Python</pre>
             <td><span class="function-ref">try_parse_structured_type</span>, <span class="function-ref">type_ref_targets</span></td>
         </tr>
         <tr>
-            <td>Type Constraints</td>
-            <td><span class="status-no">No</span></td>
+            <td>Type Constraints (Bounds)</td>
+            <td><span class="status-yes">Sì</span></td>
             <td>
-                <pre>&lt;T extends Serializable&gt;</pre>
+                <pre>&lt;T extends Service&gt; // Java
+&lt;T: Worker&gt; / where T: Worker // Rust
+TypeVar('T', bound=Model) // Python</pre>
             </td>
             <td>
-                <div class="implementation-idea"><strong>Idea di implementazione:</strong> Molto complesso in un'architettura agnostica. Si potrebbe modellare introducendo un "nodo fantasma" nel modulo per rappresentare <code>T</code>, per poi fargli ereditare (`IsA`) da <code>Serializable</code>. I parametri generici punterebbero quindi a questo nodo fittizio.</div>
+                Modellati con <code>TypeParameter { name, bounds }</code> e <code>TypeRef::TypeVar</code>. Nello ScopeTree vengono creati <strong>Phantom Scopes</strong> per le variabili di tipo e la risoluzione dei metodi vincolati opera via <code>find_candidate_scopes_for_type</code>. Consultare <a href="4_generics_resolution_explained.html">4_generics_resolution_explained.html</a>.
             </td>
-            <td>-</td>
+            <td><span class="function-ref">extract_type_parameters</span>, <span class="function-ref">find_candidate_scopes_for_type</span></td>
         </tr>
         <tr>
             <td>Inferenza Tipi Locali (auto/let)</td>
