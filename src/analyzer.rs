@@ -365,67 +365,64 @@ pub fn analyze_project(
     crate::model::DependencyGraph,
     crate::model::AnalysisSummary,
 ) {
-    link_out_of_line_methods(&mut modules, config);
+    link_out_of_line_methods(&mut modules);
     let resolved = crate::resolver::resolve_type_refs(modules, &prim_registry, config);
     let graph = crate::export::graph::build_dependency_graph(&resolved, &prim_registry);
     let summary = crate::export::summary::build_analysis_summary(&resolved);
     (resolved, graph, summary)
 }
 
-pub fn link_out_of_line_methods(modules: &mut Vec<Module>, config: &crate::config::AnalyzerConfig) {
+pub fn link_out_of_line_methods(modules: &mut Vec<Module>) {
     for module in modules.iter_mut() {
-        let lang = module.language.as_deref().unwrap_or("root");
-        if config.get_for(lang).forward_declarations {
-            let mut methods_to_move = vec![];
+        let mut methods_to_move = vec![];
 
-            // Extract functions that have qualified names (e.g., MyClass::my_method)
-            module.free_functions.retain(|ff| {
-                if ff.name.len() > 1 {
-                    methods_to_move.push(ff.clone());
-                    false // Remove from free_functions
-                } else {
-                    true // Keep
+        // Extract functions that have qualified names (e.g., MyClass::my_method)
+        module.free_functions.retain(|ff| {
+            if ff.name.len() > 1 {
+                methods_to_move.push(ff.clone());
+                false // Remove from free_functions
+            } else {
+                true // Keep
+            }
+        });
+
+        // Find the class and append
+        for method in methods_to_move {
+            let class_name = &method.name[..method.name.len() - 1];
+            let method_name = method.name.last().unwrap().clone();
+
+            let mut found = false;
+            for st in &mut module.structured_types {
+                if st.name == class_name {
+                    let mut m = method.clone();
+                    m.name = vec![method_name.clone()];
+                    st.methods.push(m);
+                    found = true;
+                    break;
                 }
-            });
+            }
 
-            // Find the class and append
-            for method in methods_to_move {
-                let class_name = &method.name[..method.name.len() - 1];
-                let method_name = method.name.last().unwrap().clone();
-
-                let mut found = false;
-                for st in &mut module.structured_types {
-                    if st.name == class_name {
+            // If not found in current module, maybe it's cross-module?
+            // For simplicity in C++, we assume the definition is in the same namespace block,
+            // or we could use the ImplBlock logic. Let's create an ImplBlock!
+            if !found {
+                module.impl_blocks.push(crate::model::ImplBlock {
+                    name: class_name.to_vec(),
+                    impl_for: crate::model::TypeRef::ResolutionQuery(
+                        crate::model::Query::Find(class_name.last().unwrap().clone()),
+                    ),
+                    implements_trait: None,
+                    methods: vec![{
                         let mut m = method.clone();
-                        m.name = vec![method_name.clone()];
-                        st.methods.push(m);
-                        found = true;
-                        break;
-                    }
-                }
-
-                // If not found in current module, maybe it's cross-module?
-                // For simplicity in C++, we assume the definition is in the same namespace block,
-                // or we could use the ImplBlock logic. Let's create an ImplBlock!
-                if !found {
-                    module.impl_blocks.push(crate::model::ImplBlock {
-                        name: class_name.to_vec(),
-                        impl_for: crate::model::TypeRef::ResolutionQuery(
-                            crate::model::Query::Find(class_name.last().unwrap().clone()),
-                        ),
-                        implements_trait: None,
-                        methods: vec![{
-                            let mut m = method.clone();
-                            m.name = vec![method_name];
-                            m
-                        }],
-                        nested_types: vec![],
-                        type_aliases: vec![],
-                    });
-                }
+                        m.name = vec![method_name];
+                        m
+                    }],
+                    nested_types: vec![],
+                    type_aliases: vec![],
+                });
             }
         }
 
-        link_out_of_line_methods(&mut module.sub_modules, config);
+        link_out_of_line_methods(&mut module.sub_modules);
     }
 }

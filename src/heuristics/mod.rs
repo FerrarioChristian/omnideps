@@ -43,9 +43,7 @@ pub fn dispatch_node(
     if let Some(ff) = parsers::try_parse_function(node, source) {
         return Some(ParsedItem::Component(Component::Function(ff)));
     }
-    if config.get_for(lang_name).support_impl_blocks
-        && let Some(implb) = parsers::try_parse_impl_block(node, source, lang_name, config)
-    {
+    if let Some(implb) = parsers::try_parse_impl_block(node, source, lang_name, config) {
         return Some(ParsedItem::ImplBlock(implb));
     }
     if let Some(ta) = parsers::try_parse_type_alias(node, source, config.get_for(lang_name)) {
