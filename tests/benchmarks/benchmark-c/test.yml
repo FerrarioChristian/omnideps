@@ -121,6 +121,16 @@ nodes:
   kind: struct
 - name: get_opaque
   kind: function
+- name: cast_typedef_parenthesized
+  kind: function
+- name: cast_typedef_unparenthesized
+  kind: function
+- name: call_parenthesized
+  kind: function
+- name: square_func
+  kind: function
+- name: call_single_arg_parenthesized
+  kind: function
 edges:
 - testid: UNION-DECL
   source: Rectangle.data
@@ -294,3 +304,19 @@ edges:
   source: get_opaque
   sink: OpaqueStruct
   kind: uses_return_type
+- testid: C-CAST-PAREN
+  source: cast_typedef_parenthesized
+  sink: MyInt
+  kind: casts_to
+- testid: C-CAST-UNPAREN
+  source: cast_typedef_unparenthesized
+  sink: MyInt
+  kind: casts_to
+- testid: C-CALL-PAREN
+  source: call_parenthesized
+  sink: add
+  kind: calls
+- testid: C-CALL-SINGLE-PAREN
+  source: call_single_arg_parenthesized
+  sink: square_func
+  kind: calls

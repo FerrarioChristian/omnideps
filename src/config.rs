@@ -20,6 +20,7 @@ pub struct LanguageConfig {
     pub extract_dynamic_fields: bool,
     pub deref_coercion_target_name: Option<String>,
     pub assignment_type_aliases: bool,
+    pub callable_types: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -57,6 +58,7 @@ impl AnalyzerConfig {
                 extract_dynamic_fields: true,
                 deref_coercion_target_name: None,
                 assignment_type_aliases: true,
+                callable_types: true,
             },
         );
 
@@ -78,6 +80,7 @@ impl AnalyzerConfig {
                 extract_dynamic_fields: false,
                 deref_coercion_target_name: Some("Target".to_string()),
                 assignment_type_aliases: false,
+                callable_types: false,
             },
         );
 
@@ -99,6 +102,7 @@ impl AnalyzerConfig {
                 extract_dynamic_fields: false,
                 deref_coercion_target_name: None,
                 assignment_type_aliases: false,
+                callable_types: false,
             },
         );
 
@@ -120,6 +124,7 @@ impl AnalyzerConfig {
                 extract_dynamic_fields: false,
                 deref_coercion_target_name: None,
                 assignment_type_aliases: false,
+                callable_types: true,
             },
         );
 
@@ -141,6 +146,7 @@ impl AnalyzerConfig {
                 extract_dynamic_fields: false,
                 deref_coercion_target_name: None,
                 assignment_type_aliases: false,
+                callable_types: false,
             },
         );
 
@@ -160,6 +166,7 @@ impl AnalyzerConfig {
                 extract_dynamic_fields: false,
                 deref_coercion_target_name: None,
                 assignment_type_aliases: false,
+                callable_types: false,
             },
             languages,
         }

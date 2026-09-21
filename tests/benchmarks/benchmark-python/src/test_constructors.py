@@ -16,3 +16,13 @@ class Dog(Animal):
 def test_inference() -> None:
     my_dog = Dog("Rex")
     my_dog.speak()
+
+class Cat(Animal):
+    pass
+
+class EmptyRecord:
+    pass
+
+def test_default_constructors() -> None:
+    c = Cat("Feline")
+    r = EmptyRecord()

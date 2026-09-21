@@ -276,14 +276,6 @@ fn execute_block(
             d
         })
         .collect();
-    b.calls = b
-        .calls
-        .into_iter()
-        .map(|c| {
-            let tr = evaluate_typeref(ctx, c, block_scope_id, false);
-            redirect_to_constructor(ctx, tr)
-        })
-        .collect();
     b.instantiates = b
         .instantiates
         .into_iter()
@@ -303,6 +295,21 @@ fn execute_block(
         .map(|c| evaluate_typeref(ctx, c, block_scope_id, false))
         .collect();
 
+    let lang = get_scope_language(ctx.tree, block_scope_id).unwrap_or("");
+    let lang_config = ctx.config.get_for(lang);
+
+    let mut resolved_calls = Vec::with_capacity(b.calls.len());
+    for c in b.calls {
+        let tr = evaluate_typeref(ctx, c, block_scope_id, false);
+        let redirected = redirect_to_constructor(ctx, tr);
+        if !lang_config.callable_types && is_type_or_alias(ctx, &redirected) {
+            b.type_casts.push(redirected);
+        } else {
+            resolved_calls.push(redirected);
+        }
+    }
+    b.calls = resolved_calls;
+
     let sub_blocks: Vec<Block> = b
         .sub_blocks
         .into_iter()
@@ -311,6 +318,71 @@ fn execute_block(
         .collect();
     b.sub_blocks = sub_blocks;
     b
+}
+
+fn get_scope_language<'a>(tree: &'a ScopeTree, mut scope_id: ScopeId) -> Option<&'a str> {
+    loop {
+        let s = &tree.arena[scope_id];
+        if let Some(l) = &s.language {
+            return Some(l.as_str());
+        }
+        match s.parent {
+            Some(p) => scope_id = p,
+            None => return None,
+        }
+    }
+}
+
+fn find_symbol_by_path<'a>(tree: &'a ScopeTree, path: &[String]) -> Option<&'a Symbol> {
+    let mut curr = tree.root;
+    for (i, part) in path.iter().enumerate() {
+        if (part == "root" || part == "crate") && i == 0 {
+            continue;
+        }
+        if i == path.len() - 1 {
+            return tree.arena[curr].symbols.get(part);
+        }
+        if let Some(sym) = tree.arena[curr].symbols.get(part) {
+            match sym {
+                Symbol::Module(id) | Symbol::Type(id) => {
+                    curr = *id;
+                    continue;
+                }
+                _ => {}
+            }
+        }
+        if let Some(child_scope) = tree
+            .arena
+            .iter()
+            .find(|s| s.parent == Some(curr) && &s.name == part)
+        {
+            curr = child_scope.id;
+            continue;
+        }
+        return None;
+    }
+    None
+}
+
+fn is_type_or_alias(ctx: &ExecutorContext, tr: &TypeRef) -> bool {
+    match tr {
+        TypeRef::Primitive(_) => true,
+        TypeRef::Resolved(path) | TypeRef::External(path) => {
+            if path.len() == 1 && ctx.primitives.is_primitive(&path[0]) {
+                return true;
+            }
+            if let Some(sym) = find_symbol_by_path(ctx.tree, path) {
+                return matches!(sym, Symbol::Type(_) | Symbol::TypeAlias(_));
+            }
+            if let Some(scope_id) = find_scope_for_type(ctx.tree, tr) {
+                return !ctx.tree.arena[scope_id].is_module;
+            }
+            false
+        }
+        TypeRef::EvaluatedAccess(_, inner) => is_type_or_alias(ctx, inner),
+        TypeRef::Generic { base, .. } => is_type_or_alias(ctx, base),
+        _ => false,
+    }
 }
 
 fn redirect_to_constructor(ctx: &ExecutorContext, tr: TypeRef) -> TypeRef {

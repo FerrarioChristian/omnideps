@@ -29,3 +29,11 @@ using MyEngine = automotive::IEngine;
 void do_cast() {
     float f = (float)10;
 }
+
+using LocalSpeed = int;
+
+void test_constructors_and_casts() {
+    Transport::Car* heapCar = new Transport::Car("Tesla", 200, 4);
+    automotive::V8Engine tempEngine = automotive::V8Engine(600);
+    LocalSpeed castedSpeed = (LocalSpeed)(120.5);
+}

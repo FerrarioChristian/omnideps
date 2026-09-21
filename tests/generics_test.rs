@@ -539,4 +539,165 @@ fn test_constructor_and_destructor_dependencies() {
     );
 }
 
+#[test]
+fn test_c_parenthesized_cast_and_call_disambiguation() {
+    let code = r#"
+        typedef int CustomInt;
+
+        int helper_func(int x) {
+            return x + 1;
+        }
+
+        CustomInt do_cast(double val) {
+            return (CustomInt)(val);
+        }
+
+        int do_call(int a) {
+            return (helper_func)(a);
+        }
+    "#;
+
+    let graph = analyze_snippet(SupportedLanguage::C, code, "src/math.c");
+
+    assert!(
+        has_edge(&graph, &["do_cast"], &["CustomInt"], DependencyEdgeKind::CastsTo),
+        "Expected do_cast -> CustomInt (CastsTo)"
+    );
+    assert!(
+        has_edge(&graph, &["do_call"], &["helper_func"], DependencyEdgeKind::Calls),
+        "Expected do_call -> helper_func (Calls)"
+    );
+}
+
+#[test]
+fn test_c_advanced_cast_and_call_scenarios() {
+    let code = r#"
+        typedef int CustomInt;
+
+        int helper_func(int x) {
+            return x + 1;
+        }
+
+        CustomInt do_nested_cast(double val) {
+            return ((CustomInt))(val);
+        }
+
+        int do_nested_call(int a) {
+            return ((helper_func))(a);
+        }
+
+        int do_primitive_cast(double val) {
+            return (int)(val);
+        }
+
+        int do_expr_cast(double val) {
+            return 10 + (CustomInt)(val);
+        }
+
+        CustomInt do_cast_of_call(int a) {
+            return (CustomInt)(helper_func(a));
+        }
+
+        int do_call_with_cast(double val) {
+            return (helper_func)((CustomInt)(val));
+        }
+    "#;
+
+    let graph = analyze_snippet(SupportedLanguage::C, code, "src/math.c");
+
+    // 1. Nested cast
+    assert!(
+        has_edge(&graph, &["do_nested_cast"], &["CustomInt"], DependencyEdgeKind::CastsTo),
+        "Expected do_nested_cast -> CustomInt (CastsTo)"
+    );
+
+    // 2. Nested call
+    assert!(
+        has_edge(&graph, &["do_nested_call"], &["helper_func"], DependencyEdgeKind::Calls),
+        "Expected do_nested_call -> helper_func (Calls)"
+    );
+
+    // 3. Primitive cast
+    assert!(
+        has_edge(&graph, &["do_primitive_cast"], &["int"], DependencyEdgeKind::CastsTo),
+        "Expected do_primitive_cast -> int (CastsTo)"
+    );
+
+    // 4. Cast in expression
+    assert!(
+        has_edge(&graph, &["do_expr_cast"], &["CustomInt"], DependencyEdgeKind::CastsTo),
+        "Expected do_expr_cast -> CustomInt (CastsTo)"
+    );
+
+    // 5. Cast of call result (should have CastsTo CustomInt AND Calls helper_func)
+    assert!(
+        has_edge(&graph, &["do_cast_of_call"], &["CustomInt"], DependencyEdgeKind::CastsTo),
+        "Expected do_cast_of_call -> CustomInt (CastsTo)"
+    );
+    assert!(
+        has_edge(&graph, &["do_cast_of_call"], &["helper_func"], DependencyEdgeKind::Calls),
+        "Expected do_cast_of_call -> helper_func (Calls)"
+    );
+
+    // 6. Call with cast argument (should have Calls helper_func AND CastsTo CustomInt)
+    assert!(
+        has_edge(&graph, &["do_call_with_cast"], &["helper_func"], DependencyEdgeKind::Calls),
+        "Expected do_call_with_cast -> helper_func (Calls)"
+    );
+    assert!(
+        has_edge(&graph, &["do_call_with_cast"], &["CustomInt"], DependencyEdgeKind::CastsTo),
+        "Expected do_call_with_cast -> CustomInt (CastsTo)"
+    );
+}
+
+#[test]
+fn test_c_pointer_cast_scenarios() {
+    let code = r#"
+        typedef struct Point {
+            int x;
+            int y;
+        } Point;
+
+        typedef int CustomInt;
+
+        void* do_ptr_cast(void* ptr) {
+            CustomInt* p1 = (CustomInt*)(ptr);
+            Point* p2 = (Point*)(ptr);
+            return (void*)(p1);
+        }
+    "#;
+
+    let graph = analyze_snippet(SupportedLanguage::C, code, "src/points.c");
+
+    assert!(
+        has_edge(&graph, &["do_ptr_cast"], &["CustomInt"], DependencyEdgeKind::CastsTo),
+        "Expected do_ptr_cast -> CustomInt (CastsTo)"
+    );
+    assert!(
+        has_edge(&graph, &["do_ptr_cast"], &["Point"], DependencyEdgeKind::CastsTo),
+        "Expected do_ptr_cast -> Point (CastsTo)"
+    );
+}
+
+#[test]
+fn test_c_function_pointer_cast_and_invocation() {
+    let code = r#"
+        typedef void (*Callback)(int);
+
+        void my_handler(int x) {}
+
+        void test_fp() {
+            Callback cb = (Callback)(my_handler);
+            (cb)(42);
+        }
+    "#;
+
+    let graph = analyze_snippet(SupportedLanguage::C, code, "src/fp.c");
+
+    assert!(
+        has_edge(&graph, &["test_fp"], &["Callback"], DependencyEdgeKind::CastsTo),
+        "Expected test_fp -> Callback (CastsTo)"
+    );
+}
+
 

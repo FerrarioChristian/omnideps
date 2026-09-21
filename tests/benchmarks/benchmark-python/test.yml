@@ -103,6 +103,12 @@ nodes:
   kind: method
 - name: test_constructors.Dog.speak
   kind: method
+- name: test_constructors.Cat
+  kind: class
+- name: test_constructors.EmptyRecord
+  kind: class
+- name: test_constructors.test_default_constructors
+  kind: function
 - name: generics_test
   kind: module
 - name: generics_test.Container
@@ -311,6 +317,10 @@ edges:
 - testid: PY-CONSTR-3
   source: test_constructors.Dog.__init__
   sink: test_constructors.Animal.__init__
+  kind: calls
+- testid: PY-CONSTR-EMPTY
+  source: test_constructors.test_default_constructors
+  sink: test_constructors.EmptyRecord
   kind: calls
 - testid: ALIA-1
   source: utils.MyAlias

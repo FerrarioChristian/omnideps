@@ -441,6 +441,13 @@ fn extract_call_path(node: Node, source: &str) -> Vec<String> {
         "scoped_identifier" | "qualified_identifier" => {
             split_qualified_name(&node_text(node, source))
         }
+        "parenthesized_expression" => {
+            let mut cursor = node.walk();
+            for child in node.named_children(&mut cursor) {
+                return extract_call_path(child, source);
+            }
+            vec![]
+        }
         "field_expression" | "member_expression" | "attribute" => {
             let mut path = vec![];
             if let Some(obj) = node

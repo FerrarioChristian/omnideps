@@ -38,6 +38,10 @@ nodes:
   kind: method
 - name: main
   kind: function
+- name: test_constructors_and_casts
+  kind: function
+- name: LocalSpeed
+  kind: alias
 - name: automotive
   kind: namespace
 - name: automotive.IEngine
@@ -230,6 +234,18 @@ edges:
 - testid: CAST-1
   source: do_cast
   sink: float
+  kind: casts_type
+- testid: CPP-NEW-CAR
+  source: test_constructors_and_casts
+  sink: Transport.Car
+  kind: instantiates
+- testid: CPP-TEMP-ENGINE
+  source: test_constructors_and_casts
+  sink: automotive.V8Engine
+  kind: calls
+- testid: CPP-CAST-PAREN
+  source: test_constructors_and_casts
+  sink: LocalSpeed
   kind: casts_type
 
 - testid: "CPP-ANNO-1"
