@@ -1,5 +1,4 @@
-use omnideps::analyzer::{analyze_project, parse_source};
-use omnideps::language::SupportedLanguage;
+use omnideps::analyzer::analyze_project;
 use std::fs;
 use std::path::Path;
 use walkdir::WalkDir;
@@ -27,29 +26,23 @@ fn test_benchmarks_analysis() {
         if path.is_file() {
             let ext = path.extension().and_then(|s| s.to_str()).unwrap_or("");
 
-            // Definisce il parser Tree-sitter corrispondente in base all'estensione
-            let lang = match ext {
-                "rs" => SupportedLanguage::Rust,
-                "java" => SupportedLanguage::Java,
-                "py" => SupportedLanguage::Python,
-                "c" | "h" => SupportedLanguage::C,
-                "cpp" | "cxx" | "cc" | "hxx" => SupportedLanguage::Cpp,
-                _ => continue, // Ignora file JSON e altri non supportati
-            };
+            // Filtra solo estensioni supportate
+            if !matches!(ext, "rs" | "java" | "py" | "c" | "h" | "cpp" | "cxx" | "cc" | "hxx") {
+                continue;
+            }
 
             let source = fs::read_to_string(path).expect("Impossibile leggere il file");
             let config = omnideps::config::AnalyzerConfig::default();
 
             // Verifica che l'analisi non vada in panico
-            let parse_result = parse_source(lang, &source, path, &config);
+            let analysis_result = analyze_project(path, &config);
             assert!(
-                parse_result.is_ok(),
-                "Il parsing ha fallito per il file {:?}",
+                analysis_result.is_ok(),
+                "L'analisi ha fallito per il file {:?}",
                 path
             );
 
-            let (modules, primitives) = parse_result.unwrap();
-            let (_resolved_modules, graph, summary) = analyze_project(modules, primitives, &config);
+            let (resolved_modules, graph) = analysis_result.unwrap();
 
             // Assicuriamoci che il grafo contenga almeno dei nodi di base se il file non è vuoto
             if source.len() > 10 {
@@ -61,7 +54,7 @@ fn test_benchmarks_analysis() {
             }
 
             assert!(
-                summary.total_modules > 0,
+                !resolved_modules.is_empty(),
                 "Dovrebbe esserci almeno il root module per {:?}",
                 path
             );

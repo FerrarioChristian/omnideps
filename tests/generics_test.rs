@@ -1,15 +1,12 @@
-use omnideps::analyzer::{analyze_project, parse_source};
+use omnideps::analyzer::analyze_code_snippet;
 use omnideps::config::AnalyzerConfig;
 use omnideps::language::SupportedLanguage;
 use omnideps::model::*;
-use std::path::Path;
 
 fn analyze_snippet(lang: SupportedLanguage, source: &str, filename: &str) -> DependencyGraph {
-    let path = Path::new(filename);
     let config = AnalyzerConfig::default();
-    let (modules, primitives) =
-        parse_source(lang, source, path, &config).expect("Failed to parse source snippet");
-    let (_resolved_modules, graph, _summary) = analyze_project(modules, primitives, &config);
+    let (_resolved_modules, graph) =
+        analyze_code_snippet(lang, source, filename, &config).expect("Failed to parse source snippet");
     graph
 }
 

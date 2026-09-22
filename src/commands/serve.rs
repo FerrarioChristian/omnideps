@@ -13,10 +13,9 @@ use std::net::SocketAddr;
 use std::path::Path;
 
 use omnideps::{
-    analyzer::{analyze_project, parse_source},
+    analyzer::{analyze_code_snippet, analyze_project},
     config::AnalyzerConfig,
     language::SupportedLanguage,
-    resolver::primitives::PrimitiveRegistry,
 };
 
 #[derive(RustEmbed)]
@@ -95,7 +94,7 @@ pub fn execute(port: u16) -> Result<()> {
 async fn api_analyze(Json(payload): Json<AnalyzeRequest>) -> impl IntoResponse {
     let config = AnalyzerConfig::default_strategies();
 
-    let (modules, primitives) = if let Some(code) = &payload.code {
+    let graph = if let Some(code) = &payload.code {
         if let Some(ext) = &payload.extension {
             let lang = match SupportedLanguage::from_extension(ext) {
                 Some(l) => l,
@@ -107,8 +106,8 @@ async fn api_analyze(Json(payload): Json<AnalyzeRequest>) -> impl IntoResponse {
                         .into_response();
                 }
             };
-            match parse_source(lang, code, Path::new("temp"), &config) {
-                Ok(res) => res,
+            match analyze_code_snippet(lang, code, "temp", &config) {
+                Ok((_, graph)) => graph,
                 Err(e) => {
                     return (
                         StatusCode::INTERNAL_SERVER_ERROR,
@@ -166,38 +165,16 @@ async fn api_analyze(Json(payload): Json<AnalyzeRequest>) -> impl IntoResponse {
             path.to_path_buf()
         };
 
-        let mut all_modules = vec![];
-        let mut combined_primitives = PrimitiveRegistry::empty();
-
-        if actual_path.is_file() {
-            if let Some(lang) = SupportedLanguage::from_path(&actual_path) {
-                if let Ok(source) = std::fs::read_to_string(&actual_path) {
-                    let rel_path = actual_path.file_name().map(Path::new).unwrap_or(&actual_path);
-                    if let Ok((mut file_modules, file_primitives)) =
-                        parse_source(lang, &source, rel_path, &config)
-                    {
-                        all_modules.append(&mut file_modules);
-                        combined_primitives.merge(file_primitives);
-                    }
-                }
-            }
-        } else {
-            for entry in walkdir::WalkDir::new(&actual_path).into_iter().filter_map(|e| e.ok()) {
-                if entry.file_type().is_file()
-                    && let Some(lang) = SupportedLanguage::from_path(entry.path())
-                    && let Ok(source) = std::fs::read_to_string(entry.path())
-                {
-                    let rel_path = entry.path().strip_prefix(&actual_path).unwrap_or(entry.path());
-                    if let Ok((mut file_modules, file_primitives)) =
-                        parse_source(lang, &source, rel_path, &config)
-                    {
-                        all_modules.append(&mut file_modules);
-                        combined_primitives.merge(file_primitives);
-                    }
-                }
+        match analyze_project(&actual_path, &config) {
+            Ok((_, graph)) => graph,
+            Err(e) => {
+                return (
+                    StatusCode::BAD_REQUEST,
+                    axum::Json(serde_json::json!({ "error": e.to_string() })),
+                )
+                    .into_response();
             }
         }
-        (all_modules, combined_primitives)
     } else {
         return (
             StatusCode::BAD_REQUEST,
@@ -205,8 +182,6 @@ async fn api_analyze(Json(payload): Json<AnalyzeRequest>) -> impl IntoResponse {
         )
             .into_response();
     };
-
-    let (_, graph, _) = analyze_project(modules, primitives, &config);
 
     (
         StatusCode::OK,
