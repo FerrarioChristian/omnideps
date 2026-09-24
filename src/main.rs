@@ -1,10 +1,9 @@
 use anyhow::Result;
 use clap::Parser;
-use std::fs;
 
 mod cli;
 mod commands;
-use cli::{Cli, Commands, BenchmarkCommands, ConfigCommands};
+use cli::{BenchmarkCommands, Cli, Commands, ConfigCommands};
 
 fn main() -> Result<()> {
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("warn")).init();
@@ -12,33 +11,31 @@ fn main() -> Result<()> {
     let cli = Cli::parse();
 
     match &cli.command {
-        Commands::Analyze { path, output, csv, debug_refs, config } => {
-            let config_val = if let Some(config_path) = config {
-                let content = fs::read_to_string(config_path)?;
-                serde_json::from_str(&content)?
-            } else {
-                omnideps::config::AnalyzerConfig::default_strategies()
-            };
-            commands::analyze::execute(path, output.as_deref(), csv.as_deref(), *debug_refs, &config_val)?;
+        Commands::Analyze {
+            path,
+            output,
+            csv,
+            debug_refs,
+            config,
+        } => {
+            commands::analyze::execute(
+                path,
+                output.as_deref(),
+                csv.as_deref(),
+                *debug_refs,
+                config.as_deref(),
+            )?;
         }
         Commands::Benchmark { cmd } => match cmd {
-            BenchmarkCommands::Run { testdir, output, config } => {
-                let config_val = if let Some(config_path) = config {
-                    let content = fs::read_to_string(config_path)?;
-                    serde_json::from_str(&content)?
-                } else {
-                    omnideps::config::AnalyzerConfig::default_strategies()
-                };
-                commands::benchmark::execute_run(testdir, output.as_deref(), &config_val)?;
+            BenchmarkCommands::Run {
+                testdir,
+                output,
+                config,
+            } => {
+                commands::benchmark::execute_run(testdir, output.as_deref(), config.as_deref())?;
             }
             BenchmarkCommands::All { output, config } => {
-                let config_val = if let Some(config_path) = config {
-                    let content = fs::read_to_string(config_path)?;
-                    serde_json::from_str(&content)?
-                } else {
-                    omnideps::config::AnalyzerConfig::default_strategies()
-                };
-                commands::benchmark::execute_all(output.as_deref(), &config_val)?;
+                commands::benchmark::execute_all(output.as_deref(), config.as_deref())?;
             }
         },
         Commands::ExportCyto { input, output } => {

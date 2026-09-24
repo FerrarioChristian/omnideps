@@ -292,9 +292,7 @@ fn type_ref_targets(tr: &TypeRef) -> Vec<QualifiedName> {
             }
             targets
         }
-        TypeRef::TypeVar { bounds, .. } => {
-            bounds.iter().flat_map(type_ref_targets).collect()
-        }
+        TypeRef::TypeVar { bounds, .. } => bounds.iter().flat_map(type_ref_targets).collect(),
         _ => vec![],
     }
 }
@@ -361,16 +359,11 @@ fn add_function_edges(ff: &Function, ff_name: &QualifiedName, edges: &mut Vec<De
     }
 
     if let Some(body) = &ff.body {
-        add_block_edges(ff, ff_name, body, edges);
+        add_block_edges(ff_name, body, edges);
     }
 }
 
-fn add_block_edges(
-    ff: &Function,
-    ff_name: &QualifiedName,
-    block: &Block,
-    edges: &mut Vec<Dependency>,
-) {
+fn add_block_edges(ff_name: &QualifiedName, block: &Block, edges: &mut Vec<Dependency>) {
     // 1. Declarations (Local variables)
     for decl in &block.declarations {
         for to in type_ref_targets(&decl.ty) {
@@ -422,7 +415,7 @@ fn add_block_edges(
 
     // 3. Recurse into sub-blocks
     for sub in &block.sub_blocks {
-        add_block_edges(ff, ff_name, sub, edges);
+        add_block_edges(ff_name, sub, edges);
     }
 }
 

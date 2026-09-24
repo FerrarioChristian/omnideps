@@ -82,7 +82,7 @@ pub fn extract_type_ref(node: Node, source: &str) -> TypeRef {
             | "string"
     ) {
         let text = node_text(node, source);
-        let text = text.replace('\'', "").replace('"', "");
+        let text = text.replace(['\'', '"'], "");
         if !text.is_empty() {
             if let Some(generic_ref) = parse_generic_from_text(&text) {
                 return generic_ref;
@@ -166,10 +166,10 @@ pub fn try_extract_generic(node: Node, source: &str) -> Option<TypeRef> {
     }
 
     // Exclude Union types (e.g. typing.Union[A, B]), handled specifically by try_extract_union
-    if let TypeRef::Unresolved(ref qn) = base_tr {
-        if qn.last().map(|s| s.as_str()) == Some("Union") {
-            return None;
-        }
+    if let TypeRef::Unresolved(ref qn) = base_tr
+        && qn.last().map(|s| s.as_str()) == Some("Union")
+    {
+        return None;
     }
 
     let args_container = node
@@ -230,8 +230,7 @@ fn extract_type_argument_list(container: Node, source: &str) -> Vec<TypeRef> {
 /// Parses a generic type from a textual representation containing balanced `<...>` or `[...]`.
 pub fn parse_generic_from_text(text: &str) -> Option<TypeRef> {
     let text = text.trim();
-    parse_delimited_type(text, '<', '>')
-        .or_else(|| parse_delimited_type(text, '[', ']'))
+    parse_delimited_type(text, '<', '>').or_else(|| parse_delimited_type(text, '[', ']'))
 }
 
 /// Helper to parse a delimited type application: Base<Arg1, Arg2> or Base[Arg1, Arg2]
@@ -267,7 +266,7 @@ fn parse_delimited_type(text: &str, open: char, close: char) -> Option<TypeRef> 
 
 /// Fallback text parser that handles nested generics, unions, and simple identifiers.
 pub fn parse_type_from_text(text: &str) -> TypeRef {
-    let text = text.trim().replace('&', "").replace('*', "");
+    let text = text.trim().replace(['&', '*'], "");
     let text = text.trim();
     if let Some(generic_ref) = parse_generic_from_text(text) {
         return generic_ref;
@@ -419,7 +418,8 @@ mod tests {
 
     #[test]
     fn test_parse_generic_multiple_arguments() {
-        let tr = parse_generic_from_text("KeyValue<int, Transport::Car>").expect("Should parse generic");
+        let tr =
+            parse_generic_from_text("KeyValue<int, Transport::Car>").expect("Should parse generic");
         match tr {
             TypeRef::Generic { base, args } => {
                 assert_eq!(*base, TypeRef::Unresolved(vec!["KeyValue".to_string()]));

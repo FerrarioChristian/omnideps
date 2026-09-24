@@ -1,10 +1,10 @@
 use crate::model::Query;
 use std::collections::HashMap;
 
-/// A single frame representing a lexical scope during the Query Building phase.
+/// A single lexical scope frame $\sigma_i$ representing local symbol bindings.
 #[derive(Debug, Clone)]
 pub struct StackFrame {
-    /// Local symbols defined in this scope. Maps a simple name to its algebraic Query.
+    /// Local symbols defined in this scope frame. Maps an unqualified identifier to its algebraic [`Query`].
     pub symbols: HashMap<String, Query>,
 }
 
@@ -22,7 +22,10 @@ impl StackFrame {
     }
 }
 
-/// The Environment (ρ) used during the Query Building phase to apply substitutions.
+/// The Lexical Symbol Stack ($\Delta = [\sigma_0, \sigma_1, \dots, \sigma_k]$).
+///
+/// Used during the Query Building phase ($\rho_{\text{build}}$) to rewrite local terms,
+/// variables, and parameter references into algebraic resolution queries ([`Query`]).
 #[derive(Debug, Clone)]
 pub struct SymbolStack {
     pub frames: Vec<StackFrame>,

@@ -5,8 +5,8 @@ use omnideps::model::*;
 
 fn analyze_snippet(lang: SupportedLanguage, source: &str, filename: &str) -> DependencyGraph {
     let config = AnalyzerConfig::default();
-    let (_resolved_modules, graph) =
-        analyze_code_snippet(lang, source, filename, &config).expect("Failed to parse source snippet");
+    let (_resolved_modules, graph) = analyze_code_snippet(lang, source, filename, &config)
+        .expect("Failed to parse source snippet");
     graph
 }
 
@@ -27,9 +27,10 @@ fn has_edge(
     to_suffix: &[&str],
     kind: DependencyEdgeKind,
 ) -> bool {
-    graph.edges.iter().any(|e| {
-        ends_with(&e.from, from_suffix) && ends_with(&e.to, to_suffix) && e.kind == kind
-    })
+    graph
+        .edges
+        .iter()
+        .any(|e| ends_with(&e.from, from_suffix) && ends_with(&e.to, to_suffix) && e.kind == kind)
 }
 
 // =========================================================================
@@ -66,25 +67,50 @@ fn test_rust_generic_struct_and_field_dependencies() {
 
     // Warehouse.single uses Container and Item
     assert!(
-        has_edge(&graph, &["Warehouse", "single"], &["Container"], DependencyEdgeKind::UsesFieldType),
+        has_edge(
+            &graph,
+            &["Warehouse", "single"],
+            &["Container"],
+            DependencyEdgeKind::UsesFieldType
+        ),
         "Expected Warehouse.single -> Container (UsesFieldType)"
     );
     assert!(
-        has_edge(&graph, &["Warehouse", "single"], &["Item"], DependencyEdgeKind::UsesFieldType),
+        has_edge(
+            &graph,
+            &["Warehouse", "single"],
+            &["Item"],
+            DependencyEdgeKind::UsesFieldType
+        ),
         "Expected Warehouse.single -> Item (UsesFieldType)"
     );
 
     // Warehouse.entry uses Pair, Item, and Tag
     assert!(
-        has_edge(&graph, &["Warehouse", "entry"], &["Pair"], DependencyEdgeKind::UsesFieldType),
+        has_edge(
+            &graph,
+            &["Warehouse", "entry"],
+            &["Pair"],
+            DependencyEdgeKind::UsesFieldType
+        ),
         "Expected Warehouse.entry -> Pair (UsesFieldType)"
     );
     assert!(
-        has_edge(&graph, &["Warehouse", "entry"], &["Item"], DependencyEdgeKind::UsesFieldType),
+        has_edge(
+            &graph,
+            &["Warehouse", "entry"],
+            &["Item"],
+            DependencyEdgeKind::UsesFieldType
+        ),
         "Expected Warehouse.entry -> Item (UsesFieldType)"
     );
     assert!(
-        has_edge(&graph, &["Warehouse", "entry"], &["Tag"], DependencyEdgeKind::UsesFieldType),
+        has_edge(
+            &graph,
+            &["Warehouse", "entry"],
+            &["Tag"],
+            DependencyEdgeKind::UsesFieldType
+        ),
         "Expected Warehouse.entry -> Tag (UsesFieldType)"
     );
 }
@@ -108,12 +134,22 @@ fn test_rust_generic_trait_bound_dispatch() {
     let graph = analyze_snippet(SupportedLanguage::Rust, code, "src/lib.rs");
 
     assert!(
-        has_edge(&graph, &["execute_inline_bound"], &["Worker", "do_work"], DependencyEdgeKind::Calls),
+        has_edge(
+            &graph,
+            &["execute_inline_bound"],
+            &["Worker", "do_work"],
+            DependencyEdgeKind::Calls
+        ),
         "Expected execute_inline_bound -> Worker.do_work (Calls)"
     );
 
     assert!(
-        has_edge(&graph, &["execute_where_clause"], &["Worker", "do_work"], DependencyEdgeKind::Calls),
+        has_edge(
+            &graph,
+            &["execute_where_clause"],
+            &["Worker", "do_work"],
+            DependencyEdgeKind::Calls
+        ),
         "Expected execute_where_clause -> Worker.do_work (Calls)"
     );
 }
@@ -138,11 +174,21 @@ fn test_rust_generic_multiple_trait_bounds() {
     let graph = analyze_snippet(SupportedLanguage::Rust, code, "src/lib.rs");
 
     assert!(
-        has_edge(&graph, &["execute_both_bounds"], &["Printable", "print"], DependencyEdgeKind::Calls),
+        has_edge(
+            &graph,
+            &["execute_both_bounds"],
+            &["Printable", "print"],
+            DependencyEdgeKind::Calls
+        ),
         "Expected execute_both_bounds -> Printable.print (Calls)"
     );
     assert!(
-        has_edge(&graph, &["execute_both_bounds"], &["Loggable", "log"], DependencyEdgeKind::Calls),
+        has_edge(
+            &graph,
+            &["execute_both_bounds"],
+            &["Loggable", "log"],
+            DependencyEdgeKind::Calls
+        ),
         "Expected execute_both_bounds -> Loggable.log (Calls)"
     );
 }
@@ -182,19 +228,39 @@ fn test_cpp_template_class_and_concrete_usage() {
     let graph = analyze_snippet(SupportedLanguage::Cpp, code, "src/garage.cpp");
 
     assert!(
-        has_edge(&graph, &["Garage", "car_box"], &["Box"], DependencyEdgeKind::UsesFieldType),
+        has_edge(
+            &graph,
+            &["Garage", "car_box"],
+            &["Box"],
+            DependencyEdgeKind::UsesFieldType
+        ),
         "Expected Garage.car_box -> Box (UsesFieldType)"
     );
     assert!(
-        has_edge(&graph, &["Garage", "car_box"], &["Car"], DependencyEdgeKind::UsesFieldType),
+        has_edge(
+            &graph,
+            &["Garage", "car_box"],
+            &["Car"],
+            DependencyEdgeKind::UsesFieldType
+        ),
         "Expected Garage.car_box -> Car (UsesFieldType)"
     );
     assert!(
-        has_edge(&graph, &["Garage", "mapped_car"], &["KeyValue"], DependencyEdgeKind::UsesFieldType),
+        has_edge(
+            &graph,
+            &["Garage", "mapped_car"],
+            &["KeyValue"],
+            DependencyEdgeKind::UsesFieldType
+        ),
         "Expected Garage.mapped_car -> KeyValue (UsesFieldType)"
     );
     assert!(
-        has_edge(&graph, &["Garage", "mapped_car"], &["Car"], DependencyEdgeKind::UsesFieldType),
+        has_edge(
+            &graph,
+            &["Garage", "mapped_car"],
+            &["Car"],
+            DependencyEdgeKind::UsesFieldType
+        ),
         "Expected Garage.mapped_car -> Car (UsesFieldType)"
     );
 }
@@ -222,15 +288,30 @@ fn test_cpp_template_member_chain_call() {
     let graph = analyze_snippet(SupportedLanguage::Cpp, code, "src/holder.cpp");
 
     assert!(
-        has_edge(&graph, &["operate_holder"], &["Holder"], DependencyEdgeKind::UsesParamType),
+        has_edge(
+            &graph,
+            &["operate_holder"],
+            &["Holder"],
+            DependencyEdgeKind::UsesParamType
+        ),
         "Expected operate_holder -> Holder (UsesParamType)"
     );
     assert!(
-        has_edge(&graph, &["operate_holder"], &["Vehicle"], DependencyEdgeKind::UsesParamType),
+        has_edge(
+            &graph,
+            &["operate_holder"],
+            &["Vehicle"],
+            DependencyEdgeKind::UsesParamType
+        ),
         "Expected operate_holder -> Vehicle (UsesParamType)"
     );
     assert!(
-        has_edge(&graph, &["operate_holder"], &["Vehicle", "honk"], DependencyEdgeKind::Calls),
+        has_edge(
+            &graph,
+            &["operate_holder"],
+            &["Vehicle", "honk"],
+            DependencyEdgeKind::Calls
+        ),
         "Expected operate_holder -> Vehicle.honk (Calls)"
     );
 }
@@ -260,11 +341,21 @@ fn test_cpp_nested_template_vector_usage() {
     let graph = analyze_snippet(SupportedLanguage::Cpp, code, "src/fleet.cpp");
 
     assert!(
-        has_edge(&graph, &["Fleet", "engines"], &["Container"], DependencyEdgeKind::UsesFieldType),
+        has_edge(
+            &graph,
+            &["Fleet", "engines"],
+            &["Container"],
+            DependencyEdgeKind::UsesFieldType
+        ),
         "Expected Fleet.engines -> Container (UsesFieldType)"
     );
     assert!(
-        has_edge(&graph, &["Fleet", "engines"], &["Engine"], DependencyEdgeKind::UsesFieldType),
+        has_edge(
+            &graph,
+            &["Fleet", "engines"],
+            &["Engine"],
+            DependencyEdgeKind::UsesFieldType
+        ),
         "Expected Fleet.engines -> Engine (UsesFieldType)"
     );
 }
@@ -290,7 +381,12 @@ fn test_java_generic_bound_method_call() {
     let graph = analyze_snippet(SupportedLanguage::Java, code, "src/Runner.java");
 
     assert!(
-        has_edge(&graph, &["Runner", "runService"], &["Service", "execute"], DependencyEdgeKind::Calls),
+        has_edge(
+            &graph,
+            &["Runner", "runService"],
+            &["Service", "execute"],
+            DependencyEdgeKind::Calls
+        ),
         "Expected Runner.runService -> Service.execute (Calls)"
     );
 }
@@ -312,11 +408,21 @@ fn test_java_generic_container_field_dependencies() {
     let graph = analyze_snippet(SupportedLanguage::Java, code, "src/Manager.java");
 
     assert!(
-        has_edge(&graph, &["Manager", "repo"], &["Repository"], DependencyEdgeKind::UsesFieldType),
+        has_edge(
+            &graph,
+            &["Manager", "repo"],
+            &["Repository"],
+            DependencyEdgeKind::UsesFieldType
+        ),
         "Expected Manager.repo -> Repository (UsesFieldType)"
     );
     assert!(
-        has_edge(&graph, &["Manager", "repo"], &["Entity"], DependencyEdgeKind::UsesFieldType),
+        has_edge(
+            &graph,
+            &["Manager", "repo"],
+            &["Entity"],
+            DependencyEdgeKind::UsesFieldType
+        ),
         "Expected Manager.repo -> Entity (UsesFieldType)"
     );
 }
@@ -340,15 +446,30 @@ fn test_java_multiple_type_parameters() {
     let graph = analyze_snippet(SupportedLanguage::Java, code, "src/Cache.java");
 
     assert!(
-        has_edge(&graph, &["Cache", "entry"], &["Mapping"], DependencyEdgeKind::UsesFieldType),
+        has_edge(
+            &graph,
+            &["Cache", "entry"],
+            &["Mapping"],
+            DependencyEdgeKind::UsesFieldType
+        ),
         "Expected Cache.entry -> Mapping (UsesFieldType)"
     );
     assert!(
-        has_edge(&graph, &["Cache", "entry"], &["KeyType"], DependencyEdgeKind::UsesFieldType),
+        has_edge(
+            &graph,
+            &["Cache", "entry"],
+            &["KeyType"],
+            DependencyEdgeKind::UsesFieldType
+        ),
         "Expected Cache.entry -> KeyType (UsesFieldType)"
     );
     assert!(
-        has_edge(&graph, &["Cache", "entry"], &["ValType"], DependencyEdgeKind::UsesFieldType),
+        has_edge(
+            &graph,
+            &["Cache", "entry"],
+            &["ValType"],
+            DependencyEdgeKind::UsesFieldType
+        ),
         "Expected Cache.entry -> ValType (UsesFieldType)"
     );
 }
@@ -375,7 +496,12 @@ fn test_python_typevar_bound_method_call() {
     let graph = analyze_snippet(SupportedLanguage::Python, code, "src/app.py");
 
     assert!(
-        has_edge(&graph, &["persist_entity"], &["Model", "save"], DependencyEdgeKind::Calls),
+        has_edge(
+            &graph,
+            &["persist_entity"],
+            &["Model", "save"],
+            DependencyEdgeKind::Calls
+        ),
         "Expected persist_entity -> Model.save (Calls)"
     );
 }
@@ -403,19 +529,39 @@ fn test_python_generic_class_and_nested_subscripts() {
     let graph = analyze_snippet(SupportedLanguage::Python, code, "src/storage.py");
 
     assert!(
-        has_edge(&graph, &["Storage", "single"], &["Box"], DependencyEdgeKind::UsesFieldType),
+        has_edge(
+            &graph,
+            &["Storage", "single"],
+            &["Box"],
+            DependencyEdgeKind::UsesFieldType
+        ),
         "Expected Storage.single -> Box (UsesFieldType)"
     );
     assert!(
-        has_edge(&graph, &["Storage", "single"], &["User"], DependencyEdgeKind::UsesFieldType),
+        has_edge(
+            &graph,
+            &["Storage", "single"],
+            &["User"],
+            DependencyEdgeKind::UsesFieldType
+        ),
         "Expected Storage.single -> User (UsesFieldType)"
     );
     assert!(
-        has_edge(&graph, &["Storage", "nested"], &["User"], DependencyEdgeKind::UsesFieldType),
+        has_edge(
+            &graph,
+            &["Storage", "nested"],
+            &["User"],
+            DependencyEdgeKind::UsesFieldType
+        ),
         "Expected Storage.nested -> User (UsesFieldType)"
     );
     assert!(
-        has_edge(&graph, &["Storage", "mapped"], &["User"], DependencyEdgeKind::UsesFieldType),
+        has_edge(
+            &graph,
+            &["Storage", "mapped"],
+            &["User"],
+            DependencyEdgeKind::UsesFieldType
+        ),
         "Expected Storage.mapped -> User (UsesFieldType)"
     );
 }
@@ -432,7 +578,12 @@ fn test_python_assignment_type_alias() {
     let graph = analyze_snippet(SupportedLanguage::Python, code, "src/alias.py");
 
     assert!(
-        has_edge(&graph, &["AccountList"], &["Account"], DependencyEdgeKind::Aliases),
+        has_edge(
+            &graph,
+            &["AccountList"],
+            &["Account"],
+            DependencyEdgeKind::Aliases
+        ),
         "Expected AccountList -> Account (Aliases)"
     );
 }
@@ -461,7 +612,11 @@ fn test_python_wildcard_import_cycle() {
             pass
     "#;
 
-    let _graph = analyze_snippet(SupportedLanguage::Python, code, "Python3/tests/TestLexer.py");
+    let _graph = analyze_snippet(
+        SupportedLanguage::Python,
+        code,
+        "Python3/tests/TestLexer.py",
+    );
 }
 
 #[test]
@@ -515,23 +670,48 @@ fn test_constructor_and_destructor_dependencies() {
 
     let graph = analyze_snippet(SupportedLanguage::Cpp, code, "Server.cpp");
     assert!(
-        has_edge(&graph, &["Server"], &["Server", "Server"], DependencyEdgeKind::NestedIn),
+        has_edge(
+            &graph,
+            &["Server"],
+            &["Server", "Server"],
+            DependencyEdgeKind::NestedIn
+        ),
         "Expected Server -> Server.Server (NestedIn)"
     );
     assert!(
-        has_edge(&graph, &["Server", "Server"], &["Config"], DependencyEdgeKind::UsesParamType),
+        has_edge(
+            &graph,
+            &["Server", "Server"],
+            &["Config"],
+            DependencyEdgeKind::UsesParamType
+        ),
         "Expected Server.Server -> Config (UsesParamType)"
     );
     assert!(
-        has_edge(&graph, &["Server", "Server"], &["Logger", "log"], DependencyEdgeKind::Calls),
+        has_edge(
+            &graph,
+            &["Server", "Server"],
+            &["Logger", "log"],
+            DependencyEdgeKind::Calls
+        ),
         "Expected Server.Server -> Logger.log (Calls)"
     );
     assert!(
-        has_edge(&graph, &["Server"], &["Server", "~Server"], DependencyEdgeKind::NestedIn),
+        has_edge(
+            &graph,
+            &["Server"],
+            &["Server", "~Server"],
+            DependencyEdgeKind::NestedIn
+        ),
         "Expected Server -> Server.~Server (NestedIn)"
     );
     assert!(
-        has_edge(&graph, &["Server", "~Server"], &["Logger", "log"], DependencyEdgeKind::Calls),
+        has_edge(
+            &graph,
+            &["Server", "~Server"],
+            &["Logger", "log"],
+            DependencyEdgeKind::Calls
+        ),
         "Expected Server.~Server -> Logger.log (Calls)"
     );
 }
@@ -557,11 +737,21 @@ fn test_c_parenthesized_cast_and_call_disambiguation() {
     let graph = analyze_snippet(SupportedLanguage::C, code, "src/math.c");
 
     assert!(
-        has_edge(&graph, &["do_cast"], &["CustomInt"], DependencyEdgeKind::CastsTo),
+        has_edge(
+            &graph,
+            &["do_cast"],
+            &["CustomInt"],
+            DependencyEdgeKind::CastsTo
+        ),
         "Expected do_cast -> CustomInt (CastsTo)"
     );
     assert!(
-        has_edge(&graph, &["do_call"], &["helper_func"], DependencyEdgeKind::Calls),
+        has_edge(
+            &graph,
+            &["do_call"],
+            &["helper_func"],
+            DependencyEdgeKind::Calls
+        ),
         "Expected do_call -> helper_func (Calls)"
     );
 }
@@ -604,45 +794,85 @@ fn test_c_advanced_cast_and_call_scenarios() {
 
     // 1. Nested cast
     assert!(
-        has_edge(&graph, &["do_nested_cast"], &["CustomInt"], DependencyEdgeKind::CastsTo),
+        has_edge(
+            &graph,
+            &["do_nested_cast"],
+            &["CustomInt"],
+            DependencyEdgeKind::CastsTo
+        ),
         "Expected do_nested_cast -> CustomInt (CastsTo)"
     );
 
     // 2. Nested call
     assert!(
-        has_edge(&graph, &["do_nested_call"], &["helper_func"], DependencyEdgeKind::Calls),
+        has_edge(
+            &graph,
+            &["do_nested_call"],
+            &["helper_func"],
+            DependencyEdgeKind::Calls
+        ),
         "Expected do_nested_call -> helper_func (Calls)"
     );
 
     // 3. Primitive cast
     assert!(
-        has_edge(&graph, &["do_primitive_cast"], &["int"], DependencyEdgeKind::CastsTo),
+        has_edge(
+            &graph,
+            &["do_primitive_cast"],
+            &["int"],
+            DependencyEdgeKind::CastsTo
+        ),
         "Expected do_primitive_cast -> int (CastsTo)"
     );
 
     // 4. Cast in expression
     assert!(
-        has_edge(&graph, &["do_expr_cast"], &["CustomInt"], DependencyEdgeKind::CastsTo),
+        has_edge(
+            &graph,
+            &["do_expr_cast"],
+            &["CustomInt"],
+            DependencyEdgeKind::CastsTo
+        ),
         "Expected do_expr_cast -> CustomInt (CastsTo)"
     );
 
     // 5. Cast of call result (should have CastsTo CustomInt AND Calls helper_func)
     assert!(
-        has_edge(&graph, &["do_cast_of_call"], &["CustomInt"], DependencyEdgeKind::CastsTo),
+        has_edge(
+            &graph,
+            &["do_cast_of_call"],
+            &["CustomInt"],
+            DependencyEdgeKind::CastsTo
+        ),
         "Expected do_cast_of_call -> CustomInt (CastsTo)"
     );
     assert!(
-        has_edge(&graph, &["do_cast_of_call"], &["helper_func"], DependencyEdgeKind::Calls),
+        has_edge(
+            &graph,
+            &["do_cast_of_call"],
+            &["helper_func"],
+            DependencyEdgeKind::Calls
+        ),
         "Expected do_cast_of_call -> helper_func (Calls)"
     );
 
     // 6. Call with cast argument (should have Calls helper_func AND CastsTo CustomInt)
     assert!(
-        has_edge(&graph, &["do_call_with_cast"], &["helper_func"], DependencyEdgeKind::Calls),
+        has_edge(
+            &graph,
+            &["do_call_with_cast"],
+            &["helper_func"],
+            DependencyEdgeKind::Calls
+        ),
         "Expected do_call_with_cast -> helper_func (Calls)"
     );
     assert!(
-        has_edge(&graph, &["do_call_with_cast"], &["CustomInt"], DependencyEdgeKind::CastsTo),
+        has_edge(
+            &graph,
+            &["do_call_with_cast"],
+            &["CustomInt"],
+            DependencyEdgeKind::CastsTo
+        ),
         "Expected do_call_with_cast -> CustomInt (CastsTo)"
     );
 }
@@ -667,11 +897,21 @@ fn test_c_pointer_cast_scenarios() {
     let graph = analyze_snippet(SupportedLanguage::C, code, "src/points.c");
 
     assert!(
-        has_edge(&graph, &["do_ptr_cast"], &["CustomInt"], DependencyEdgeKind::CastsTo),
+        has_edge(
+            &graph,
+            &["do_ptr_cast"],
+            &["CustomInt"],
+            DependencyEdgeKind::CastsTo
+        ),
         "Expected do_ptr_cast -> CustomInt (CastsTo)"
     );
     assert!(
-        has_edge(&graph, &["do_ptr_cast"], &["Point"], DependencyEdgeKind::CastsTo),
+        has_edge(
+            &graph,
+            &["do_ptr_cast"],
+            &["Point"],
+            DependencyEdgeKind::CastsTo
+        ),
         "Expected do_ptr_cast -> Point (CastsTo)"
     );
 }
@@ -692,9 +932,12 @@ fn test_c_function_pointer_cast_and_invocation() {
     let graph = analyze_snippet(SupportedLanguage::C, code, "src/fp.c");
 
     assert!(
-        has_edge(&graph, &["test_fp"], &["Callback"], DependencyEdgeKind::CastsTo),
+        has_edge(
+            &graph,
+            &["test_fp"],
+            &["Callback"],
+            DependencyEdgeKind::CastsTo
+        ),
         "Expected test_fp -> Callback (CastsTo)"
     );
 }
-
-

@@ -2,7 +2,7 @@ use anyhow::Result;
 use std::path::Path;
 
 use crate::config::AnalyzerConfig;
-use crate::export::graph::build_dependency_graph;
+use crate::export::build_dependency_graph;
 pub use crate::extraction::{extract_from_cst, extract_ir as parse_path};
 use crate::extraction::{extract_ir, parse_source};
 use crate::language::SupportedLanguage;

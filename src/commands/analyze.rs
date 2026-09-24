@@ -3,7 +3,7 @@ use omnideps::{
     analyzer::analyze_project,
     config::AnalyzerConfig,
     debug::print_references,
-    export::summary::build_analysis_summary,
+    export::build_analysis_summary,
     model::{AnalysisSummary, DependencyGraph, Module},
 };
 use std::fs;
@@ -22,9 +22,10 @@ pub fn execute(
     json_out: Option<&Path>,
     csv_out: Option<&Path>,
     debug_refs: bool,
-    config: &AnalyzerConfig,
+    config_path: Option<&Path>,
 ) -> Result<()> {
-    let (resolved_modules, graph) = analyze_project(path, config)?;
+    let config = AnalyzerConfig::load_or_default(config_path)?;
+    let (resolved_modules, graph) = analyze_project(path, &config)?;
     let summary = build_analysis_summary(&resolved_modules);
 
     print_report(&summary, &resolved_modules, path, debug_refs);
@@ -67,10 +68,7 @@ fn export_results(
                 .and_then(|n| n.to_str())
                 .unwrap_or("graph.json");
             let cyto_path = parent.join(format!("cyto_{}", file_name));
-            omnideps::export::cytoscape::export_graphs(
-                std::slice::from_ref(graph),
-                &cyto_path,
-            )?;
+            omnideps::export::cytoscape::export_graphs(std::slice::from_ref(graph), &cyto_path)?;
             println!("Cytoscape graph saved to {}", cyto_path.display());
         }
     }

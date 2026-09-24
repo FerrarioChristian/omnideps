@@ -1,14 +1,14 @@
 pub mod strategies;
 
+use anyhow::{Result, anyhow, bail};
 use std::fs;
 use std::path::Path;
-use anyhow::{anyhow, bail, Result};
 use tree_sitter::{Language, Node, Parser};
 use walkdir::WalkDir;
 
 use crate::config::AnalyzerConfig;
 use crate::heuristics::parsers::try_parse_package_declaration;
-use crate::heuristics::{dispatch_node, ParsedItem};
+use crate::heuristics::{ParsedItem, dispatch_node};
 use crate::language::SupportedLanguage;
 use crate::model::{Component, Field, Module, TypeRef};
 use crate::resolver::primitives::PrimitiveRegistry;

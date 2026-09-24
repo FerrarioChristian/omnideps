@@ -1,12 +1,10 @@
 use anyhow::{Context, Result};
 use omnideps::model::DependencyGraph;
 use std::fs;
- 
 
 pub fn execute(input: &std::path::Path, output: &std::path::Path) -> Result<()> {
-    let input_str = fs::read_to_string(input).with_context(|| {
-        format!("Impossibile leggere il file di input: {}", input.display())
-    })?;
+    let input_str = fs::read_to_string(input)
+        .with_context(|| format!("Impossibile leggere il file di input: {}", input.display()))?;
 
     let graphs: Vec<DependencyGraph> = match serde_json::from_str(&input_str) {
         Ok(list) => list,

@@ -22,21 +22,45 @@ pub fn print_references(modules: &[Module]) {
     println!("  ❌ FAILED      : Resolution completely failed (missing or unparseable)");
     println!("  🎯 EVALUATED   : Access path fully evaluated to a concrete target");
     println!("  🔀 UNION       : Multiple possible types (e.g. dynamic typing or overloaded)");
-    println!("");
-    println!("[{:^14}] {:<30} | {}", "STATE", "REFERENCE TYPE", "TARGET (CONTEXT)");
+    println!();
+    println!(
+        "[{:^14}] {:<30} | TARGET (CONTEXT)",
+        "STATE", "REFERENCE TYPE"
+    );
     println!("{:-<16}{:-<31}|{:-<40}", "", "", "");
     for m in modules {
         visit_module(m);
     }
 }
 
-/// Recursively visits a module's contents (sub-modules, structured types, and free functions).
+/// Recursively visits a module's contents (sub-modules, structured types, free functions, impl blocks, and free variables).
 fn visit_module(m: &Module) {
+    let mod_context = m.name.join("::");
     for st in &m.structured_types {
         visit_structured_type(st);
     }
     for ff in &m.free_functions {
-        visit_function(ff, &m.name.join("::"));
+        visit_function(ff, &mod_context);
+    }
+    for ib in &m.impl_blocks {
+        let ib_context = format!("{}::impl {}", mod_context, ib.name.join("::"));
+        print_ref("ImplFor", &ib_context, &ib.impl_for);
+        if let Some(trait_ref) = &ib.implements_trait {
+            print_ref("ImplementsTrait", &ib_context, trait_ref);
+        }
+        for method in &ib.methods {
+            visit_function(method, &ib_context);
+        }
+    }
+    for fv in &m.free_variables {
+        print_ref(&format!("FreeVar '{}'", fv.name), &mod_context, &fv.ty);
+    }
+    for ta in &m.type_aliases {
+        print_ref(
+            &format!("TypeAlias '{}'", ta.name.join("::")),
+            &mod_context,
+            &ta.target,
+        );
     }
     for sub in &m.sub_modules {
         visit_module(sub);
@@ -47,6 +71,11 @@ fn visit_module(m: &Module) {
 /// for its super-types, fields, and recursively visiting its methods and nested types.
 fn visit_structured_type(st: &StructuredType) {
     let context = st.name.join("::");
+    for tp in &st.type_parameters {
+        for bound in &tp.bounds {
+            print_ref(&format!("TypeVarBound '{}'", tp.name), &context, bound);
+        }
+    }
     for sup in &st.super_types {
         print_ref("SuperType", &context, sup);
     }
@@ -65,6 +94,11 @@ fn visit_structured_type(st: &StructuredType) {
 /// and recursively visiting its behavioral body block.
 fn visit_function(f: &Function, context: &str) {
     let fn_context = format!("{}::{}", context, f.name.last().unwrap_or(&"".to_string()));
+    for tp in &f.type_parameters {
+        for bound in &tp.bounds {
+            print_ref(&format!("TypeVarBound '{}'", tp.name), &fn_context, bound);
+        }
+    }
     for p in &f.signature.parameters {
         print_ref(
             &format!("Param '{}'", p.name.as_deref().unwrap_or("?")),
@@ -105,18 +139,10 @@ fn print_ref(kind: &str, context: &str, tr: &TypeRef) {
         TypeRef::Resolved(q) => ("✅ RESOLVED", q.join("::")),
         TypeRef::External(q) => ("🌐 EXTERNAL", q.join("::")),
         TypeRef::Failed(q) => ("❌ FAILED", q.join("::")),
-        TypeRef::EvaluatedAccess(acc, ty) => {
-            ("🎯 EVALUATED", format!("{:?} ➡ {:?}", acc, ty))
-        }
+        TypeRef::EvaluatedAccess(acc, ty) => ("🎯 EVALUATED", format!("{:?} ➡ {:?}", acc, ty)),
         TypeRef::Union(types) => ("🔀 UNION", format!("{} variants", types.len())),
-        TypeRef::Generic { base, args } => (
-            "🧬 GENERIC",
-            format!("{:?}<{:?}>", base, args),
-        ),
-        TypeRef::TypeVar { name, bounds } => (
-            "🏷️ TYPEVAR",
-            format!("{}: {:?}", name, bounds),
-        ),
+        TypeRef::Generic { base, args } => ("🧬 GENERIC", format!("{:?}<{:?}>", base, args)),
+        TypeRef::TypeVar { name, bounds } => ("🏷️ TYPEVAR", format!("{}: {:?}", name, bounds)),
     };
     println!("[{:^14}] {:<30} | {} ({})", state, kind, text, context);
 }

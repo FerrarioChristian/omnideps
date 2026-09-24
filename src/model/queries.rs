@@ -48,4 +48,3 @@ pub enum TypeRef {
         bounds: Vec<TypeRef>,
     },
 }
-

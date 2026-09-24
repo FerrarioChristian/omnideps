@@ -9,10 +9,25 @@ use std::fs::{self, OpenOptions};
 use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-/// Executes a benchmark run for a single target directory against its `test.yml` specification.
+/// Executes a benchmark run for a single target directory against its `test.yml` specification,
+/// loading the configuration from an optional file path or using defaults.
+pub fn execute_run(
+    testdir: &Path,
+    output: Option<&Path>,
+    config_path: Option<&Path>,
+) -> Result<()> {
+    let config = AnalyzerConfig::load_or_default(config_path)?;
+    execute_run_with_config(testdir, output, &config)
+}
+
+/// Executes a benchmark run with a pre-configured [`AnalyzerConfig`].
 ///
 /// Produces `report.md` and `report.json` in the specified output directory and prints node/edge statistics.
-pub fn execute_run(testdir: &Path, output: Option<&Path>, config: &AnalyzerConfig) -> Result<()> {
+pub fn execute_run_with_config(
+    testdir: &Path,
+    output: Option<&Path>,
+    config: &AnalyzerConfig,
+) -> Result<()> {
     let manifest_path = testdir.join("test.yml");
     if !manifest_path.exists() {
         anyhow::bail!("test.yml not found in {}", testdir.display());
@@ -60,7 +75,13 @@ pub fn execute_run(testdir: &Path, output: Option<&Path>, config: &AnalyzerConfi
 ///
 /// Aggregates validation scores across C, C++, Java, Rust, and Python, prints summary tables,
 /// and appends timestamped records to `results.csv`.
-pub fn execute_all(output: Option<&Path>, config: &AnalyzerConfig) -> Result<()> {
+pub fn execute_all(output: Option<&Path>, config_path: Option<&Path>) -> Result<()> {
+    let config = AnalyzerConfig::load_or_default(config_path)?;
+    execute_all_with_config(output, &config)
+}
+
+/// Discovers and executes all language benchmark suites with a pre-configured [`AnalyzerConfig`].
+pub fn execute_all_with_config(output: Option<&Path>, config: &AnalyzerConfig) -> Result<()> {
     let benchmarks_dir = Path::new("tests/benchmarks");
 
     if !benchmarks_dir.exists() {
@@ -85,12 +106,16 @@ pub fn execute_all(output: Option<&Path>, config: &AnalyzerConfig) -> Result<()>
                 println!("Running benchmark for {}...", lang);
 
                 let sub_out_dir = output.map(|p| p.join(dir_name.as_ref()));
-                if let Err(e) = execute_run(&path, sub_out_dir.as_deref(), config) {
+                if let Err(e) = execute_run_with_config(&path, sub_out_dir.as_deref(), config) {
                     log::warn!(" benchmark run failed on {:?}: {}", path, e);
                 }
 
                 let report_path = sub_out_dir.unwrap_or_else(|| path.join("report.json"));
-                let report_path = if report_path.is_dir() { report_path.join("report.json") } else { report_path };
+                let report_path = if report_path.is_dir() {
+                    report_path.join("report.json")
+                } else {
+                    report_path
+                };
                 if report_path.exists() {
                     let content = fs::read_to_string(&report_path)?;
                     let report: omnideps::model::TestReport = serde_json::from_str(&content)?;

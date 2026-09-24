@@ -27,7 +27,10 @@ fn test_benchmarks_analysis() {
             let ext = path.extension().and_then(|s| s.to_str()).unwrap_or("");
 
             // Filtra solo estensioni supportate
-            if !matches!(ext, "rs" | "java" | "py" | "c" | "h" | "cpp" | "cxx" | "cc" | "hxx") {
+            if !matches!(
+                ext,
+                "rs" | "java" | "py" | "c" | "h" | "cpp" | "cxx" | "cc" | "hxx"
+            ) {
                 continue;
             }
 
@@ -67,11 +70,8 @@ fn test_benchmarks_analysis() {
 
             // Esporta anche la versione Cytoscape per i test
             let cyto_path = outputs_dir.join(format!("cyto_{}.json", filename));
-            omnideps::export::cytoscape::export_graphs(
-                std::slice::from_ref(&graph),
-                &cyto_path,
-            )
-            .expect("Impossibile esportare il grafo Cytoscape di test");
+            omnideps::export::cytoscape::export_graphs(std::slice::from_ref(&graph), &cyto_path)
+                .expect("Impossibile esportare il grafo Cytoscape di test");
         }
     }
 }

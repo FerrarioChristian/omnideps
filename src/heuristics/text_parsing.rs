@@ -26,11 +26,12 @@ pub fn node_text(node: Node, source: &str) -> String {
 pub fn split_qualified_name(text: &str) -> QualifiedName {
     // Remove generic parameters for basic name resolution
     let text = text.split('<').next().unwrap_or(text);
-    
+
     // Normalize C/C++ pointer access to dot notation for uniform splitting
     let text_norm = text.replace("->", ".");
 
-    text_norm.split(&[':', '.'][..])
+    text_norm
+        .split(&[':', '.'][..])
         .filter(|s| !s.trim().is_empty())
         .map(|s| s.trim().to_string())
         .collect()
@@ -96,10 +97,14 @@ fn extract_identifier_from_declarator(mut decl: Node, source: &str) -> Option<St
     }
 
     let text = node_text(decl, source).trim().to_string();
-    if decl.kind() == "identifier" || decl.kind() == "type_identifier" || decl.kind() == "pattern" || decl.kind() == "field_identifier" || decl.kind() == "destructor_name" {
-        if !text.is_empty() {
-            return Some(text);
-        }
+    if (decl.kind() == "identifier"
+        || decl.kind() == "type_identifier"
+        || decl.kind() == "pattern"
+        || decl.kind() == "field_identifier"
+        || decl.kind() == "destructor_name")
+        && !text.is_empty()
+    {
+        return Some(text);
     }
 
     // Take just the name before '(' or '='
@@ -131,10 +136,10 @@ pub fn extract_identifier(node: Node, source: &str) -> Option<String> {
     }
 
     // For C/C++ style declarations with nested declarators
-    if let Some(decl) = node.child_by_field_name("declarator") {
-        if let Some(ident) = extract_identifier_from_declarator(decl, source) {
-            return Some(ident);
-        }
+    if let Some(decl) = node.child_by_field_name("declarator")
+        && let Some(ident) = extract_identifier_from_declarator(decl, source)
+    {
+        return Some(ident);
     }
 
     if let Some(n) = node

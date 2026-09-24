@@ -1,5 +1,5 @@
-use std::path::Path;
 use crate::model::{ImplBlock, Module, Query, TypeRef};
+use std::path::Path;
 
 /// Wraps extracted components in a nested module hierarchy matching the file's relative path on disk.
 ///
@@ -14,19 +14,15 @@ pub fn apply_directory_strategy(
         .components()
         .filter_map(|c| {
             let s = c.as_os_str().to_string_lossy().to_string();
-            if s == "." || s == ".." {
-                None
-            } else {
-                Some(s)
-            }
+            if s == "." || s == ".." { None } else { Some(s) }
         })
         .collect();
 
     // Remove common source roots from the beginning of the path
-    if let Some(first) = path_components.first() {
-        if matches!(first.as_str(), "src" | "lib" | "include") {
-            path_components.remove(0);
-        }
+    if let Some(first) = path_components.first()
+        && matches!(first.as_str(), "src" | "lib" | "include")
+    {
+        path_components.remove(0);
     }
 
     if let Some(last) = path_components.last_mut()
@@ -144,7 +140,7 @@ pub fn apply_package_strategy(
 /// a synthetic [`crate::model::ImplBlock`] for cross-module definitions.
 ///
 /// For languages without qualified top-level function names (Java, Python, Rust, C), this pass performs zero modifications.
-pub fn link_out_of_line_methods(modules: &mut Vec<Module>) {
+pub fn link_out_of_line_methods(modules: &mut [Module]) {
     for module in modules.iter_mut() {
         let mut methods_to_move = vec![];
 
@@ -180,9 +176,9 @@ pub fn link_out_of_line_methods(modules: &mut Vec<Module>) {
             if !found {
                 module.impl_blocks.push(ImplBlock {
                     name: class_name.to_vec(),
-                    impl_for: TypeRef::ResolutionQuery(
-                        Query::Find(class_name.last().unwrap().clone()),
-                    ),
+                    impl_for: TypeRef::ResolutionQuery(Query::Find(
+                        class_name.last().unwrap().clone(),
+                    )),
                     implements_trait: None,
                     methods: vec![{
                         let mut m = method.clone();

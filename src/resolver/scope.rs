@@ -2,24 +2,24 @@ use crate::config::AnalyzerConfig;
 use crate::model::{Block, Function, ImplBlock, Module, StructuredType, TypeRef};
 use std::collections::HashMap;
 
-/// Un identificatore univoco per uno Scope all'interno dell'Arena.
+/// Unique identifier for a scope node within the [`ScopeTree`] arena.
 pub type ScopeId = usize;
 
-/// Rappresenta il tipo di un simbolo all'interno di uno Scope.
+/// Represents the classification and payload of a symbol bound within a lexical scope.
 #[derive(Debug, Clone)]
 pub enum Symbol {
-    /// Un sottomodulo. Punta al suo Scope.
+    /// A submodule pointing to its nested [`ScopeId`].
     Module(ScopeId),
-    /// Un tipo strutturato (Classe, Struct). Punta al suo Scope.
+    /// A structured type (class, struct, interface) pointing to its internal type [`ScopeId`].
     Type(ScopeId),
-    /// Un Type Alias. Punta al tipo bersaglio.
+    /// A type alias pointing to its target [`TypeRef`].
     TypeAlias(TypeRef),
-    /// Un valore concreto: Variabile locale, parametro, campo o funzione.
-    /// Il TypeRef indica il tipo del valore (o il tipo di ritorno per le funzioni).
+    /// A concrete term: local variable, parameter, field, or function.
+    /// The [`TypeRef`] specifies the value's type (or return type for functions).
     Value(TypeRef),
 }
 
-/// Un singolo Environment Lexicale (Scope).
+/// A single lexical environment node (Scope) within the hierarchy.
 #[derive(Debug, Clone)]
 pub struct Scope {
     pub id: ScopeId,
@@ -34,7 +34,10 @@ pub struct Scope {
     pub is_phantom: bool,
 }
 
-/// L'albero gerarchico degli Scope Lexicali, implementato tramite Arena Pattern.
+/// Hierarchical tree of lexical scopes ($\mathcal{E}$), implemented via an arena allocator.
+///
+/// Models the global symbol environment $\mathcal{E}$ formalised in Chapter 7, enabling
+/// scope climbing, inheritance traversing, and global query resolution.
 #[derive(Debug, Clone)]
 pub struct ScopeTree {
     pub arena: Vec<Scope>,
@@ -43,7 +46,7 @@ pub struct ScopeTree {
 }
 
 impl ScopeTree {
-    /// Costruisce l'albero degli scope a partire dai moduli estratti.
+    /// Constructs the global Scope Tree $\mathcal{E}$ from extracted IR modules $\mathcal{D}$.
     pub fn build(modules: &[Module], config: &AnalyzerConfig) -> Self {
         let mut tree = ScopeTree {
             arena: vec![Scope {
@@ -66,6 +69,7 @@ impl ScopeTree {
             tree.register_module(m, 0, config);
         }
 
+        // Deferred registration of impl blocks across modules
         let pending = std::mem::take(&mut tree.pending_impl_blocks);
         for (ib, parent_id, lang) in pending {
             tree.register_impl_block(&ib, parent_id, config, &lang);
@@ -74,7 +78,7 @@ impl ScopeTree {
         tree
     }
 
-    /// Crea un nuovo scope figlio.
+    /// Creates a new child scope in the arena.
     pub fn new_scope(&mut self, parent: ScopeId, name: String) -> ScopeId {
         let id = self.arena.len();
         self.arena.push(Scope {
@@ -92,7 +96,7 @@ impl ScopeTree {
         id
     }
 
-    /// Inserisce un simbolo all'interno di uno scope.
+    /// Binds a symbol within the specified scope.
     pub fn define_symbol(&mut self, scope_id: ScopeId, name: String, symbol: Symbol) {
         self.arena[scope_id].symbols.insert(name, symbol);
     }
@@ -131,7 +135,7 @@ impl ScopeTree {
             self.arena[scope_id].language = m.language.clone();
         }
 
-        // Aggiungi import
+        // Add imports
         for imp in &m.imports {
             if !self.arena[scope_id].imports.contains(imp) {
                 self.arena[scope_id].imports.push(imp.clone());
@@ -144,7 +148,7 @@ impl ScopeTree {
             self.define_symbol(scope_id, name, Symbol::TypeAlias(ta.target.clone()));
         }
 
-        // Tipi strutturati
+        // Structured types
         for st in &m.structured_types {
             self.register_structured_type(
                 st,
@@ -163,7 +167,7 @@ impl ScopeTree {
             ));
         }
 
-        // Funzioni libere
+        // Free functions
         for ff in &m.free_functions {
             let name = ff.name.last().cloned().unwrap_or_default();
             self.define_symbol(
@@ -180,12 +184,12 @@ impl ScopeTree {
             );
         }
 
-        // Variabili libere
+        // Free variables
         for fv in &m.free_variables {
             self.define_symbol(scope_id, fv.name.clone(), Symbol::Value(fv.ty.clone()));
         }
 
-        // Sottomoduli
+        // Submodules
         for sub in &m.sub_modules {
             self.register_module(sub, scope_id, config);
         }
@@ -206,7 +210,9 @@ impl ScopeTree {
         self.define_symbol(parent_id, name.clone(), Symbol::Type(class_scope));
 
         for tp in &st.type_parameters {
-            self.arena[class_scope].type_parameters.push(tp.name.clone());
+            self.arena[class_scope]
+                .type_parameters
+                .push(tp.name.clone());
             let phantom_scope = self.new_scope(class_scope, tp.name.clone());
             self.arena[phantom_scope].is_phantom = true;
             self.arena[phantom_scope].super_types = tp.bounds.clone();
@@ -231,7 +237,7 @@ impl ScopeTree {
         }
         path.reverse();
         let type_ref = TypeRef::Resolved(path);
-        
+
         for method in &st.methods {
             let m_name = method.name.last().cloned().unwrap_or_default();
             if !method.is_constructor && m_name != name && !m_name.starts_with('~') {
@@ -285,7 +291,7 @@ impl ScopeTree {
         if let Some(Symbol::Type(id)) = self.arena[parent_id].symbols.get(&target_name) {
             target_scope_id = Some(*id);
         }
-        
+
         // If not found in parent, try to find the class globally (common for out-of-line C++ methods)
         if target_scope_id.is_none() {
             for (id, scope) in self.arena.iter().enumerate() {
@@ -299,7 +305,8 @@ impl ScopeTree {
 
         log::trace!(
             "register_impl_block target_name: {} resolved to: {:?}",
-            target_name, target_scope_id
+            target_name,
+            target_scope_id
         );
         let class_scope = if let Some(id) = target_scope_id {
             id
@@ -342,24 +349,22 @@ impl ScopeTree {
             );
 
             // Magic support for Rust's `Deref` trait which implies inheritance
-            if ta_name == "Target" {
-                if let Some(trait_ref) = &ib.implements_trait {
-                    let is_deref = match trait_ref {
-                        TypeRef::Resolved(qn) | TypeRef::Unresolved(qn) | TypeRef::External(qn) => {
-                            qn.last().map(|s| s.as_str()) == Some("Deref")
-                        }
-                        TypeRef::ResolutionQuery(q) => {
-                            crate::resolver::executor::extract_base_name(q) == "Deref"
-                        }
-                        _ => false,
-                    };
-                    if is_deref {
-                        self.arena[class_scope].super_types.push(ta.target.clone());
+            if ta_name == "Target"
+                && let Some(trait_ref) = &ib.implements_trait
+            {
+                let is_deref = match trait_ref {
+                    TypeRef::Resolved(qn) | TypeRef::Unresolved(qn) | TypeRef::External(qn) => {
+                        qn.last().map(|s| s.as_str()) == Some("Deref")
                     }
+                    TypeRef::ResolutionQuery(q) => {
+                        crate::resolver::executor::extract_base_name(q) == "Deref"
+                    }
+                    _ => false,
+                };
+                if is_deref {
+                    self.arena[class_scope].super_types.push(ta.target.clone());
                 }
             }
-
-
         }
     }
 
