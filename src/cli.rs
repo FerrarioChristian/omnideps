@@ -33,6 +33,10 @@ pub enum Commands {
         #[arg(short = 'd', long)]
         debug_refs: bool,
 
+        /// Print debug info ONLY for failed references
+        #[arg(short = 'f', long)]
+        failed_only: bool,
+
         /// Calculate and display analysis summary statistics (modules, types, references)
         #[arg(short = 's', long)]
         summary: bool,

@@ -16,6 +16,7 @@ fn main() -> Result<()> {
             output,
             csv,
             debug_refs,
+            failed_only,
             summary,
             config,
         } => {
@@ -24,6 +25,7 @@ fn main() -> Result<()> {
                 output.as_deref(),
                 csv.as_deref(),
                 *debug_refs,
+                *failed_only,
                 config.as_deref(),
                 *summary,
             )?;

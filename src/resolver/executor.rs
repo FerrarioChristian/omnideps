@@ -666,25 +666,51 @@ fn resolve_super_keyword(
     resolve_type: bool,
     visited: &mut std::collections::HashSet<String>,
 ) -> Option<TypeRef> {
-    let mut curr = Some(scope_id);
-    while let Some(id) = curr {
-        let scope = &ctx.tree.arena[id];
-        if !scope.super_types.is_empty() {
-            let st = &scope.super_types[0];
-            return match st {
-                TypeRef::ResolutionQuery(q) => {
-                    evaluate_query(ctx, q, id, resolve_type, visited).or(Some(st.clone()))
-                }
-                TypeRef::Unresolved(qn) => {
-                    let query = Query::Find(qn.last().cloned().unwrap_or_default());
-                    evaluate_query(ctx, &query, id, resolve_type, visited).or(Some(st.clone()))
-                }
-                _ => Some(st.clone()),
-            };
-        }
-        curr = scope.parent;
+    let super_key = format!("super:{}", scope_id);
+    if !visited.insert(super_key.clone()) {
+        return None;
     }
-    None
+
+    let result = (|| {
+        let mut curr = Some(scope_id);
+        while let Some(id) = curr {
+            let scope = &ctx.tree.arena[id];
+            if !scope.super_types.is_empty() {
+                let st = &scope.super_types[0];
+                return match st {
+                    TypeRef::ResolutionQuery(q) => {
+                        evaluate_query(ctx, q, id, resolve_type, visited).or(Some(st.clone()))
+                    }
+                    TypeRef::Unresolved(qn) => {
+                        let query = Query::Find(qn.last().cloned().unwrap_or_default());
+                        evaluate_query(ctx, &query, id, resolve_type, visited).or(Some(st.clone()))
+                    }
+                    _ => Some(st.clone()),
+                };
+            }
+            curr = scope.parent;
+        }
+
+        // If no super_types were found (e.g. Rust module `super::`),
+        // resolve to the parent module in the module hierarchy
+        let mut mod_curr = Some(scope_id);
+        while let Some(id) = mod_curr {
+            let scope = &ctx.tree.arena[id];
+            if scope.is_module {
+                if let Some(parent_id) = scope.parent {
+                    let parent_path = build_path_from_scope(ctx.tree, parent_id);
+                    return Some(TypeRef::Resolved(parent_path));
+                }
+                break;
+            }
+            mod_curr = scope.parent;
+        }
+
+        None
+    })();
+
+    visited.remove(&super_key);
+    result
 }
 
 /// Helper function to resolve the "Self" keyword dynamically.
@@ -710,6 +736,97 @@ fn resolve_self_keyword(ctx: &ExecutorContext, scope_id: ScopeId) -> Option<Type
         curr = scope.parent;
     }
     None
+}
+
+/// Resolves an import path taking into account the declaring scope (for relative imports).
+/// Handles `super::`, `self::`, sibling submodules, and falls back to global lookup.
+fn resolve_import_path(
+    ctx: &ExecutorContext,
+    scope_id: ScopeId,
+    path: &[String],
+    visited: &mut std::collections::HashSet<String>,
+) -> Option<TypeRef> {
+    if path.is_empty() {
+        return None;
+    }
+
+    let cycle_key = format!("imp_path:{}:{}", scope_id, path.join("::"));
+    if !visited.insert(cycle_key.clone()) {
+        return None;
+    }
+
+    let result = (|| {
+        // 1. If path starts with "super", climb up the module hierarchy
+        if path[0] == "super" {
+            let mut curr_scope = scope_id;
+            let mut skip = 0;
+            for part in path {
+                if part == "super" {
+                    let mut climbed = false;
+                    let mut check = Some(curr_scope);
+                    while let Some(sid) = check {
+                        let sc = &ctx.tree.arena[sid];
+                        if sc.is_module {
+                            if let Some(parent) = sc.parent {
+                                curr_scope = parent;
+                                climbed = true;
+                                skip += 1;
+                            }
+                            break;
+                        }
+                        check = sc.parent;
+                    }
+                    if !climbed {
+                        break;
+                    }
+                } else {
+                    break;
+                }
+            }
+            if skip > 0 {
+                let mut full_path = build_path_from_scope(ctx.tree, curr_scope);
+                full_path.extend_from_slice(&path[skip..]);
+                return find_global_internal(ctx, &full_path, visited);
+            }
+        }
+
+        // 2. If path starts with "self", resolve relative to current enclosing module
+        if path[0] == "self" {
+            let mut check = Some(scope_id);
+            while let Some(sid) = check {
+                let sc = &ctx.tree.arena[sid];
+                if sc.is_module {
+                    let mut full_path = build_path_from_scope(ctx.tree, sid);
+                    full_path.extend_from_slice(&path[1..]);
+                    return find_global_internal(ctx, &full_path, visited);
+                }
+                check = sc.parent;
+            }
+        }
+
+        // 3. Check if path[0] is a symbol (e.g. child submodule) in the current enclosing module
+        let mut check = Some(scope_id);
+        while let Some(sid) = check {
+            let sc = &ctx.tree.arena[sid];
+            if sc.is_module {
+                if sc.symbols.contains_key(&path[0]) {
+                    let mut full_path = build_path_from_scope(ctx.tree, sid);
+                    full_path.extend_from_slice(path);
+                    if let Some(res) = find_global_internal(ctx, &full_path, visited) {
+                        return Some(res);
+                    }
+                }
+                break;
+            }
+            check = sc.parent;
+        }
+
+        // 4. Fallback: try global resolution from root (e.g. crate::... or root module)
+        find_global_internal(ctx, path, visited)
+    })();
+
+    visited.remove(&cycle_key);
+    result
 }
 
 /// Helper function to evaluate `Query::Find`. Performs lexical climbing up the scope tree.
@@ -738,7 +855,7 @@ fn evaluate_query_find(
         for imp in &ctx.tree.arena[id].imports {
             if let Some(last) = imp.path.last() {
                 if last == name {
-                    if let Some(resolved) = find_global(ctx, &imp.path) {
+                    if let Some(resolved) = resolve_import_path(ctx, id, &imp.path, visited) {
                         return Some(resolved);
                     } else {
                         // If not found in the tree, it might be an external library
@@ -751,7 +868,7 @@ fn evaluate_query_find(
                     }
                     specific_path.push(name.to_string());
 
-                    if let Some(resolved) = find_global(ctx, &specific_path) {
+                    if let Some(resolved) = resolve_import_path(ctx, id, &specific_path, visited) {
                         return Some(resolved);
                     }
 
@@ -760,7 +877,7 @@ fn evaluate_query_find(
                     if last == "*" {
                         base_path.pop();
                     }
-                    if find_global(ctx, &base_path).is_none() {
+                    if resolve_import_path(ctx, id, &base_path, visited).is_none() {
                         return Some(TypeRef::External(specific_path));
                     }
                 }
@@ -802,6 +919,13 @@ fn evaluate_query_extract(
 
     let candidate_scopes = find_candidate_scopes_for_type(ctx.tree, &resolved_parent_ty);
     for target_scope in candidate_scopes {
+        if member == "super" && ctx.tree.arena[target_scope].is_module {
+            if let Some(parent_id) = ctx.tree.arena[target_scope].parent {
+                let parent_path = build_path_from_scope(ctx.tree, parent_id);
+                return Some(TypeRef::Resolved(parent_path));
+            }
+        }
+
         if let Some(mut res) =
             find_symbol_in_scope_and_supers(ctx, target_scope, member, resolve_type, visited)
         {
@@ -1128,7 +1252,7 @@ fn resolve_via_transitive_imports(
             for imp in &node.imports {
                 if let Some(last) = imp.path.last() {
                     if last == member {
-                        if let Some(resolved) = find_global_internal(ctx, &imp.path, visited) {
+                        if let Some(resolved) = resolve_import_path(ctx, scope_id, &imp.path, visited) {
                             result = Some(resolved);
                             break;
                         } else {
@@ -1142,7 +1266,7 @@ fn resolve_via_transitive_imports(
                         }
                         target_path.push(member.to_string());
 
-                        if let Some(resolved) = find_global_internal(ctx, &target_path, visited) {
+                        if let Some(resolved) = resolve_import_path(ctx, scope_id, &target_path, visited) {
                             result = Some(resolved);
                             break;
                         }

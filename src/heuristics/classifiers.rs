@@ -167,3 +167,23 @@ pub fn is_type_alias(node: Node) -> bool {
         "type_alias_declaration" | "alias_declaration" | "type_item" | "type_alias_statement"
     ) || (kind == "type_definition" && !is_structured_type(node))
 }
+
+/// Heuristically determines if a node is an anonymous function, closure, or lambda expression.
+pub fn is_closure(node: Node) -> bool {
+    if !node.is_named() {
+        return false;
+    }
+    let kind = node.kind();
+    matches!(
+        kind,
+        "closure_expression"
+            | "lambda_expression"
+            | "lambda"
+            | "arrow_function"
+            | "function_expression"
+            | "func_literal"
+            | "lambda_literal"
+            | "anonymous_method_expression"
+    )
+}
+

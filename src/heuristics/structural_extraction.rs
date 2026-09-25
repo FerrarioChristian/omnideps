@@ -253,10 +253,21 @@ pub fn extract_parameters(node: Node, source: &str) -> Vec<Parameter> {
         for p in params_node.children(&mut cursor) {
             let p_kind = p.kind();
             if p_kind.contains("parameter") || p_kind == "identifier" {
-                let name = super::text_parsing::extract_identifier(p, source);
+                let mut name = super::text_parsing::extract_identifier(p, source);
                 let raw_ty = super::type_extraction::extract_type_ref(p, source);
-                let ty = sanitize_parameter_type(raw_ty, name.as_deref().unwrap_or(""));
                 let text = super::text_parsing::node_text(p, source);
+
+                if name.is_none() && (p_kind.contains("self") || text.contains("self")) {
+                    name = Some("self".to_string());
+                }
+
+                let ty = if name.as_deref() == Some("self") && matches!(raw_ty, TypeRef::Failed(_))
+                {
+                    TypeRef::Unresolved(vec!["Self".to_string()])
+                } else {
+                    sanitize_parameter_type(raw_ty, name.as_deref().unwrap_or(""))
+                };
+
                 let is_variadic = text.contains("...") || text.contains("*args");
                 params.push(Parameter {
                     name,
@@ -293,7 +304,7 @@ pub fn extract_return_type(node: Node, source: &str) -> TypeRef {
         }
     }
 
-    TypeRef::Failed(vec![])
+    TypeRef::Primitive("void".to_string())
 }
 
 /// Extracts all inherited or implemented super-types (base classes, interfaces, traits).

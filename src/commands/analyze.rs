@@ -22,6 +22,7 @@ pub fn execute(
     json_out: Option<&Path>,
     csv_out: Option<&Path>,
     debug_refs: bool,
+    failed_only: bool,
     config_path: Option<&Path>,
     summary: bool,
 ) -> Result<()> {
@@ -38,6 +39,7 @@ pub fn execute(
         &resolved_modules,
         path,
         debug_refs,
+        failed_only,
     );
     export_results(&graph, analysis_summary.as_ref(), json_out, csv_out)?;
 
@@ -50,6 +52,7 @@ fn print_report(
     resolved_modules: &[Module],
     path: &Path,
     debug_refs: bool,
+    failed_only: bool,
 ) {
     let target_kind = if path.is_dir() { "CARTELLA " } else { "" };
     println!("=== ANALYSIS {}{} ===", target_kind, path.display());
@@ -57,8 +60,8 @@ fn print_report(
         print_summary(s);
     }
 
-    if debug_refs {
-        print_references(resolved_modules);
+    if debug_refs || failed_only {
+        print_references(resolved_modules, failed_only);
     }
 }
 

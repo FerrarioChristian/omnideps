@@ -46,6 +46,10 @@ pub fn determine_structured_kind(kind: &str, text: &str) -> StructuredTypeKind {
 pub fn extract_type_ref(node: Node, source: &str) -> TypeRef {
     let kind = node.kind();
 
+    if super::classifiers::is_closure(node) {
+        return TypeRef::Failed(vec![]);
+    }
+
     // 0.2. Unwrap wrapper `type` nodes (e.g. in Python)
     if kind == "type"
         && node.child_count() == 1
@@ -80,6 +84,7 @@ pub fn extract_type_ref(node: Node, source: &str) -> TypeRef {
             | "template_type"
             | "type"
             | "string"
+            | "void_type"
     ) {
         let text = node_text(node, source);
         let text = text.replace(['\'', '"'], "");
@@ -271,12 +276,15 @@ pub fn parse_type_from_text(text: &str) -> TypeRef {
     if let Some(generic_ref) = parse_generic_from_text(text) {
         return generic_ref;
     }
-    if text.contains('|') {
-        let types: Vec<TypeRef> = text
-            .split('|')
-            .map(|part| parse_type_from_text(part.trim()))
-            .collect();
-        return TypeRef::Union(types);
+    if text.contains('|') && !text.starts_with('|') && !text.ends_with('|') {
+        let parts: Vec<&str> = text.split('|').map(str::trim).collect();
+        if parts.len() > 1 && parts.iter().all(|p| !p.is_empty()) {
+            let types: Vec<TypeRef> = parts
+                .into_iter()
+                .map(parse_type_from_text)
+                .collect();
+            return TypeRef::Union(types);
+        }
     }
     TypeRef::Unresolved(split_qualified_name(text))
 }

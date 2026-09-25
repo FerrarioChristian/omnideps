@@ -4,6 +4,7 @@
 //! local variable declarations, instantiated types, and method calls. It powers the
 //! Behavioral Lexical Scoping engine.
 
+use std::collections::HashSet;
 use crate::model::{Field, TypeRef};
 use tree_sitter::Node;
 
@@ -134,6 +135,7 @@ pub fn extract_block(node: Node, source: &str) -> crate::model::Block {
                 find_behavioral_deps(
                     val,
                     source,
+                    &mut declarations,
                     &mut inner_calls,
                     &mut inner_inst,
                     &mut inner_accesses,
@@ -145,6 +147,7 @@ pub fn extract_block(node: Node, source: &str) -> crate::model::Block {
                 find_behavioral_deps(
                     child,
                     source,
+                    &mut declarations,
                     &mut inner_calls,
                     &mut inner_inst,
                     &mut inner_accesses,
@@ -191,6 +194,7 @@ pub fn extract_block(node: Node, source: &str) -> crate::model::Block {
             find_behavioral_deps(
                 child,
                 source,
+                &mut declarations,
                 &mut inner_calls,
                 &mut inner_inst,
                 &mut inner_accesses,
@@ -213,21 +217,218 @@ pub fn extract_block(node: Node, source: &str) -> crate::model::Block {
     }
 }
 
+/// Heuristically extracts parameter names and explicit parameter types from a closure or lambda node.
+fn extract_closure_params(node: Node, source: &str) -> (HashSet<String>, Vec<Field>) {
+    let mut names = HashSet::new();
+    let mut fields = Vec::new();
+
+    let mut params_node = node
+        .child_by_field_name("parameters")
+        .or_else(|| node.child_by_field_name("parameter"))
+        .or_else(|| node.child_by_field_name("declarator"))
+        .or_else(|| {
+            let mut cursor = node.walk();
+            node.children(&mut cursor)
+                .find(|c| c.kind().contains("parameter") || c.kind().contains("declarator"))
+        });
+
+    if let Some(p) = params_node {
+        let mut cursor = p.walk();
+        if let Some(nested) = p.children(&mut cursor).find(|c| c.kind() == "parameter_list") {
+            params_node = Some(nested);
+        }
+    }
+
+    if let Some(params) = params_node {
+        if params.kind() == "identifier" {
+            let name = node_text(params, source);
+            names.insert(name);
+        } else {
+            let mut cursor = params.walk();
+            for child in params.children(&mut cursor) {
+                let kind = child.kind();
+                if kind == "identifier" {
+                    let name = node_text(child, source);
+                    names.insert(name);
+                } else if kind.contains("parameter") || kind == "parameter" {
+                    let name_opt = child
+                        .child_by_field_name("name")
+                        .or_else(|| child.child_by_field_name("pattern"))
+                        .or_else(|| child.child_by_field_name("declarator"))
+                        .map(|n| {
+                            if n.kind() == "identifier" {
+                                node_text(n, source)
+                            } else {
+                                let mut c = n.walk();
+                                n.children(&mut c)
+                                    .find(|sc| sc.kind() == "identifier")
+                                    .map(|id| node_text(id, source))
+                                    .unwrap_or_else(|| node_text(n, source))
+                            }
+                        })
+                        .or_else(|| {
+                            let mut c = child.walk();
+                            child
+                                .children(&mut c)
+                                .find(|n| n.kind() == "identifier")
+                                .map(|id| node_text(id, source))
+                        });
+
+                    if let Some(name) = name_opt {
+                        let ty = if let Some(type_node) = child.child_by_field_name("type") {
+                            extract_type_ref(type_node, source)
+                        } else {
+                            TypeRef::Failed(vec![])
+                        };
+                        names.insert(name.clone());
+                        if !matches!(ty, TypeRef::Failed(_)) {
+                            fields.push(Field {
+                                name,
+                                ty,
+                                annotations: vec![],
+                            });
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if let Some(ret_node) = node.child_by_field_name("return_type") {
+        let ty = extract_type_ref(ret_node, source);
+        if !matches!(ty, TypeRef::Failed(_)) {
+            fields.push(Field {
+                name: "_return".to_string(),
+                ty,
+                annotations: vec![],
+            });
+        }
+    }
+
+    (names, fields)
+}
+
+fn find_closure_body(node: Node) -> Option<Node> {
+    if let Some(body) = node.child_by_field_name("body") {
+        return Some(body);
+    }
+    let mut cursor = node.walk();
+    for child in node.children(&mut cursor) {
+        let k = child.kind();
+        if k.contains("body") || k.contains("block") || k == "compound_statement" {
+            return Some(child);
+        }
+    }
+    let mut cursor = node.walk();
+    node.children(&mut cursor)
+        .filter(|c| {
+            c.is_named()
+                && !c.kind().contains("parameter")
+                && c.kind() != "return_type"
+                && c.kind() != "type"
+                && c.kind() != "captures"
+                && c.kind() != "lambda_capture_specifier"
+        })
+        .last()
+}
+
 /// Iterates over statements within a block to intercept any behavioral actions
 /// (e.g. `object_creation_expression` for instantiations, `call_expression` for method calls).
 /// It skips nested blocks, deferring their parsing to recursive `extract_block` calls.
 fn find_behavioral_deps(
     node: Node,
     source: &str,
+    declarations: &mut Vec<Field>,
     calls: &mut Vec<TypeRef>,
     instantiates: &mut Vec<TypeRef>,
     accesses: &mut Vec<TypeRef>,
     type_casts: &mut Vec<TypeRef>,
 ) {
+    let ignored_idents = HashSet::new();
+    find_behavioral_deps_with_ctx(
+        node,
+        source,
+        declarations,
+        calls,
+        instantiates,
+        accesses,
+        type_casts,
+        &ignored_idents,
+        false,
+    );
+}
+
+fn find_behavioral_deps_with_ctx(
+    node: Node,
+    source: &str,
+    declarations: &mut Vec<Field>,
+    calls: &mut Vec<TypeRef>,
+    instantiates: &mut Vec<TypeRef>,
+    accesses: &mut Vec<TypeRef>,
+    type_casts: &mut Vec<TypeRef>,
+    ignored_idents: &HashSet<String>,
+    inside_closure: bool,
+) {
     let kind = node.kind();
 
-    // Skip nested blocks to avoid double counting (they are handled by extract_block)
-    if kind.contains("body") || kind.contains("block") || kind == "compound_statement" {
+    // Check if node is a closure / lambda
+    if super::classifiers::is_closure(node) {
+        let (param_names, param_fields) = extract_closure_params(node, source);
+        declarations.extend(param_fields);
+        let mut new_ignored = ignored_idents.clone();
+        new_ignored.extend(param_names);
+
+        if let Some(body) = find_closure_body(node) {
+            find_behavioral_deps_with_ctx(
+                body,
+                source,
+                declarations,
+                calls,
+                instantiates,
+                accesses,
+                type_casts,
+                &new_ignored,
+                true,
+            );
+        }
+        return;
+    }
+
+    // Skip nested blocks to avoid double counting (they are handled by extract_block),
+    // UNLESS we are inside a closure, where blocks are part of the closure body!
+    if !inside_closure && (kind.contains("body") || kind.contains("block") || kind == "compound_statement") {
+        return;
+    }
+
+    // If inside a closure block, handle variable declarations by adding them to ignored
+    if inside_closure && (kind.contains("body") || kind.contains("block") || kind == "compound_statement") {
+        let mut local_ignored = ignored_idents.clone();
+        let mut cursor = node.walk();
+        for child in node.children(&mut cursor) {
+            let c_kind = child.kind();
+            if c_kind.contains("declaration") || c_kind.contains("definition") || c_kind == "assignment" {
+                if let Some(decl_name) = extract_identifier(child, source)
+                    .or_else(|| {
+                        child.child_by_field_name("name")
+                            .or_else(|| child.child_by_field_name("left"))
+                            .and_then(|n| extract_identifier(n, source))
+                    })
+                {
+                    local_ignored.insert(decl_name);
+                }
+            }
+            find_behavioral_deps_with_ctx(
+                child,
+                source,
+                declarations,
+                calls,
+                instantiates,
+                accesses,
+                type_casts,
+                &local_ignored,
+                true,
+            );
+        }
         return;
     }
 
@@ -277,7 +478,14 @@ fn find_behavioral_deps(
             | "member_access"
             | "attribute"
     ) {
-        accesses.push(extract_type_ref(node, source));
+        if kind == "identifier" {
+            let text = node_text(node, source);
+            if !ignored_idents.contains(&text) {
+                accesses.push(extract_type_ref(node, source));
+            }
+        } else {
+            accesses.push(extract_type_ref(node, source));
+        }
     }
 
     // --- Type Casts ---
@@ -290,7 +498,7 @@ fn find_behavioral_deps(
 
     // --- Token Tree Coalescing (e.g. for Rust macros or generic unparsed blocks) ---
     if kind == "token_tree" {
-        parse_token_tree_macro(node, source, calls, instantiates, accesses, type_casts);
+        parse_token_tree_macro(node, source, declarations, calls, instantiates, accesses, type_casts);
         return;
     }
 
@@ -318,9 +526,20 @@ fn find_behavioral_deps(
             continue;
         }
 
-        find_behavioral_deps(child, source, calls, instantiates, accesses, type_casts);
+        find_behavioral_deps_with_ctx(
+            child,
+            source,
+            declarations,
+            calls,
+            instantiates,
+            accesses,
+            type_casts,
+            ignored_idents,
+            inside_closure,
+        );
     }
 }
+
 
 /// Provides a "best-effort" type inference for implicitly typed local variables (like `let x = ...` or `auto y = ...`).
 ///
@@ -484,6 +703,7 @@ fn extract_call_path(node: Node, source: &str) -> Vec<String> {
 fn parse_token_tree_macro(
     node: Node,
     source: &str,
+    declarations: &mut Vec<Field>,
     calls: &mut Vec<TypeRef>,
     instantiates: &mut Vec<TypeRef>,
     accesses: &mut Vec<TypeRef>,
@@ -524,7 +744,7 @@ fn parse_token_tree_macro(
             expect_ident = true;
 
             // Recurse into this child
-            find_behavioral_deps(child, source, calls, instantiates, accesses, type_casts);
+            find_behavioral_deps(child, source, declarations, calls, instantiates, accesses, type_casts);
         }
         i += 1;
     }

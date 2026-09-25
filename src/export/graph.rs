@@ -273,7 +273,7 @@ fn type_ref_targets(tr: &TypeRef) -> Vec<QualifiedName> {
             }
         }
         TypeRef::Primitive(s) => {
-            if s.is_empty() {
+            if s.is_empty() || s == "void" || s == "None" {
                 vec![]
             } else {
                 vec![vec![s.clone()]]

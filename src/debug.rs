@@ -11,17 +11,21 @@ use crate::model::*;
 ///
 /// # Arguments
 /// * `modules` - A slice of resolved `Module` components to inspect.
-pub fn print_references(modules: &[Module]) {
-    println!("\n=== REFERENCES REPORT ===");
-    println!("LEGEND:");
-    println!("  🧱 PRIMITIVE   : Built-in language types (int, boolean, etc.)");
-    println!("  ⚠️ UNRESOLVED  : Type referenced but not yet resolved to a concrete definition");
-    println!("  🔍 QUERY       : Intermediate state during complex path resolution");
-    println!("  ✅ RESOLVED    : Successfully linked to a known internal component");
-    println!("  🌐 EXTERNAL    : Recognized as an external/library dependency");
-    println!("  ❌ FAILED      : Resolution completely failed (missing or unparseable)");
-    println!("  🎯 EVALUATED   : Access path fully evaluated to a concrete target");
-    println!("  🔀 UNION       : Multiple possible types (e.g. dynamic typing or overloaded)");
+pub fn print_references(modules: &[Module], failed_only: bool) {
+    if failed_only {
+        println!("\n=== FAILED REFERENCES REPORT ===");
+    } else {
+        println!("\n=== REFERENCES REPORT ===");
+        println!("LEGEND:");
+        println!("  🧱 PRIMITIVE   : Built-in language types (int, boolean, etc.)");
+        println!("  ⚠️ UNRESOLVED  : Type referenced but not yet resolved to a concrete definition");
+        println!("  🔍 QUERY       : Intermediate state during complex path resolution");
+        println!("  ✅ RESOLVED    : Successfully linked to a known internal component");
+        println!("  🌐 EXTERNAL    : Recognized as an external/library dependency");
+        println!("  ❌ FAILED      : Resolution completely failed (missing or unparseable)");
+        println!("  🎯 EVALUATED   : Access path fully evaluated to a concrete target");
+        println!("  🔀 UNION       : Multiple possible types (e.g. dynamic typing or overloaded)");
+    }
     println!();
     println!(
         "[{:^14}] {:<30} | TARGET (CONTEXT)",
@@ -29,74 +33,75 @@ pub fn print_references(modules: &[Module]) {
     );
     println!("{:-<16}{:-<31}|{:-<40}", "", "", "");
     for m in modules {
-        visit_module(m);
+        visit_module(m, failed_only);
     }
 }
 
 /// Recursively visits a module's contents (sub-modules, structured types, free functions, impl blocks, and free variables).
-fn visit_module(m: &Module) {
+fn visit_module(m: &Module, failed_only: bool) {
     let mod_context = m.name.join("::");
     for st in &m.structured_types {
-        visit_structured_type(st);
+        visit_structured_type(st, failed_only);
     }
     for ff in &m.free_functions {
-        visit_function(ff, &mod_context);
+        visit_function(ff, &mod_context, failed_only);
     }
     for ib in &m.impl_blocks {
         let ib_context = format!("{}::impl {}", mod_context, ib.name.join("::"));
-        print_ref("ImplFor", &ib_context, &ib.impl_for);
+        print_ref("ImplFor", &ib_context, &ib.impl_for, failed_only);
         if let Some(trait_ref) = &ib.implements_trait {
-            print_ref("ImplementsTrait", &ib_context, trait_ref);
+            print_ref("ImplementsTrait", &ib_context, trait_ref, failed_only);
         }
         for method in &ib.methods {
-            visit_function(method, &ib_context);
+            visit_function(method, &ib_context, failed_only);
         }
     }
     for fv in &m.free_variables {
-        print_ref(&format!("FreeVar '{}'", fv.name), &mod_context, &fv.ty);
+        print_ref(&format!("FreeVar '{}'", fv.name), &mod_context, &fv.ty, failed_only);
     }
     for ta in &m.type_aliases {
         print_ref(
             &format!("TypeAlias '{}'", ta.name.join("::")),
             &mod_context,
             &ta.target,
+            failed_only,
         );
     }
     for sub in &m.sub_modules {
-        visit_module(sub);
+        visit_module(sub, failed_only);
     }
 }
 
 /// Visits a structured type (Class, Struct, Interface, Trait), printing references
 /// for its super-types, fields, and recursively visiting its methods and nested types.
-fn visit_structured_type(st: &StructuredType) {
+fn visit_structured_type(st: &StructuredType, failed_only: bool) {
     let context = st.name.join("::");
     for tp in &st.type_parameters {
         for bound in &tp.bounds {
-            print_ref(&format!("TypeVarBound '{}'", tp.name), &context, bound);
+            print_ref(&format!("TypeVarBound '{}'", tp.name), &context, bound, failed_only);
         }
     }
     for sup in &st.super_types {
-        print_ref("SuperType", &context, sup);
+        print_ref("SuperType", &context, sup, failed_only);
     }
     for f in &st.fields {
-        print_ref(&format!("Field '{}'", f.name), &context, &f.ty);
+        print_ref(&format!("Field '{}'", f.name), &context, &f.ty, failed_only);
     }
     for method in &st.methods {
-        visit_function(method, &context);
+        visit_function(method, &context, failed_only);
     }
     for nested in &st.nested_types {
-        visit_structured_type(nested);
+        visit_structured_type(nested, failed_only);
     }
 }
 
 /// Visits a function or method, printing references for its parameters and return type,
 /// and recursively visiting its behavioral body block.
-fn visit_function(f: &Function, context: &str) {
+fn visit_function(f: &Function, context: &str, failed_only: bool) {
     let fn_context = format!("{}::{}", context, f.name.last().unwrap_or(&"".to_string()));
     for tp in &f.type_parameters {
         for bound in &tp.bounds {
-            print_ref(&format!("TypeVarBound '{}'", tp.name), &fn_context, bound);
+            print_ref(&format!("TypeVarBound '{}'", tp.name), &fn_context, bound, failed_only);
         }
     }
     for p in &f.signature.parameters {
@@ -104,34 +109,38 @@ fn visit_function(f: &Function, context: &str) {
             &format!("Param '{}'", p.name.as_deref().unwrap_or("?")),
             &fn_context,
             &p.ty,
+            failed_only,
         );
     }
-    print_ref("Return", &fn_context, &f.signature.return_type);
+    print_ref("Return", &fn_context, &f.signature.return_type, failed_only);
 
     if let Some(body) = &f.body {
-        visit_block(body, &fn_context);
+        visit_block(body, &fn_context, failed_only);
     }
 }
 
 /// Recursively visits a block's statements, printing references for local variable
 /// declarations, method calls, instantiations, and exploring nested sub-blocks.
-fn visit_block(b: &Block, context: &str) {
+fn visit_block(b: &Block, context: &str, failed_only: bool) {
     for decl in &b.declarations {
-        print_ref(&format!("LocalVar '{}'", decl.name), context, &decl.ty);
+        print_ref(&format!("LocalVar '{}'", decl.name), context, &decl.ty, failed_only);
     }
     for call in &b.calls {
-        print_ref("Call", context, call);
+        print_ref("Call", context, call, failed_only);
     }
     for inst in &b.instantiates {
-        print_ref("Instantiates", context, inst);
+        print_ref("Instantiates", context, inst, failed_only);
     }
     for sub in &b.sub_blocks {
-        visit_block(sub, context);
+        visit_block(sub, context, failed_only);
     }
 }
 
 /// Helper function that formats and prints a single `TypeRef` state to the standard output.
-fn print_ref(kind: &str, context: &str, tr: &TypeRef) {
+fn print_ref(kind: &str, context: &str, tr: &TypeRef, failed_only: bool) {
+    if failed_only && !matches!(tr, TypeRef::Failed(_)) {
+        return;
+    }
     let (state, text) = match tr {
         TypeRef::Primitive(p) => ("🧱 PRIMITIVE", format!("{:?}", p)),
         TypeRef::Unresolved(q) => ("⚠️ UNRESOLVED", q.join("::")),

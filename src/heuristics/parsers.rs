@@ -373,6 +373,11 @@ fn try_parse_assignment_type_alias(node: Node, source: &str) -> Option<crate::mo
         return Some(type_var);
     }
 
+    if super::classifiers::is_closure(right) {
+        return None;
+    }
+
+
     // Otherwise, standard assignment type alias: e.g. MyType = List[int]
     let target = extract_type_ref(right, source);
     if matches!(target, TypeRef::Failed(_)) {

@@ -941,3 +941,148 @@ fn test_c_function_pointer_cast_and_invocation() {
         "Expected test_fp -> Callback (CastsTo)"
     );
 }
+
+#[test]
+fn test_rust_closure() {
+    let code = r#"
+        struct TargetStruct {
+            x: i32,
+        }
+        impl TargetStruct {
+            fn target_method() {}
+        }
+        fn test_func() {
+            let f = |x| x + 1;
+            let g = |y: i32| {
+                TargetStruct::target_method();
+                y + 2
+            };
+        }
+    "#;
+
+    let graph = analyze_snippet(SupportedLanguage::Rust, code, "src/closure.rs");
+
+    assert!(
+        has_edge(
+            &graph,
+            &["test_func"],
+            &["TargetStruct", "target_method"],
+            DependencyEdgeKind::Calls
+        ),
+        "Expected test_func -> TargetStruct::target_method (Calls)"
+    );
+    assert!(
+        !graph.edges.iter().any(|e| ends_with(&e.from, &["test_func"]) && e.to == &["x"]),
+        "Closure parameter 'x' should not be emitted as an edge from test_func"
+    );
+    assert!(
+        !graph.edges.iter().any(|e| ends_with(&e.from, &["test_func"]) && e.to == &["y"]),
+        "Closure parameter 'y' should not be emitted as an edge from test_func"
+    );
+    assert!(
+        !graph.nodes.iter().any(|n| match n {
+            Component::External(qn) => qn == &["x"] || qn == &["y"],
+            _ => false,
+        }),
+        "External nodes for closure parameters 'x' or 'y' should not exist"
+    );
+}
+
+#[test]
+fn test_python_lambda() {
+    let code = r#"
+class TargetClass:
+    @staticmethod
+    def static_method(val):
+        pass
+
+def test_func():
+    f = lambda x: TargetClass.static_method(x)
+"#;
+
+    let graph = analyze_snippet(SupportedLanguage::Python, code, "src/closure.py");
+    assert!(
+        has_edge(
+            &graph,
+            &["test_func"],
+            &["TargetClass", "static_method"],
+            DependencyEdgeKind::Calls
+        ),
+        "Expected test_func -> TargetClass::static_method (Calls)"
+    );
+    assert!(
+        !graph.edges.iter().any(|e| ends_with(&e.to, &["x"])),
+        "Lambda parameter 'x' should not be emitted as an edge"
+    );
+    assert!(
+        !graph.nodes.iter().any(|n| match n {
+            Component::External(qn) => ends_with(qn, &["x"]),
+            _ => false,
+        }),
+        "External node for lambda parameter 'x' should not exist"
+    );
+}
+
+#[test]
+fn test_java_lambda() {
+    let code = r#"
+class TargetClass {
+    public static void staticMethod() {}
+}
+
+class Main {
+    void testFunc() {
+        Runnable r = () -> {
+            TargetClass.staticMethod();
+        };
+    }
+}
+"#;
+
+    let graph = analyze_snippet(SupportedLanguage::Java, code, "src/Main.java");
+    assert!(
+        has_edge(
+            &graph,
+            &["testFunc"],
+            &["TargetClass", "staticMethod"],
+            DependencyEdgeKind::Calls
+        ),
+        "Expected testFunc -> TargetClass::staticMethod (Calls)"
+    );
+}
+
+#[test]
+fn test_cpp_lambda() {
+    let code = r#"
+class TargetClass {
+public:
+    static void static_method() {}
+};
+
+void test_func() {
+    auto f = [](int x) {
+        TargetClass::static_method();
+        return x + 1;
+    };
+}
+"#;
+
+    let graph = analyze_snippet(SupportedLanguage::Cpp, code, "src/main.cpp");
+    assert!(
+        has_edge(
+            &graph,
+            &["test_func"],
+            &["TargetClass", "static_method"],
+            DependencyEdgeKind::Calls
+        ),
+        "Expected test_func -> TargetClass::static_method (Calls)"
+    );
+    assert!(
+        !graph.edges.iter().any(|e| ends_with(&e.to, &["x"])),
+        "Lambda parameter 'x' should not be emitted as an edge"
+    );
+}
+
+
+
+
