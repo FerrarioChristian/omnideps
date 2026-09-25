@@ -33,6 +33,10 @@ pub enum Commands {
         #[arg(short = 'd', long)]
         debug_refs: bool,
 
+        /// Calculate and display analysis summary statistics (modules, types, references)
+        #[arg(short = 's', long)]
+        summary: bool,
+
         /// Path to a JSON configuration file defining architectural strategies
         #[arg(long)]
         config: Option<PathBuf>,

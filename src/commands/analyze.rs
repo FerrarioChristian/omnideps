@@ -13,7 +13,7 @@ use std::path::Path;
 ///
 /// Workflow:
 /// 1. Executes the complete analysis pipeline via [`analyze_project`].
-/// 2. Calculates analysis summary statistics via [`build_analysis_summary`].
+/// 2. Optionally calculates analysis summary statistics via [`build_analysis_summary`].
 /// 3. Prints reports to stdout.
 /// 4. Optionally exports graph results to JSON and Cytoscape formats.
 /// 5. Optionally exports analysis summaries to CSV format.
@@ -23,27 +23,39 @@ pub fn execute(
     csv_out: Option<&Path>,
     debug_refs: bool,
     config_path: Option<&Path>,
+    summary: bool,
 ) -> Result<()> {
     let config = AnalyzerConfig::load_or_default(config_path)?;
     let (resolved_modules, graph) = analyze_project(path, &config)?;
-    let summary = build_analysis_summary(&resolved_modules);
+    let analysis_summary = if summary || csv_out.is_some() {
+        Some(build_analysis_summary(&resolved_modules))
+    } else {
+        None
+    };
 
-    print_report(&summary, &resolved_modules, path, debug_refs);
-    export_results(&graph, &summary, json_out, csv_out)?;
+    print_report(
+        analysis_summary.as_ref(),
+        &resolved_modules,
+        path,
+        debug_refs,
+    );
+    export_results(&graph, analysis_summary.as_ref(), json_out, csv_out)?;
 
     Ok(())
 }
 
 /// Prints the formatted analysis summary and optional debug references to stdout.
 fn print_report(
-    summary: &AnalysisSummary,
+    summary: Option<&AnalysisSummary>,
     resolved_modules: &[Module],
     path: &Path,
     debug_refs: bool,
 ) {
     let target_kind = if path.is_dir() { "CARTELLA " } else { "" };
     println!("=== ANALYSIS {}{} ===", target_kind, path.display());
-    print_summary(summary);
+    if let Some(s) = summary {
+        print_summary(s);
+    }
 
     if debug_refs {
         print_references(resolved_modules);
@@ -53,7 +65,7 @@ fn print_report(
 /// Exports the dependency graph and analysis summary to JSON, Cytoscape, and/or CSV files if requested.
 fn export_results(
     graph: &DependencyGraph,
-    summary: &AnalysisSummary,
+    summary: Option<&AnalysisSummary>,
     json_out: Option<&Path>,
     csv_out: Option<&Path>,
 ) -> Result<()> {
@@ -73,8 +85,10 @@ fn export_results(
         }
     }
 
-    if let Some(csv) = csv_out {
-        save_summary_csv(summary, csv)?;
+    if let Some(csv) = csv_out
+        && let Some(s) = summary
+    {
+        save_summary_csv(s, csv)?;
     }
 
     Ok(())

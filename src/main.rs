@@ -16,6 +16,7 @@ fn main() -> Result<()> {
             output,
             csv,
             debug_refs,
+            summary,
             config,
         } => {
             commands::analyze::execute(
@@ -24,6 +25,7 @@ fn main() -> Result<()> {
                 csv.as_deref(),
                 *debug_refs,
                 config.as_deref(),
+                *summary,
             )?;
         }
         Commands::Benchmark { cmd } => match cmd {
