@@ -1065,29 +1065,71 @@ fn evaluate_query_extract(
             _ => None,
         },
         TypeRef::EvaluatedAccess(base, inner) => {
-            let inner_ty = *inner;
-            match inner_ty {
+            let curr_base = base;
+            let mut curr_inner = *inner;
+            while let TypeRef::EvaluatedAccess(_, next_inner) = curr_inner {
+                curr_inner = *next_inner;
+            }
+            match curr_inner {
                 TypeRef::Resolved(mut path) => {
                     path.push(member.to_string());
                     Some(TypeRef::EvaluatedAccess(
-                        base,
+                        curr_base,
                         Box::new(TypeRef::Resolved(path)),
                     ))
                 }
                 TypeRef::External(mut path) => {
                     path.push(member.to_string());
                     Some(TypeRef::EvaluatedAccess(
-                        base,
+                        curr_base,
                         Box::new(TypeRef::External(path)),
                     ))
                 }
                 TypeRef::Unresolved(mut path) => {
                     path.push(member.to_string());
                     Some(TypeRef::EvaluatedAccess(
-                        base,
+                        curr_base,
                         Box::new(TypeRef::Unresolved(path)),
                     ))
                 }
+                TypeRef::Primitive(prim) => {
+                    let path = vec![prim, member.to_string()];
+                    Some(TypeRef::EvaluatedAccess(
+                        curr_base,
+                        Box::new(TypeRef::External(path)),
+                    ))
+                }
+                TypeRef::Generic { base: gen_base, .. } => match *gen_base {
+                    TypeRef::Resolved(mut path) => {
+                        path.push(member.to_string());
+                        Some(TypeRef::EvaluatedAccess(
+                            curr_base,
+                            Box::new(TypeRef::Resolved(path)),
+                        ))
+                    }
+                    TypeRef::External(mut path) => {
+                        path.push(member.to_string());
+                        Some(TypeRef::EvaluatedAccess(
+                            curr_base,
+                            Box::new(TypeRef::External(path)),
+                        ))
+                    }
+                    TypeRef::Unresolved(mut path) => {
+                        path.push(member.to_string());
+                        Some(TypeRef::EvaluatedAccess(
+                            curr_base,
+                            Box::new(TypeRef::Unresolved(path)),
+                        ))
+                    }
+                    TypeRef::Primitive(prim) => {
+                        let path = vec![prim, member.to_string()];
+                        Some(TypeRef::EvaluatedAccess(
+                            curr_base,
+                            Box::new(TypeRef::External(path)),
+                        ))
+                    }
+                    _ => None,
+                },
                 _ => None,
             }
         }

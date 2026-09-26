@@ -81,6 +81,9 @@ pub fn extract_type_ref(node: Node, source: &str) -> TypeRef {
             | "field_access"
             | "primitive_type"
             | "predefined_type"
+            | "integral_type"
+            | "floating_point_type"
+            | "boolean_type"
             | "template_type"
             | "type"
             | "string"
@@ -107,7 +110,13 @@ pub fn extract_type_ref(node: Node, source: &str) -> TypeRef {
         let child_kind = child.kind();
         if matches!(
             child_kind,
-            "type_identifier" | "primitive_type" | "identifier" | "type"
+            "type_identifier"
+                | "primitive_type"
+                | "integral_type"
+                | "floating_point_type"
+                | "boolean_type"
+                | "identifier"
+                | "type"
         ) {
             let text = node_text(child, source);
             if !text.is_empty() && !text.contains(' ') {
@@ -147,6 +156,7 @@ fn try_extract_from_type_field(node: Node, source: &str) -> Option<TypeRef> {
         .or_else(|| node.child_by_field_name("return_type"))
         .or_else(|| node.child_by_field_name("field_type"))
         .or_else(|| node.child_by_field_name("value_type"))
+        .or_else(|| node.child_by_field_name("element"))
         .or_else(|| node.child_by_field_name("right"))
         .map(|type_node| extract_type_ref(type_node, source))
 }

@@ -1149,6 +1149,50 @@ fn test_func() {
     );
 }
 
+#[test]
+fn test_java_chained_method_call_and_constructor() {
+    let code = r#"
+        class Engine {
+            public void start() {}
+        }
+
+        class Car {
+            private Engine engine = new Engine();
+            public Engine getEngine() { return engine; }
+        }
+
+        class Garage {
+            private Car car = new Car();
+            public void testChain() {
+                car.getEngine().start();
+                new Car().getEngine().start();
+            }
+        }
+    "#;
+
+    let graph = analyze_snippet(SupportedLanguage::Java, code, "src/Garage.java");
+
+    assert!(
+        has_edge(
+            &graph,
+            &["Garage", "testChain"],
+            &["Car", "getEngine"],
+            DependencyEdgeKind::Calls
+        ),
+        "Expected Garage.testChain -> Car.getEngine (Calls)"
+    );
+    assert!(
+        has_edge(
+            &graph,
+            &["Garage", "testChain"],
+            &["Engine", "start"],
+            DependencyEdgeKind::Calls
+        ),
+        "Expected Garage.testChain -> Engine.start (Calls)"
+    );
+}
+
+
 
 
 

@@ -444,24 +444,8 @@ fn find_behavioral_deps_with_ctx(
     }
 
     // --- Calls ---
-    if matches!(kind, "call_expression" | "call") {
+    if matches!(kind, "call_expression" | "call" | "method_invocation") {
         extract_call_dependency(node, source, calls, accesses);
-    } else if kind == "method_invocation" {
-        // Java
-        let mut parts = vec![];
-        if let Some(obj) = node.child_by_field_name("object")
-            && let TypeRef::Unresolved(qn) = extract_type_ref(obj, source)
-        {
-            parts.extend(qn);
-        }
-        if let Some(name) = node.child_by_field_name("name")
-            && let TypeRef::Unresolved(qn) = extract_type_ref(name, source)
-        {
-            parts.extend(qn);
-        }
-        if !parts.is_empty() {
-            calls.push(TypeRef::Unresolved(parts));
-        }
     }
 
     // --- Accesses ---
@@ -647,6 +631,15 @@ fn extract_call_dependency(
         {
             accesses.push(extract_type_ref(obj, source));
         }
+    } else if node.kind() == "method_invocation" {
+        let path = extract_call_path(node, source);
+        if !path.is_empty() {
+            calls.push(TypeRef::Unresolved(path));
+        }
+
+        if let Some(obj) = node.child_by_field_name("object") {
+            accesses.push(extract_type_ref(obj, source));
+        }
     }
 }
 
@@ -656,7 +649,11 @@ fn extract_call_path(node: Node, source: &str) -> Vec<String> {
     match node.kind() {
         "identifier" | "field_identifier" | "type_identifier" => {
             let t = node_text(node, source).trim().to_string();
-            if t.is_empty() { vec![] } else { vec![t] }
+            if t.is_empty() {
+                vec![]
+            } else {
+                vec![t]
+            }
         }
         "scoped_identifier" | "qualified_identifier" => {
             split_qualified_name(&node_text(node, source))
@@ -668,7 +665,7 @@ fn extract_call_path(node: Node, source: &str) -> Vec<String> {
                 vec![]
             }
         }
-        "field_expression" | "member_expression" | "attribute" => {
+        "field_expression" | "member_expression" | "attribute" | "field_access" => {
             let mut path = vec![];
             if let Some(obj) = node
                 .child_by_field_name("argument")
@@ -679,6 +676,8 @@ fn extract_call_path(node: Node, source: &str) -> Vec<String> {
                     if let Some(inner_f) = obj.child_by_field_name("function") {
                         path.extend(extract_call_path(inner_f, source));
                     }
+                } else if obj.kind() == "method_invocation" {
+                    path.extend(extract_call_path(obj, source));
                 } else {
                     path.extend(extract_call_path(obj, source));
                 }
@@ -686,10 +685,28 @@ fn extract_call_path(node: Node, source: &str) -> Vec<String> {
             if let Some(field) = node
                 .child_by_field_name("field")
                 .or_else(|| node.child_by_field_name("attribute"))
+                .or_else(|| node.child_by_field_name("name"))
             {
                 path.extend(extract_call_path(field, source));
             }
             path
+        }
+        "method_invocation" => {
+            let mut path = vec![];
+            if let Some(obj) = node.child_by_field_name("object") {
+                path.extend(extract_call_path(obj, source));
+            }
+            if let Some(name) = node.child_by_field_name("name") {
+                path.extend(extract_call_path(name, source));
+            }
+            path
+        }
+        "object_creation_expression" => {
+            if let Some(t_node) = node.child_by_field_name("type") {
+                extract_call_path(t_node, source)
+            } else {
+                split_qualified_name(&node_text(node, source))
+            }
         }
         _ => split_qualified_name(&node_text(node, source)),
     }
