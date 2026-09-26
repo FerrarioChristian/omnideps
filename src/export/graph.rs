@@ -5,7 +5,8 @@ pub fn build_dependency_graph(
     modules: &[Module],
     primitives: &crate::resolver::primitives::PrimitiveRegistry,
 ) -> DependencyGraph {
-    let mut nodes = flatten_modules(modules, vec![]);
+    let mut seen_modules = std::collections::HashSet::new();
+    let mut nodes = flatten_modules(modules, vec![], &mut seen_modules);
     let mut edges = vec![];
 
     for m in modules {
@@ -37,12 +38,16 @@ pub fn build_dependency_graph(
         }
     }
 
+    // Deduplicate edges first to prevent quadratic string checks and redundant allocations
+    edges.sort();
+    edges.dedup();
+
     for edge in &edges {
         if edge.to.len() == 1 && primitives.is_primitive(&edge.to[0]) {
             used_primitives.insert(edge.to[0].clone());
-        } else if primitives.is_primitive(&edge.to.join("::")) {
+        } else if edge.to.len() <= 2 && primitives.is_primitive(&edge.to.join("::")) {
             used_primitives.insert(edge.to.join("::"));
-        } else if primitives.is_primitive(&edge.to.join(".")) {
+        } else if edge.to.len() <= 2 && primitives.is_primitive(&edge.to.join(".")) {
             used_primitives.insert(edge.to.join("."));
         } else if !existing_node_names.contains(&edge.to) {
             used_unresolved.insert(edge.to.clone());
@@ -55,10 +60,6 @@ pub fn build_dependency_graph(
     for unres in used_unresolved {
         nodes.push(Component::External(unres));
     }
-
-    // Deduplicate edges to prevent inflated coupling metrics
-    edges.sort();
-    edges.dedup();
 
     DependencyGraph { nodes, edges }
 }
@@ -439,16 +440,32 @@ fn add_annotation_edges(
     }
 }
 
-fn flatten_modules(modules: &[Module], prefix: QualifiedName) -> Vec<Component> {
+fn flatten_modules(
+    modules: &[Module],
+    prefix: QualifiedName,
+    seen_modules: &mut std::collections::HashSet<QualifiedName>,
+) -> Vec<Component> {
     let mut flat = vec![];
     for m in modules {
         let mut m_name = prefix.clone();
         let name_to_add: Vec<String> = m.name.iter().filter(|s| *s != "root").cloned().collect();
         m_name.extend(name_to_add);
 
-        let mut m_clone = m.clone();
-        m_clone.name = m_name.clone();
-        flat.push(Component::Module(m_clone));
+        if seen_modules.insert(m_name.clone()) {
+            let m_node = Module {
+                name: m_name.clone(),
+                language: m.language.clone(),
+                file_path: m.file_path.clone(),
+                imports: m.imports.clone(),
+                sub_modules: vec![],
+                structured_types: vec![],
+                type_aliases: vec![],
+                free_functions: vec![],
+                impl_blocks: vec![],
+                free_variables: vec![],
+            };
+            flat.push(Component::Module(m_node));
+        }
 
         for ta in &m.type_aliases {
             let mut ta_name = m_name.clone();
@@ -466,6 +483,7 @@ fn flatten_modules(modules: &[Module], prefix: QualifiedName) -> Vec<Component> 
             let mut ff_name = m_name.clone();
             ff_name.extend(ff.name.clone());
             ff.name = ff_name;
+            ff.body = None;
             Component::Function(ff)
         }));
 
@@ -481,6 +499,7 @@ fn flatten_modules(modules: &[Module], prefix: QualifiedName) -> Vec<Component> 
                     let mut m_name = to.clone();
                     m_name.extend(m.name.clone());
                     m.name = m_name;
+                    m.body = None;
                     flat.push(Component::Function(m));
                 }
                 for nested in &ib.nested_types {
@@ -495,7 +514,7 @@ fn flatten_modules(modules: &[Module], prefix: QualifiedName) -> Vec<Component> 
             }
         }
 
-        flat.extend(flatten_modules(&m.sub_modules, m_name.clone()));
+        flat.extend(flatten_modules(&m.sub_modules, m_name.clone(), seen_modules));
     }
     flat
 }
@@ -506,6 +525,9 @@ fn flatten_structured_type(st: &StructuredType, prefix: &QualifiedName) -> Vec<C
 
     let mut st_clone = st.clone();
     st_clone.name = st_name.clone();
+    st_clone.nested_types = vec![];
+    st_clone.methods = vec![];
+    st_clone.fields = vec![];
     let mut flat = vec![Component::StructuredType(st_clone)];
 
     for f in &st.fields {
@@ -518,6 +540,7 @@ fn flatten_structured_type(st: &StructuredType, prefix: &QualifiedName) -> Vec<C
         let mut m_name = st_name.clone();
         m_name.extend(m.name.clone());
         m.name = m_name;
+        m.body = None;
         Component::Function(m)
     }));
 

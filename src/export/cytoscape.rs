@@ -46,13 +46,22 @@ fn get_parent_id(qn: &QualifiedName) -> Option<String> {
 }
 
 pub fn export_graphs(graphs: &[DependencyGraph], out_path: &Path) -> anyhow::Result<()> {
-    let elements = convert_to_cyto_elements(graphs);
-    let json = serde_json::to_string_pretty(&elements)?;
-    fs::write(out_path, json)?;
+    if let Some(parent) = out_path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    let elements = build_cyto_elements(graphs);
+    let file = fs::File::create(out_path)?;
+    let writer = std::io::BufWriter::new(file);
+    serde_json::to_writer(writer, &elements)?;
     Ok(())
 }
 
 pub fn convert_to_cyto_elements(graphs: &[DependencyGraph]) -> serde_json::Value {
+    let elements = build_cyto_elements(graphs);
+    serde_json::to_value(elements).unwrap_or(serde_json::json!([]))
+}
+
+fn build_cyto_elements(graphs: &[DependencyGraph]) -> Vec<CytoscapeElement> {
     let mut elements = vec![];
     let mut added_nodes = std::collections::HashSet::new();
     let mut added_edges = std::collections::HashSet::new();
@@ -69,8 +78,7 @@ pub fn convert_to_cyto_elements(graphs: &[DependencyGraph]) -> serde_json::Value
         if id.is_empty() {
             return;
         }
-        if !added_nodes.contains(&id) {
-            added_nodes.insert(id.clone());
+        if added_nodes.insert(id.clone()) {
             elements.push(CytoscapeElement {
                 data: CytoscapeData::Node {
                     id,
@@ -83,14 +91,15 @@ pub fn convert_to_cyto_elements(graphs: &[DependencyGraph]) -> serde_json::Value
     };
 
     for graph in graphs {
-        let mut parent_types = std::collections::HashMap::new();
+        let mut parent_types: std::collections::HashMap<&[String], &'static str> =
+            std::collections::HashMap::with_capacity(graph.nodes.len());
         for node in &graph.nodes {
             match node {
                 Component::Module(m) => {
-                    parent_types.insert(qn_to_id(&m.name), "Module");
+                    parent_types.insert(m.name.as_slice(), "Module");
                 }
                 Component::StructuredType(st) => {
-                    parent_types.insert(qn_to_id(&st.name), "Struct");
+                    parent_types.insert(st.name.as_slice(), "Struct");
                 }
                 _ => {}
             }
@@ -147,11 +156,12 @@ pub fn convert_to_cyto_elements(graphs: &[DependencyGraph]) -> serde_json::Value
                     let id = qn_to_id(name);
                     let label = name.last().cloned().unwrap_or_else(|| "".to_string());
                     let parent = get_parent_id(name);
-                    let parent_type = parent
-                        .as_ref()
-                        .and_then(|p| parent_types.get(p))
-                        .copied()
-                        .unwrap_or("Unknown");
+                    let parent_type = if name.len() > 1 {
+                        let parent_slice = &name[..name.len() - 1];
+                        parent_types.get(parent_slice).copied().unwrap_or("Unknown")
+                    } else {
+                        "Unknown"
+                    };
 
                     let ty_str = if parent_type == "Module" {
                         "StaticVariable".to_string()
@@ -197,17 +207,18 @@ pub fn convert_to_cyto_elements(graphs: &[DependencyGraph]) -> serde_json::Value
         }
 
         for edge in &graph.edges {
+            match edge.kind {
+                crate::model::DependencyEdgeKind::ModuleContainment
+                | crate::model::DependencyEdgeKind::NestedIn => continue,
+                _ => {}
+            }
+
+            if edge.from.is_empty() || edge.to.is_empty() {
+                continue;
+            }
+
             let source_id = qn_to_id(&edge.from);
             let target_id = qn_to_id(&edge.to);
-            let label = format!("{:?}", edge.kind);
-
-            if label == "ModuleContainment" || label == "NestedIn" {
-                continue;
-            }
-
-            if source_id.is_empty() || target_id.is_empty() {
-                continue;
-            }
 
             if !added_nodes.contains(&source_id) {
                 let node_label = source_id.split("::").last().unwrap_or("").to_string();
@@ -232,9 +243,8 @@ pub fn convert_to_cyto_elements(graphs: &[DependencyGraph]) -> serde_json::Value
                 );
             }
 
-            let edge_sig = format!("{}->{}:{}", source_id, target_id, label);
-            if !added_edges.contains(&edge_sig) {
-                added_edges.insert(edge_sig);
+            if added_edges.insert((&edge.from, &edge.to, edge.kind.clone())) {
+                let label = format!("{:?}", edge.kind);
                 elements.push(CytoscapeElement {
                     data: CytoscapeData::Edge {
                         id: format!("e{}", global_edge_id),
@@ -248,5 +258,5 @@ pub fn convert_to_cyto_elements(graphs: &[DependencyGraph]) -> serde_json::Value
         }
     }
 
-    serde_json::to_value(elements).unwrap_or(serde_json::json!([]))
+    elements
 }

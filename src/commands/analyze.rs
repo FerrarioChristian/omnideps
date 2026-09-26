@@ -73,8 +73,12 @@ fn export_results(
     csv_out: Option<&Path>,
 ) -> Result<()> {
     if let Some(out) = json_out {
-        let json = serde_json::to_string_pretty(graph)?;
-        fs::write(out, json)?;
+        if let Some(parent) = out.parent() {
+            fs::create_dir_all(parent)?;
+        }
+        let file = fs::File::create(out)?;
+        let writer = std::io::BufWriter::new(file);
+        serde_json::to_writer(writer, graph)?;
         println!("Graph saved to {}", out.display());
 
         if let Some(parent) = out.parent() {
@@ -91,6 +95,9 @@ fn export_results(
     if let Some(csv) = csv_out
         && let Some(s) = summary
     {
+        if let Some(parent) = csv.parent() {
+            fs::create_dir_all(parent)?;
+        }
         save_summary_csv(s, csv)?;
     }
 
