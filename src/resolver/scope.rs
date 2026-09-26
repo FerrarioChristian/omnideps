@@ -32,6 +32,8 @@ pub struct Scope {
     pub language: Option<String>,
     pub type_parameters: Vec<String>,
     pub is_phantom: bool,
+    pub children: Vec<ScopeId>,
+    pub children_by_name: HashMap<String, Vec<ScopeId>>,
 }
 
 /// Hierarchical tree of lexical scopes ($\mathcal{E}$), implemented via an arena allocator.
@@ -43,6 +45,7 @@ pub struct ScopeTree {
     pub arena: Vec<Scope>,
     pub root: ScopeId,
     pub pending_impl_blocks: Vec<(crate::model::ImplBlock, ScopeId, String)>,
+    pub type_scopes_by_name: HashMap<String, Vec<ScopeId>>,
 }
 
 impl ScopeTree {
@@ -60,9 +63,12 @@ impl ScopeTree {
                 language: None,
                 type_parameters: vec![],
                 is_phantom: false,
+                children: vec![],
+                children_by_name: HashMap::new(),
             }],
             root: 0,
             pending_impl_blocks: vec![],
+            type_scopes_by_name: HashMap::new(),
         };
 
         for m in modules {
@@ -84,7 +90,7 @@ impl ScopeTree {
         self.arena.push(Scope {
             id,
             parent: Some(parent),
-            name,
+            name: name.clone(),
             symbols: HashMap::new(),
             imports: vec![],
             super_types: vec![],
@@ -92,7 +98,15 @@ impl ScopeTree {
             language: None,
             type_parameters: vec![],
             is_phantom: false,
+            children: vec![],
+            children_by_name: HashMap::new(),
         });
+        self.arena[parent].children.push(id);
+        self.arena[parent]
+            .children_by_name
+            .entry(name)
+            .or_default()
+            .push(id);
         id
     }
 
@@ -109,13 +123,10 @@ impl ScopeTree {
             }
 
             // Check if this part already exists as a child of parent_id
-            let mut found = None;
-            for child in &self.arena {
-                if child.parent == Some(parent_id) && child.name == *part {
-                    found = Some(child.id);
-                    break;
-                }
-            }
+            let found = self.arena[parent_id]
+                .children_by_name
+                .get(part)
+                .and_then(|ids| ids.first().copied());
 
             parent_id = if let Some(existing_id) = found {
                 existing_id
@@ -204,6 +215,12 @@ impl ScopeTree {
     ) {
         let name = st.name.last().cloned().unwrap_or_default();
         let class_scope = self.new_scope(parent_id, name.clone());
+        if !name.is_empty() {
+            self.type_scopes_by_name
+                .entry(name.clone())
+                .or_default()
+                .push(class_scope);
+        }
 
         self.arena[class_scope].super_types = st.super_types.clone();
 
@@ -294,12 +311,8 @@ impl ScopeTree {
 
         // If not found in parent, try to find the class globally (common for out-of-line C++ methods)
         if target_scope_id.is_none() {
-            for (id, scope) in self.arena.iter().enumerate() {
-                // If the scope itself is named like the target class, and it's not a block
-                if scope.name == target_name && !scope.name.starts_with("block") {
-                    target_scope_id = Some(id);
-                    break;
-                }
+            if let Some(ids) = self.type_scopes_by_name.get(&target_name) {
+                target_scope_id = ids.first().copied();
             }
         }
 
@@ -313,6 +326,10 @@ impl ScopeTree {
         } else {
             let id = self.new_scope(parent_id, target_name.clone());
             self.define_symbol(parent_id, target_name.clone(), Symbol::Type(id));
+            self.type_scopes_by_name
+                .entry(target_name.clone())
+                .or_default()
+                .push(id);
             id
         };
 

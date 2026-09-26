@@ -5,7 +5,24 @@ mod cli;
 mod commands;
 use cli::{BenchmarkCommands, Cli, Commands, ConfigCommands};
 
+const STACK_SIZE: usize = 64 * 1024 * 1024;
+
 fn main() -> Result<()> {
+    // Spawn worker thread with a large stack (64MB) to prevent stack overflow on massive ASTs
+    // (such as large array tables and deep macro expansions in C/C++ projects like FFmpeg),
+    // following the standard architectural pattern used by rustc and other static analysis tools.
+    let child = std::thread::Builder::new()
+        .name("omnideps-worker".to_string())
+        .stack_size(STACK_SIZE)
+        .spawn(run)?;
+
+    match child.join() {
+        Ok(res) => res,
+        Err(payload) => std::panic::resume_unwind(payload),
+    }
+}
+
+fn run() -> Result<()> {
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("warn")).init();
 
     let cli = Cli::parse();

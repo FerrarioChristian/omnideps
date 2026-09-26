@@ -1,6 +1,6 @@
 pub mod strategies;
 
-use anyhow::{Result, anyhow, bail};
+use anyhow::{Result, bail};
 use std::fs;
 use std::path::Path;
 use tree_sitter::{Language, Node, Parser};
@@ -192,9 +192,29 @@ pub fn extract_from_cst(
     let mut parser = Parser::new();
     parser.set_language(&lang).unwrap();
 
-    let tree = parser
-        .parse(source, None)
-        .ok_or_else(|| anyhow!("parse failed"))?;
+    let start = std::time::Instant::now();
+    let mut progress = |_state: &tree_sitter::ParseState| {
+        if start.elapsed() > std::time::Duration::from_secs(3) {
+            std::ops::ControlFlow::Break(())
+        } else {
+            std::ops::ControlFlow::Continue(())
+        }
+    };
+    let options = tree_sitter::ParseOptions::new().progress_callback(&mut progress);
+
+    let bytes = source.as_bytes();
+    let len = bytes.len();
+    let tree = match parser.parse_with_options(
+        &mut |i, _| (i < len).then(|| &bytes[i..]).unwrap_or_default(),
+        None,
+        Some(options),
+    ) {
+        Some(t) => t,
+        None => {
+            log::warn!("Parsing timed out or failed for file: {:?}", file_path);
+            return Ok((vec![], None));
+        }
+    };
     let root = tree.root_node();
 
     let mut package_path = None;
@@ -320,6 +340,11 @@ fn walk_cst(
                 pending_attributes.extend(attrs);
             }
         }
+        return;
+    }
+
+    let kind = node.kind();
+    if kind == "initializer_list" || kind == "array" || kind == "binary_expression" {
         return;
     }
 

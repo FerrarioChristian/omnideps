@@ -179,8 +179,14 @@ fn execute_impl_block(
         _ => "".to_string(),
     };
 
-    let scope_id =
-        find_child_scope(ctx.tree, parent_scope, &target_name, false).unwrap_or(parent_scope);
+    let scope_id = find_child_scope(ctx.tree, parent_scope, &target_name, false)
+        .or_else(|| {
+            ctx.tree
+                .type_scopes_by_name
+                .get(&target_name)
+                .and_then(|ids| ids.first().copied())
+        })
+        .unwrap_or(parent_scope);
 
     ib.methods = ib
         .methods
@@ -207,13 +213,11 @@ fn execute_impl_block(
 fn execute_function(ctx: &ExecutorContext, mut f: Function, parent_scope: ScopeId) -> Function {
     let name = f.name.last().cloned().unwrap_or_default();
 
-    let mut func_scope_id = parent_scope;
-    for child in &ctx.tree.arena {
-        if child.parent == Some(parent_scope) && child.name == name {
-            func_scope_id = child.id;
-            break;
-        }
-    }
+    let func_scope_id = ctx.tree.arena[parent_scope]
+        .children_by_name
+        .get(&name)
+        .and_then(|ids| ids.first().copied())
+        .unwrap_or(parent_scope);
 
     f.signature.parameters = f
         .signature
@@ -255,13 +259,11 @@ fn execute_block(
     index: usize,
 ) -> Block {
     let block_name = format!("block_{}", index);
-    let mut block_scope_id = parent_scope;
-    for child in &ctx.tree.arena {
-        if child.parent == Some(parent_scope) && child.name == block_name {
-            block_scope_id = child.id;
-            break;
-        }
-    }
+    let block_scope_id = ctx.tree.arena[parent_scope]
+        .children_by_name
+        .get(&block_name)
+        .and_then(|ids| ids.first().copied())
+        .unwrap_or(parent_scope);
 
     b.declarations = b
         .declarations
@@ -346,13 +348,11 @@ fn find_symbol_by_path<'a>(tree: &'a ScopeTree, path: &[String]) -> Option<&'a S
             curr = *id;
             continue;
         }
-        if let Some(child_scope) = tree
-            .arena
-            .iter()
-            .find(|s| s.parent == Some(curr) && &s.name == part)
-        {
-            curr = child_scope.id;
-            continue;
+        if let Some(ids) = tree.arena[curr].children_by_name.get(part) {
+            if let Some(&child_id) = ids.first() {
+                curr = child_id;
+                continue;
+            }
         }
         return None;
     }
@@ -389,12 +389,14 @@ fn redirect_to_constructor(ctx: &ExecutorContext, tr: TypeRef) -> TypeRef {
     match &tr {
         TypeRef::Resolved(path) => {
             if let Some(scope_id) = find_scope_for_type(ctx.tree, &tr) {
-                let ctor_names = ["__init__", "constructor", path.last().unwrap().as_str()];
-                for cname in ctor_names {
-                    if ctx.tree.arena[scope_id].symbols.contains_key(cname) {
-                        let mut new_path = path.clone();
-                        new_path.push(cname.to_string());
-                        return TypeRef::Resolved(new_path);
+                if let Some(last_name) = path.last() {
+                    let ctor_names = ["__init__", "constructor", last_name.as_str()];
+                    for cname in ctor_names {
+                        if ctx.tree.arena[scope_id].symbols.contains_key(cname) {
+                            let mut new_path = path.clone();
+                            new_path.push(cname.to_string());
+                            return TypeRef::Resolved(new_path);
+                        }
                     }
                 }
             }
@@ -1272,13 +1274,11 @@ pub fn find_scope_for_type(tree: &ScopeTree, ty: &TypeRef) -> Option<ScopeId> {
                     curr = *id;
                     continue;
                 }
-                if let Some(child_scope) = tree
-                    .arena
-                    .iter()
-                    .find(|s| s.parent == Some(curr) && &s.name == part)
-                {
-                    curr = child_scope.id;
-                    continue;
+                if let Some(ids) = tree.arena[curr].children_by_name.get(part) {
+                    if let Some(&child_id) = ids.first() {
+                        curr = child_id;
+                        continue;
+                    }
                 }
                 return None;
             }
