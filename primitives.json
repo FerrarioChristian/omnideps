@@ -3,5 +3,5 @@
   "java": ["int", "boolean", "byte", "char", "short", "long", "float", "double", "String", "Object", "void"],
   "python": ["int", "float", "complex", "str", "list", "tuple", "range", "bytes", "bytearray", "memoryview", "dict", "bool", "set", "frozenset", "None", "void"],
   "c": ["int", "char", "float", "double", "void", "short", "long", "signed", "unsigned", "size_t", "bool", "_Bool"],
-  "cpp": ["int", "char", "float", "double", "void", "short", "long", "signed", "unsigned", "size_t", "bool", "string", "std::string", "auto"]
+  "cpp": ["int", "char", "float", "double", "void", "short", "long", "signed", "unsigned", "size_t", "bool", "string", "std::string", "auto", "vector", "std::vector"]
 }

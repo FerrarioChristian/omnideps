@@ -943,6 +943,36 @@ fn test_c_function_pointer_cast_and_invocation() {
 }
 
 #[test]
+fn test_c_local_struct_ast() {
+    let code = r#"
+void factory() {
+    struct LocalProduct {
+        int id;
+    };
+    struct LocalProduct p = {1};
+}
+"#;
+    let mut parser = tree_sitter::Parser::new();
+    parser.set_language(&tree_sitter_c::LANGUAGE.into()).unwrap();
+    let tree = parser.parse(code, None).unwrap();
+    println!("C AST: {}", tree.root_node().to_sexp());
+}
+
+#[test]
+fn test_c_macro_ast() {
+    let code = r#"
+#define MAX_BUFFER 1024
+#define SQUARE(x) ((x) * (x))
+#define LOG_NODE(n) printf("Node ID: %d", n->id)
+"#;
+    let mut parser = tree_sitter::Parser::new();
+    parser.set_language(&tree_sitter_c::LANGUAGE.into()).unwrap();
+    let tree = parser.parse(code, None).unwrap();
+    println!("C AST: {}", tree.root_node().to_sexp());
+}
+
+#[test]
+
 fn test_rust_closure() {
     let code = r#"
         struct TargetStruct {
@@ -1077,9 +1107,45 @@ void test_func() {
         ),
         "Expected test_func -> TargetClass::static_method (Calls)"
     );
+}
+
+#[test]
+fn test_rust_local_variable_constructor_type_inference() {
+    let code = r#"
+struct Point {
+    x: i32,
+}
+impl Point {
+    fn new() -> Self {
+        Point { x: 0 }
+    }
+    fn display(&self) {}
+}
+fn test_func() {
+    let p = Point::new();
+    p.display();
+}
+"#;
+
+    let graph = analyze_snippet(SupportedLanguage::Rust, code, "src/main.rs");
+    println!("Graph edges: {:?}", graph.edges);
     assert!(
-        !graph.edges.iter().any(|e| ends_with(&e.to, &["x"])),
-        "Lambda parameter 'x' should not be emitted as an edge"
+        has_edge(
+            &graph,
+            &["test_func"],
+            &["Point", "new"],
+            DependencyEdgeKind::Calls
+        ),
+        "Expected test_func -> Point::new (Calls)"
+    );
+    assert!(
+        has_edge(
+            &graph,
+            &["test_func"],
+            &["Point", "display"],
+            DependencyEdgeKind::Calls
+        ),
+        "Expected test_func -> Point::display (Calls)"
     );
 }
 

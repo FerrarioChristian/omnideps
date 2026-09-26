@@ -40,6 +40,10 @@ pub fn build_dependency_graph(
     for edge in &edges {
         if edge.to.len() == 1 && primitives.is_primitive(&edge.to[0]) {
             used_primitives.insert(edge.to[0].clone());
+        } else if primitives.is_primitive(&edge.to.join("::")) {
+            used_primitives.insert(edge.to.join("::"));
+        } else if primitives.is_primitive(&edge.to.join(".")) {
+            used_primitives.insert(edge.to.join("."));
         } else if !existing_node_names.contains(&edge.to) {
             used_unresolved.insert(edge.to.clone());
         }

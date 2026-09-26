@@ -276,7 +276,10 @@ fn walk_cst(
                 modules[0].free_functions.push(ff);
                 let mut cursor = node.walk();
                 for child in node.children(&mut cursor) {
-                    if child.kind().contains("body") || child.kind().contains("block") {
+                    if child.kind().contains("body")
+                        || child.kind().contains("block")
+                        || child.kind() == "compound_statement"
+                    {
                         walk_cst(
                             child,
                             source,

@@ -121,7 +121,10 @@ pub fn extract_fields(
                 });
             }
 
-            if child.child_count() > 0 && (enter_functions || !is_func) {
+            if child.child_count() > 0
+                && (enter_functions || !is_func)
+                && !crate::heuristics::classifiers::is_structured_type(child)
+            {
                 fields.extend(traverse_for_fields(
                     child,
                     src,
@@ -130,6 +133,7 @@ pub fn extract_fields(
                     implicit_first_param,
                 ));
             }
+
         }
         fields
     }

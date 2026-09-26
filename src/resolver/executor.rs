@@ -366,6 +366,11 @@ fn is_type_or_alias(ctx: &ExecutorContext, tr: &TypeRef) -> bool {
             if path.len() == 1 && ctx.primitives.is_primitive(&path[0]) {
                 return true;
             }
+            if ctx.primitives.is_primitive(&path.join("::"))
+                || ctx.primitives.is_primitive(&path.join("."))
+            {
+                return true;
+            }
             if let Some(sym) = find_symbol_by_path(ctx.tree, path) {
                 return matches!(sym, Symbol::Type(_) | Symbol::TypeAlias(_));
             }
@@ -494,6 +499,19 @@ pub fn extract_base_name(query: &Query) -> String {
         Query::Find(name) => name.clone(),
         Query::Extract(parent, member) => format!("{}::{}", extract_base_name(parent), member),
         Query::Call(parent) => format!("{}()", extract_base_name(parent)),
+    }
+}
+
+/// Extracts the qualified path components of a `Query`, if it represents a static path.
+pub fn query_to_path(query: &Query) -> Option<Vec<String>> {
+    match query {
+        Query::Find(name) => Some(vec![name.clone()]),
+        Query::Extract(parent, member) => {
+            let mut p = query_to_path(parent)?;
+            p.push(member.clone());
+            Some(p)
+        }
+        Query::Call(parent) => query_to_path(parent),
     }
 }
 
@@ -899,7 +917,26 @@ fn evaluate_query_extract(
     resolve_type: bool,
     visited: &mut std::collections::HashSet<String>,
 ) -> Option<TypeRef> {
-    let parent_ty = evaluate_query(ctx, parent_q, scope_id, true, visited)?;
+    let parent_ty = match evaluate_query(ctx, parent_q, scope_id, true, visited) {
+        Some(ty) => ty,
+        None => {
+            if let Some(mut full_path) = query_to_path(parent_q) {
+                full_path.push(member.to_string());
+                let joined_colon = full_path.join("::");
+                if ctx.primitives.is_primitive(&joined_colon) {
+                    return Some(TypeRef::Primitive(joined_colon));
+                }
+                let joined_dot = full_path.join(".");
+                if ctx.primitives.is_primitive(&joined_dot) {
+                    return Some(TypeRef::Primitive(joined_dot));
+                }
+                if let Some(res) = find_global_internal(ctx, &full_path, visited) {
+                    return Some(res);
+                }
+            }
+            return None;
+        }
+    };
     let mut resolved_parent_ty = parent_ty.clone();
 
     // If it's an EvaluatedAccess, unwrap the resolved type for further lookup,
@@ -912,7 +949,10 @@ fn evaluate_query_extract(
     };
 
     // If it's Unresolved, to ensure find_scope_for_type works
-    if let TypeRef::Unresolved(_) | TypeRef::ResolutionQuery(_) = resolved_parent_ty {
+    if matches!(
+        resolved_parent_ty,
+        TypeRef::Unresolved(_) | TypeRef::ResolutionQuery(_) | TypeRef::Generic { .. }
+    ) {
         resolved_parent_ty =
             evaluate_typeref_inner(ctx, resolved_parent_ty, scope_id, true, visited);
     }
@@ -975,15 +1015,80 @@ fn evaluate_query_extract(
                 Box::new(TypeRef::Unresolved(path)),
             ))
         }
-        TypeRef::EvaluatedAccess(base, inner) => {
-            if let TypeRef::Resolved(mut path) = *inner {
+        TypeRef::Primitive(prim) => {
+            let path = vec![prim.clone(), member.to_string()];
+            Some(TypeRef::EvaluatedAccess(
+                Box::new(TypeRef::Primitive(prim)),
+                Box::new(TypeRef::External(path)),
+            ))
+        }
+        TypeRef::Generic { base, .. } => match *base {
+            TypeRef::Resolved(mut path) => {
+                let b = path.clone();
                 path.push(member.to_string());
                 Some(TypeRef::EvaluatedAccess(
-                    base,
+                    Box::new(TypeRef::Resolved(b)),
                     Box::new(TypeRef::Resolved(path)),
                 ))
-            } else {
-                None
+            }
+            TypeRef::External(mut path) => {
+                let b = path.clone();
+                path.push(member.to_string());
+                Some(TypeRef::EvaluatedAccess(
+                    Box::new(TypeRef::External(b)),
+                    Box::new(TypeRef::External(path)),
+                ))
+            }
+            TypeRef::Unresolved(mut path) => {
+                let b = path.clone();
+                path.push(member.to_string());
+                Some(TypeRef::EvaluatedAccess(
+                    Box::new(TypeRef::Unresolved(b)),
+                    Box::new(TypeRef::Unresolved(path)),
+                ))
+            }
+            TypeRef::Failed(mut path) => {
+                let b = path.clone();
+                path.push(member.to_string());
+                Some(TypeRef::EvaluatedAccess(
+                    Box::new(TypeRef::External(b)),
+                    Box::new(TypeRef::External(path)),
+                ))
+            }
+            TypeRef::Primitive(prim) => {
+                let path = vec![prim.clone(), member.to_string()];
+                Some(TypeRef::EvaluatedAccess(
+                    Box::new(TypeRef::Primitive(prim)),
+                    Box::new(TypeRef::External(path)),
+                ))
+            }
+            _ => None,
+        },
+        TypeRef::EvaluatedAccess(base, inner) => {
+            let inner_ty = *inner;
+            match inner_ty {
+                TypeRef::Resolved(mut path) => {
+                    path.push(member.to_string());
+                    Some(TypeRef::EvaluatedAccess(
+                        base,
+                        Box::new(TypeRef::Resolved(path)),
+                    ))
+                }
+                TypeRef::External(mut path) => {
+                    path.push(member.to_string());
+                    Some(TypeRef::EvaluatedAccess(
+                        base,
+                        Box::new(TypeRef::External(path)),
+                    ))
+                }
+                TypeRef::Unresolved(mut path) => {
+                    path.push(member.to_string());
+                    Some(TypeRef::EvaluatedAccess(
+                        base,
+                        Box::new(TypeRef::Unresolved(path)),
+                    ))
+                }
+                _ => None,
             }
         }
         _ => None,
@@ -1185,6 +1290,16 @@ pub fn find_global_internal(
     if path.len() == 1 && ctx.primitives.is_primitive(&path[0]) {
         visited.remove(&path_key);
         return Some(TypeRef::Primitive(path[0].clone()));
+    }
+    let joined_colon = path.join("::");
+    if ctx.primitives.is_primitive(&joined_colon) {
+        visited.remove(&path_key);
+        return Some(TypeRef::Primitive(joined_colon));
+    }
+    let joined_dot = path.join(".");
+    if ctx.primitives.is_primitive(&joined_dot) {
+        visited.remove(&path_key);
+        return Some(TypeRef::Primitive(joined_dot));
     }
 
     for (i, part) in path.iter().enumerate() {

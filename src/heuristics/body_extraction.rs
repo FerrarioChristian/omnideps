@@ -560,8 +560,9 @@ pub fn infer_variable_type(node: Node, source: &str) -> TypeRef {
             if let Some(name_node) = val.child_by_field_name("name") {
                 return extract_type_ref(name_node, source);
             }
-        } else if val.kind() == "call" {
+        } else if matches!(val.kind(), "call" | "call_expression") {
             // In languages like Python, object creation is just a call node (e.g. `Admin(...)`)
+            // In Rust / C++, it is a call_expression (e.g. `Point::new(...)`)
             if let Some(f_node) = val.child_by_field_name("function") {
                 let extracted = extract_type_ref(f_node, source);
                 if let crate::model::TypeRef::Unresolved(path) = &extracted
@@ -600,7 +601,7 @@ pub fn infer_variable_type(node: Node, source: &str) -> TypeRef {
             if let Some(name_node) = child.child_by_field_name("name") {
                 return extract_type_ref(name_node, source);
             }
-        } else if kind == "call"
+        } else if matches!(kind, "call" | "call_expression")
             && let Some(f_node) = child.child_by_field_name("function")
         {
             let extracted = extract_type_ref(f_node, source);
