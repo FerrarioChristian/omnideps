@@ -371,8 +371,20 @@ fn find_behavioral_deps_with_ctx(
 ) {
     let kind = node.kind();
 
-    // Check if node is a closure / lambda
-    if super::classifiers::is_closure(node) {
+    // Check if node is a closure / lambda / nested function
+    if super::classifiers::is_closure(node)
+        || matches!(
+            kind,
+            "function_definition" | "function_item" | "local_function_statement"
+        )
+    {
+        if let Some(fn_name) = super::text_parsing::extract_identifier(node, source) {
+            declarations.push(Field {
+                name: fn_name,
+                ty: TypeRef::Primitive("void".to_string()),
+                annotations: vec![],
+            });
+        }
         let (param_names, param_fields) = extract_closure_params(node, source);
         declarations.extend(param_fields);
         let mut new_ignored = ignored_idents.clone();
@@ -531,38 +543,44 @@ fn find_behavioral_deps_with_ctx(
 /// assignment stems from an explicit instantiation (e.g. `new_expression`), it extracts the target
 /// class and deduces the variable's type.
 pub fn infer_variable_type(node: Node, source: &str) -> TypeRef {
-    // 1. If it has a explicit "value" or "right" field (like Rust let_declaration or Python assignment)
-    if let Some(val) = node
+    let val = node
         .child_by_field_name("value")
         .or_else(|| node.child_by_field_name("right"))
-    {
-        if matches!(val.kind(), "object_creation_expression" | "new_expression") {
-            if let Some(t_node) = val.child_by_field_name("type") {
-                return extract_type_ref(t_node, source);
-            }
-        } else if val.kind() == "struct_expression" {
-            if let Some(name_node) = val.child_by_field_name("name") {
-                return extract_type_ref(name_node, source);
-            }
-        } else if matches!(val.kind(), "call" | "call_expression") {
-            // In languages like Python, object creation is just a call node (e.g. `Admin(...)`)
-            // In Rust / C++, it is a call_expression (e.g. `Point::new(...)`)
-            if let Some(f_node) = val.child_by_field_name("function") {
-                let extracted = extract_type_ref(f_node, source);
-                if let crate::model::TypeRef::Unresolved(path) = &extracted
-                    && !path.is_empty()
-                {
-                    let mut curr = crate::model::Query::Find(path[0].clone());
-                    for part in &path[1..] {
-                        curr = crate::model::Query::Extract(Box::new(curr), part.clone());
-                    }
-                    let query = crate::model::Query::Call(Box::new(curr));
-                    return crate::model::TypeRef::ResolutionQuery(query);
-                }
-                return extracted;
-            }
+        .unwrap_or(node);
+
+    if matches!(val.kind(), "object_creation_expression" | "new_expression") {
+        if let Some(t_node) = val.child_by_field_name("type") {
+            return extract_type_ref(t_node, source);
         }
-        // It could just be an identifier (e.g. let x = Factory;)
+    } else if val.kind() == "struct_expression" {
+        if let Some(name_node) = val.child_by_field_name("name") {
+            return extract_type_ref(name_node, source);
+        }
+    } else if matches!(val.kind(), "call" | "call_expression") {
+        // In languages like Python, object creation is just a call node (e.g. `Admin(...)`)
+        // In Rust / C++, it is a call_expression (e.g. `Point::new(...)`)
+        if let Some(f_node) = val.child_by_field_name("function") {
+            let extracted = extract_type_ref(f_node, source);
+            if let crate::model::TypeRef::Unresolved(path) = &extracted
+                && !path.is_empty()
+            {
+                let mut curr = crate::model::Query::Find(path[0].clone());
+                for part in &path[1..] {
+                    curr = crate::model::Query::Extract(Box::new(curr), part.clone());
+                }
+                let query = crate::model::Query::Call(Box::new(curr));
+                return crate::model::TypeRef::ResolutionQuery(query);
+            }
+            return extracted;
+        }
+    } else if matches!(val.kind(), "string" | "string_literal") {
+        return TypeRef::Primitive("str".to_string());
+    } else if matches!(val.kind(), "integer" | "decimal_integer_literal") {
+        return TypeRef::Primitive("int".to_string());
+    }
+
+    // It could just be an identifier (e.g. let x = Factory;)
+    if val.id() != node.id() {
         let text = node_text(val, source);
         if !text.is_empty()
             && text

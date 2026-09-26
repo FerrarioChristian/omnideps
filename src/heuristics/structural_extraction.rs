@@ -62,20 +62,30 @@ pub fn extract_fields(
         enter_functions: bool,
         active_self_kw: Option<String>,
         implicit_first_param: bool,
+        active_params: &[crate::model::Parameter],
+        depth: usize,
     ) -> Vec<Field> {
+        if depth > 50 {
+            return Vec::new();
+        }
         let mut fields = Vec::new();
         let mut cursor = n.walk();
         for child in n.children(&mut cursor) {
             let mut child_active_self_kw = active_self_kw.clone();
             let is_func = crate::heuristics::classifiers::is_function(child);
 
-            if is_func
-                && implicit_first_param
+            let func_params_storage;
+            let current_params = if is_func
                 && let Some(func) = super::parsers::try_parse_function(child, src)
-                && let Some(first_param) = func.signature.parameters.first()
             {
-                child_active_self_kw = first_param.name.clone();
-            }
+                if implicit_first_param && let Some(first_param) = func.signature.parameters.first() {
+                    child_active_self_kw = first_param.name.clone();
+                }
+                func_params_storage = func.signature.parameters;
+                &func_params_storage
+            } else {
+                active_params
+            };
 
             if matches!(
                 child.kind(),
@@ -110,7 +120,15 @@ pub fn extract_fields(
                 let ty = if let Some(type_node) = child.child_by_field_name("type") {
                     super::type_extraction::extract_type_ref(type_node, src)
                 } else if let Some(right) = child.child_by_field_name("right") {
-                    crate::heuristics::body_extraction::infer_variable_type(right, src)
+                    let right_ident = super::text_parsing::extract_identifier(right, src);
+                    if let Some(ident) = &right_ident
+                        && let Some(param) = active_params.iter().find(|p| p.name.as_ref() == Some(ident))
+                        && !matches!(param.ty, crate::model::TypeRef::Failed(_))
+                    {
+                        param.ty.clone()
+                    } else {
+                        crate::heuristics::body_extraction::infer_variable_type(right, src)
+                    }
                 } else {
                     crate::model::TypeRef::Failed(vec![])
                 };
@@ -123,6 +141,7 @@ pub fn extract_fields(
 
             if child.child_count() > 0
                 && (enter_functions || !is_func)
+                && child.kind() != "field_declaration"
                 && !crate::heuristics::classifiers::is_structured_type(child)
             {
                 fields.extend(traverse_for_fields(
@@ -131,6 +150,8 @@ pub fn extract_fields(
                     enter_functions,
                     child_active_self_kw,
                     implicit_first_param,
+                    current_params,
+                    depth + 1,
                 ));
             }
 
@@ -144,6 +165,8 @@ pub fn extract_fields(
         enter_functions,
         initial_self_kw,
         implicit_first_param,
+        &[],
+        0,
     );
 
     // Handle Rust's Tuple Structs / Enum Tuple Variants

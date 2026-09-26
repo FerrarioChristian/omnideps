@@ -88,6 +88,7 @@ pub fn extract_type_ref(node: Node, source: &str) -> TypeRef {
             | "type"
             | "string"
             | "void_type"
+            | "none"
     ) {
         let text = node_text(node, source);
         let text = text.replace(['\'', '"'], "");
@@ -117,6 +118,7 @@ pub fn extract_type_ref(node: Node, source: &str) -> TypeRef {
                 | "boolean_type"
                 | "identifier"
                 | "type"
+                | "none"
         ) {
             let text = node_text(child, source);
             if !text.is_empty() && !text.contains(' ') {

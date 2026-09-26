@@ -33,6 +33,15 @@ fn has_edge(
         .any(|e| ends_with(&e.from, from_suffix) && ends_with(&e.to, to_suffix) && e.kind == kind)
 }
 
+fn has_node(graph: &DependencyGraph, name_suffix: &[&str]) -> bool {
+    graph.nodes.iter().any(|n| match n {
+        Component::StructuredType(st) => ends_with(&st.name, name_suffix),
+        Component::Function(f) => ends_with(&f.name, name_suffix),
+        Component::Module(m) => ends_with(&m.name, name_suffix),
+        _ => false,
+    })
+}
+
 // =========================================================================
 // RUST TESTS
 // =========================================================================
@@ -1192,7 +1201,36 @@ fn test_java_chained_method_call_and_constructor() {
     );
 }
 
+#[test]
+fn test_python_nested_closure_call_and_local_class() {
+    let code = r#"
+class Target:
+    def execute(self) -> None:
+        pass
 
+def my_decorator(target: Target):
+    def wrapper():
+        target.execute()
+    return wrapper
 
+def factory():
+    class LocalClass:
+        pass
+    return LocalClass()
+"#;
 
-
+    let graph = analyze_snippet(SupportedLanguage::Python, code, "src/test.py");
+    assert!(
+        has_edge(
+            &graph,
+            &["my_decorator"],
+            &["Target", "execute"],
+            DependencyEdgeKind::Calls
+        ),
+        "Expected my_decorator -> Target.execute (Calls)"
+    );
+    assert!(
+        has_node(&graph, &["LocalClass"]),
+        "Expected local class LocalClass to exist in graph"
+    );
+}

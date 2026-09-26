@@ -218,6 +218,7 @@ pub fn extract_from_cst(
         lang_name,
         file_path,
         config,
+        false,
     );
     Ok((modules, package_path))
 }
@@ -233,6 +234,7 @@ fn walk_cst(
     lang_name: &str,
     file_path: Option<String>,
     config: &AnalyzerConfig,
+    inside_function: bool,
 ) {
     if let Some(comp) = dispatch_node(node, source, lang_name, config) {
         if modules.is_empty() {
@@ -263,6 +265,7 @@ fn walk_cst(
                         lang_name,
                         file_path.clone(),
                         config,
+                        false,
                     );
                 }
                 modules[0].sub_modules.push(new_modules.remove(0));
@@ -272,8 +275,10 @@ fn walk_cst(
                 modules[0].structured_types.push(st);
             }
             ParsedItem::Component(Component::Function(mut ff)) => {
-                ff.annotations.append(pending_attributes);
-                modules[0].free_functions.push(ff);
+                if !inside_function {
+                    ff.annotations.append(pending_attributes);
+                    modules[0].free_functions.push(ff);
+                }
                 let mut cursor = node.walk();
                 for child in node.children(&mut cursor) {
                     if child.kind().contains("body")
@@ -288,12 +293,13 @@ fn walk_cst(
                             lang_name,
                             file_path.clone(),
                             config,
+                            true,
                         );
                     }
                 }
             }
             ParsedItem::Component(Component::Field(name, ty)) => {
-                if let Some(n) = name.last() {
+                if !inside_function && let Some(n) = name.last() {
                     let annotations = std::mem::take(pending_attributes);
                     modules[0].free_variables.push(Field {
                         name: n.clone(),
@@ -327,6 +333,7 @@ fn walk_cst(
             lang_name,
             file_path.clone(),
             config,
+            inside_function,
         );
     }
 }
