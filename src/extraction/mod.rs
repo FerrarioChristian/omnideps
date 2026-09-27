@@ -65,7 +65,10 @@ pub fn extract_ir(
     let (mut all_modules, combined_primitives) = aggregate_extracted_components(parse_results);
 
     if all_modules.is_empty() {
-        bail!("No supported source files successfully parsed in: {}", path.display());
+        bail!(
+            "No supported source files successfully parsed in: {}",
+            path.display()
+        );
     }
 
     // 4. Post-extraction reconciliation: link out-of-line method definitions across workspace modules
@@ -252,7 +255,7 @@ pub fn extract_from_cst(
 
     let start = std::time::Instant::now();
     let mut progress = |_state: &tree_sitter::ParseState| {
-        if start.elapsed() > std::time::Duration::from_secs(3) {
+        if start.elapsed() > std::time::Duration::from_secs(20) {
             std::ops::ControlFlow::Break(())
         } else {
             std::ops::ControlFlow::Continue(())

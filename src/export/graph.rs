@@ -1,4 +1,5 @@
 use crate::model::*;
+use rayon::slice::ParallelSliceMut;
 
 /// Constructs a dependency graph linking components based on inheritance, types used in fields, parameters, etc.
 pub fn build_dependency_graph(
@@ -38,8 +39,9 @@ pub fn build_dependency_graph(
         }
     }
 
-    // Deduplicate edges first to prevent quadratic string checks and redundant allocations
-    edges.sort();
+    // Deduplicate edges first to prevent quadratic string checks and redundant allocations.
+    // par_sort_unstable performs in-place parallel pdqsort across Rayon worker threads.
+    edges.par_sort_unstable();
     edges.dedup();
 
     for edge in &edges {
