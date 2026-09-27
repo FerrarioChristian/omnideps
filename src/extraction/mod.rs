@@ -1,8 +1,9 @@
 pub mod strategies;
 
 use anyhow::{Result, bail};
+use rayon::prelude::*;
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use tree_sitter::{Language, Node, Parser};
 use walkdir::WalkDir;
 
@@ -14,12 +15,13 @@ use crate::model::{Component, Field, Module, TypeRef};
 use crate::resolver::primitives::PrimitiveRegistry;
 use strategies::{apply_directory_strategy, apply_package_strategy, link_out_of_line_methods};
 
-/// Phase 1 Entry Point: Recursively traverses a file or directory path, extracting all IR modules ($\varepsilon : \mathcal{W} \to \mathcal{D}$).
+/// Phase 1 Entry Point: Traverses a file or directory path and extracts all IR modules ($\varepsilon : \mathcal{W} \to \mathcal{D}$).
 ///
-/// Universal workspace ingestion function for OmniDeps:
-/// - If `path` is a single file, it parses that file directly.
-/// - If `path` is a directory, it traverses the directory tree using [`WalkDir`], extracting modules from all supported files.
-/// - Post-extraction, it applies universal out-of-line method linking across all extracted modules.
+/// Executes parallel multi-threaded parsing across all available CPU cores using Rayon:
+/// 1. Discovers and indexes all supported source files via [`discover_supported_source_files`].
+/// 2. Concurrently parses each file into an independent module tree via [`extract_ir_parallel`].
+/// 3. Aggregates results into a unified module forest via [`aggregate_extracted_components`].
+/// 4. Reconciles cross-file out-of-line method declarations via [`link_out_of_line_methods`].
 ///
 /// # Arguments
 /// * `path` - A path to a single source file or root workspace directory.
@@ -29,12 +31,6 @@ use strategies::{apply_directory_strategy, apply_package_strategy, link_out_of_l
 /// A tuple containing:
 /// * `Vec<Module>`: Complete unresolved IR module forest $\mathcal{D}$.
 /// * `PrimitiveRegistry`: Merged registry of primitive types recognized across all parsed files.
-///
-/// # Errors
-/// Returns an error if:
-/// * The path does not exist.
-/// * The path points to an unsupported single file.
-/// * No supported source files are found or successfully parsed.
 pub fn extract_ir(
     path: &Path,
     config: &AnalyzerConfig,
@@ -47,38 +43,100 @@ pub fn extract_ir(
         bail!("Language not supported for file: {}", path.display());
     }
 
+    // Ensure worker threads have generous stack allocation matching the main thread
+    crate::concurrency::ensure_thread_pool_configured();
+
     let root_dir = if path.is_dir() {
         path
     } else {
         path.parent().unwrap_or(Path::new(""))
     };
 
-    let mut all_modules = vec![];
-    let mut combined_primitives = PrimitiveRegistry::empty();
+    // 1. Discovery: find all candidate source files
+    let files = discover_supported_source_files(path);
+    if files.is_empty() {
+        bail!("No supported source files found in: {}", path.display());
+    }
+
+    // 2. Parallel Extraction: concurrent parsing across worker threads
+    let parse_results = extract_ir_parallel(files, root_dir, config);
+
+    // 3. Aggregation: combine extracted modules and primitive registries
+    let (mut all_modules, combined_primitives) = aggregate_extracted_components(parse_results);
+
+    if all_modules.is_empty() {
+        bail!("No supported source files successfully parsed in: {}", path.display());
+    }
+
+    // 4. Post-extraction reconciliation: link out-of-line method definitions across workspace modules
+    link_out_of_line_methods(&mut all_modules);
+
+    Ok((all_modules, combined_primitives))
+}
+
+/// Discovers all source files within a target path that match supported languages.
+///
+/// Returns a sorted list of `(PathBuf, SupportedLanguage)` pairs to guarantee
+/// deterministic parsing order across different operating systems and filesystems.
+fn discover_supported_source_files(path: &Path) -> Vec<(PathBuf, SupportedLanguage)> {
+    let mut files = Vec::new();
+
+    if path.is_file() {
+        if let Some(lang) = SupportedLanguage::from_path(path) {
+            files.push((path.to_path_buf(), lang));
+        }
+        return files;
+    }
 
     for entry in WalkDir::new(path).into_iter().filter_map(|e| e.ok()) {
         if entry.file_type().is_file()
             && let Some(lang) = SupportedLanguage::from_path(entry.path())
-            && let Ok(source) = fs::read_to_string(entry.path())
         {
-            let rel_path = entry.path().strip_prefix(root_dir).unwrap_or(entry.path());
-            if let Ok((mut file_modules, file_primitives)) =
-                parse_source(lang, &source, rel_path, config)
-            {
-                all_modules.append(&mut file_modules);
-                combined_primitives.merge(file_primitives);
-            }
+            files.push((entry.into_path(), lang));
         }
     }
 
-    if all_modules.is_empty() {
-        bail!("No supported source files found in: {}", path.display());
+    files.sort_by(|a, b| a.0.cmp(&b.0));
+    files
+}
+
+/// Parses a single source file from disk into an IR module tree and primitive registry.
+fn parse_source_file(
+    file_path: &Path,
+    lang: SupportedLanguage,
+    root_dir: &Path,
+    config: &AnalyzerConfig,
+) -> Option<(Vec<Module>, PrimitiveRegistry)> {
+    let source = fs::read_to_string(file_path).ok()?;
+    let rel_path = file_path.strip_prefix(root_dir).unwrap_or(file_path);
+    parse_source(lang, &source, rel_path, config).ok()
+}
+
+/// Executes parallel syntactic extraction across all discovered files using Rayon.
+fn extract_ir_parallel(
+    files: Vec<(PathBuf, SupportedLanguage)>,
+    root_dir: &Path,
+    config: &AnalyzerConfig,
+) -> Vec<(Vec<Module>, PrimitiveRegistry)> {
+    files
+        .into_par_iter()
+        .filter_map(|(file_path, lang)| parse_source_file(&file_path, lang, root_dir, config))
+        .collect()
+}
+
+/// Aggregates individual file extraction results into a unified module forest and merged primitive registry.
+fn aggregate_extracted_components(
+    results: Vec<(Vec<Module>, PrimitiveRegistry)>,
+) -> (Vec<Module>, PrimitiveRegistry) {
+    let mut all_modules = Vec::with_capacity(results.len());
+    let mut combined_primitives = PrimitiveRegistry::empty();
+
+    for (mut file_modules, file_primitives) in results {
+        all_modules.append(&mut file_modules);
+        combined_primitives.merge(file_primitives);
     }
 
-    // Universal post-extraction pass: link out-of-line method definitions across workspace modules
-    link_out_of_line_methods(&mut all_modules);
-
-    Ok((all_modules, combined_primitives))
+    (all_modules, combined_primitives)
 }
 
 /// Extracts Intermediate Representation (IR) modules from a single source file or code snippet.
