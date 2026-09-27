@@ -1,18 +1,19 @@
 use super::primitives::PrimitiveRegistry;
 use super::scope::{ScopeId, ScopeTree, Symbol};
 use crate::model::*;
-use std::cell::RefCell;
+use rayon::prelude::*;
 use std::collections::HashMap;
+use std::sync::RwLock;
 
 pub struct ExecutorContext<'a> {
     pub tree: &'a ScopeTree,
     pub primitives: &'a PrimitiveRegistry,
     pub config: &'a crate::config::AnalyzerConfig,
-    pub resolved_super_scopes: RefCell<HashMap<ScopeId, Vec<ScopeId>>>,
+    pub resolved_super_scopes: RwLock<HashMap<ScopeId, Vec<ScopeId>>>,
 }
 
 /// Entry point for Phase 2b (Name Resolution).
-/// Takes the extracted modules, builds the `ScopeTree`, and resolves all `TypeRef` queries.
+/// Takes the extracted modules, builds the `ScopeTree`, and resolves all `TypeRef` queries ($\rho_{\text{exec}}$).
 pub fn execute_queries(
     modules: Vec<Module>,
     primitives: &PrimitiveRegistry,
@@ -24,12 +25,29 @@ pub fn execute_queries(
         tree: &tree,
         primitives,
         config,
-        resolved_super_scopes: RefCell::new(HashMap::new()),
+        resolved_super_scopes: RwLock::new(HashMap::new()),
     };
 
+    // Precompute inheritance hierarchies sequentially to populate the cache and avoid contention during parallel execution
+    precompute_super_scopes(&ctx);
+
+    execute_modules_parallel(&ctx, modules)
+}
+
+/// Precomputes inheritance hierarchies across all structured type scopes before worker thread dispatch.
+fn precompute_super_scopes(ctx: &ExecutorContext) {
+    for scope_id in 0..ctx.tree.arena.len() {
+        if !ctx.tree.arena[scope_id].super_types.is_empty() {
+            get_or_resolve_super_scopes(ctx, scope_id);
+        }
+    }
+}
+
+/// Executes query resolution across modules concurrently using Rayon.
+fn execute_modules_parallel(ctx: &ExecutorContext, modules: Vec<Module>) -> Vec<Module> {
     modules
-        .into_iter()
-        .map(|m| execute_module(&ctx, m, tree.root))
+        .into_par_iter()
+        .map(|m| execute_module(ctx, m, ctx.tree.root))
         .collect()
 }
 
@@ -555,14 +573,20 @@ pub fn find_symbol_in_scope_and_supers(
 /// Resolution is performed strictly within the enclosing `parent_scope` (never within `scope_id` itself),
 /// preventing combinatorial / exponential recursion when a class implements many interfaces.
 fn get_or_resolve_super_scopes(ctx: &ExecutorContext, scope_id: ScopeId) -> Vec<ScopeId> {
-    if let Some(supers) = ctx.resolved_super_scopes.borrow().get(&scope_id) {
+    if let Ok(guard) = ctx.resolved_super_scopes.read()
+        && let Some(supers) = guard.get(&scope_id)
+    {
         return supers.clone();
     }
 
     // Insert an empty entry first to break any circular inheritance cycles during resolution
-    ctx.resolved_super_scopes
-        .borrow_mut()
-        .insert(scope_id, Vec::new());
+    {
+        let mut guard = ctx.resolved_super_scopes.write().unwrap();
+        if let Some(supers) = guard.get(&scope_id) {
+            return supers.clone();
+        }
+        guard.insert(scope_id, Vec::new());
+    }
 
     let mut resolved_scopes = Vec::new();
     let mut visited = std::collections::HashSet::new();
@@ -607,7 +631,8 @@ fn get_or_resolve_super_scopes(ctx: &ExecutorContext, scope_id: ScopeId) -> Vec<
     }
 
     ctx.resolved_super_scopes
-        .borrow_mut()
+        .write()
+        .unwrap()
         .insert(scope_id, resolved_scopes.clone());
     resolved_scopes
 }
