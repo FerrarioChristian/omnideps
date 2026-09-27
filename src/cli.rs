@@ -21,9 +21,13 @@ pub enum Commands {
         #[arg(required = true)]
         path: PathBuf,
 
-        /// Output JSON for graph
+        /// Output Cytoscape JSON for graph
         #[arg(short, long)]
         output: Option<PathBuf>,
+
+        /// Export raw DependencyGraph format alongside (named raw_<output>)
+        #[arg(long)]
+        raw: bool,
 
         /// Output CSV summary
         #[arg(short, long)]
@@ -40,6 +44,21 @@ pub enum Commands {
         /// Calculate and display analysis summary statistics (modules, types, references)
         #[arg(short = 's', long)]
         summary: bool,
+
+        /// Path to a JSON configuration file defining architectural strategies
+        #[arg(long)]
+        config: Option<PathBuf>,
+    },
+    /// Dump full Intermediate Representation (IR) without pruning for debugging
+    #[command(name = "dump-ir")]
+    DumpIr {
+        /// File or directory to analyze
+        #[arg(required = true)]
+        path: PathBuf,
+
+        /// Output JSON file path (default: ir_dump.json)
+        #[arg(short, long, default_value = "ir_dump.json")]
+        output: PathBuf,
 
         /// Path to a JSON configuration file defining architectural strategies
         #[arg(long)]

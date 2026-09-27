@@ -31,6 +31,7 @@ fn run() -> Result<()> {
         Commands::Analyze {
             path,
             output,
+            raw,
             csv,
             debug_refs,
             failed_only,
@@ -40,12 +41,20 @@ fn run() -> Result<()> {
             commands::analyze::execute(
                 path,
                 output.as_deref(),
+                *raw,
                 csv.as_deref(),
                 *debug_refs,
                 *failed_only,
                 config.as_deref(),
                 *summary,
             )?;
+        }
+        Commands::DumpIr {
+            path,
+            output,
+            config,
+        } => {
+            commands::dump_ir::execute(path, output, config.as_deref())?;
         }
         Commands::Benchmark { cmd } => match cmd {
             BenchmarkCommands::Run {
