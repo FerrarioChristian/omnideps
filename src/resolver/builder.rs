@@ -2,34 +2,17 @@ use super::stack::SymbolStack;
 use crate::model::*;
 use std::cell::RefCell;
 
-use rayon::prelude::*;
-
 /// Context for the Query Building phase (Lexical Substitution).
 pub struct BuilderContext<'a> {
     pub stack: &'a RefCell<SymbolStack>,
     pub config: &'a crate::config::AnalyzerConfig,
 }
 
-/// Transforms Unresolved references into mathematical Queries using Lexical Substitution ($\rho_{\text{build}}$).
+/// Transforms Unresolved references into mathematical Queries using Lexical Substitution.
 pub fn build_queries(modules: Vec<Module>, config: &crate::config::AnalyzerConfig) -> Vec<Module> {
-    build_queries_parallel(modules, config)
-}
-
-/// Executes parallel lexical substitution across modules using Rayon.
-fn build_queries_parallel(
-    modules: Vec<Module>,
-    config: &crate::config::AnalyzerConfig,
-) -> Vec<Module> {
-    modules
-        .into_par_iter()
-        .map(|m| process_single_module(m, config))
-        .collect()
-}
-
-/// Builds lexical queries for an individual module using a dedicated local lexical symbol stack.
-fn process_single_module(m: Module, config: &crate::config::AnalyzerConfig) -> Module {
     let stack = RefCell::new(SymbolStack::new());
-    // Push the module-level root lexical frame
+
+    // We push the GLOBAL ROOT frame
     stack.borrow_mut().push_scope();
 
     let ctx = BuilderContext {
@@ -37,11 +20,16 @@ fn process_single_module(m: Module, config: &crate::config::AnalyzerConfig) -> M
         config,
     };
 
-    let lang = m.language.clone();
-    let result = build_module_queries(&ctx, lang, m);
+    let processed_modules = modules
+        .into_iter()
+        .map(|m| {
+            let lang = m.language.clone();
+            build_module_queries(&ctx, lang, m)
+        })
+        .collect();
 
     stack.borrow_mut().pop_scope();
-    result
+    processed_modules
 }
 
 fn build_module_queries(
