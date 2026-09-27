@@ -1,5 +1,5 @@
 use crate::model::*;
-use rayon::slice::ParallelSliceMut;
+use rayon::prelude::*;
 
 /// Constructs a dependency graph linking components based on inheritance, types used in fields, parameters, etc.
 pub fn build_dependency_graph(
@@ -8,11 +8,7 @@ pub fn build_dependency_graph(
 ) -> DependencyGraph {
     let mut seen_modules = std::collections::HashSet::new();
     let mut nodes = flatten_modules(modules, vec![], &mut seen_modules);
-    let mut edges = vec![];
-
-    for m in modules {
-        traverse_module_for_edges(m, None, vec![], &mut edges);
-    }
+    let mut edges = extract_edges_parallel(modules);
 
     let mut used_primitives = std::collections::HashSet::new();
     let mut used_unresolved = std::collections::HashSet::new();
@@ -64,6 +60,18 @@ pub fn build_dependency_graph(
     }
 
     DependencyGraph { nodes, edges }
+}
+
+/// Concurrently traverses all workspace modules to extract dependency edges using Rayon.
+fn extract_edges_parallel(modules: &[Module]) -> Vec<Dependency> {
+    modules
+        .par_iter()
+        .flat_map(|m| {
+            let mut mod_edges = Vec::new();
+            traverse_module_for_edges(m, None, vec![], &mut mod_edges);
+            mod_edges
+        })
+        .collect()
 }
 
 fn traverse_module_for_edges(
