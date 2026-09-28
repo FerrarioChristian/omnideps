@@ -24,6 +24,7 @@ fn main() -> Result<()> {
 
 fn run() -> Result<()> {
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("warn")).init();
+    omnideps::concurrency::ensure_thread_pool_configured();
 
     let cli = Cli::parse();
 

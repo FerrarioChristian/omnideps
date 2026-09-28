@@ -1,4 +1,5 @@
 pub mod analyzer;
+pub mod concurrency;
 pub mod config;
 pub mod debug;
 pub mod export;
