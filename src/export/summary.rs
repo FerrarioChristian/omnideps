@@ -1,31 +1,61 @@
 use crate::model::*;
 
+use std::collections::HashSet;
+
 // ==================== BENCHMARK ====================
 /// Aggregates basic statistics about the extracted components across all provided modules.
+///
+/// Modules are deduplicated by their fully qualified path (FQN) to avoid inflating
+/// the count across per-file compilation units.
 pub fn build_analysis_summary(modules: &[Module]) -> AnalysisSummary {
-    let mut s = AnalysisSummary {
-        total_modules: modules.len(),
-        ..Default::default()
-    };
-    for m in modules {
-        s.total_structured_types += m.structured_types.len();
-        for st in &m.structured_types {
-            s.total_structured_types += count_nested_types(st);
-            count_refs_in_st(st, &mut s.resolved_refs, &mut s.failed_refs);
-        }
-        s.total_free_functions += m.free_functions.len();
-        for ff in &m.free_functions {
-            count_refs_in_func(ff, &mut s.resolved_refs, &mut s.failed_refs);
-        }
+    let mut s = AnalysisSummary::default();
+    let mut unique_modules = HashSet::new();
 
-        let sub_s = build_analysis_summary(&m.sub_modules);
-        s.total_modules += sub_s.total_modules;
-        s.total_structured_types += sub_s.total_structured_types;
-        s.total_free_functions += sub_s.total_free_functions;
-        s.resolved_refs += sub_s.resolved_refs;
-        s.failed_refs += sub_s.failed_refs;
+    for m in modules {
+        collect_module_summary(m, &[], &mut unique_modules, &mut s);
     }
+
+    s.total_modules = if unique_modules.is_empty() && !modules.is_empty() {
+        1
+    } else {
+        unique_modules.len()
+    };
+
     s
+}
+
+fn collect_module_summary(
+    m: &Module,
+    prefix: &[String],
+    unique_modules: &mut HashSet<Vec<String>>,
+    s: &mut AnalysisSummary,
+) {
+    let mut current_path = prefix.to_vec();
+    let name_parts: Vec<String> = m
+        .name
+        .iter()
+        .filter(|part| *part != "root")
+        .cloned()
+        .collect();
+    current_path.extend(name_parts);
+
+    if !current_path.is_empty() {
+        unique_modules.insert(current_path.clone());
+    }
+
+    s.total_structured_types += m.structured_types.len();
+    for st in &m.structured_types {
+        s.total_structured_types += count_nested_types(st);
+        count_refs_in_st(st, &mut s.resolved_refs, &mut s.failed_refs);
+    }
+    s.total_free_functions += m.free_functions.len();
+    for ff in &m.free_functions {
+        count_refs_in_func(ff, &mut s.resolved_refs, &mut s.failed_refs);
+    }
+
+    for sub in &m.sub_modules {
+        collect_module_summary(sub, &current_path, unique_modules, s);
+    }
 }
 
 fn count_nested_types(st: &StructuredType) -> usize {

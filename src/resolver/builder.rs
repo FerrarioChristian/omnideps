@@ -39,11 +39,10 @@ fn build_module_queries(
 ) -> Module {
     ctx.stack.borrow_mut().push_scope();
 
-    // 1. Hoist imports as substitutions?
-    // Wait, the professor said "find" ascends the tree.
-    // If we handle imports in the Executor phase, the Builder doesn't need them!
-    // But local variables MUST be registered.
-    // What about `self` and `this`? They are just local symbols pointing to the current class.
+    // Query building operates on the local lexical scope stack (Delta).
+    // Import declarations and cross-module symbols are intentionally not substituted here;
+    // they are resolved globally during the execution phase (rho_exec) as Query::Find
+    // ascends the ScopeTree (E). Local variables, `self`, and `this` are registered below.
 
     module.structured_types = module
         .structured_types
@@ -277,12 +276,12 @@ fn build_impl_block_queries(
         if let Some(kw) = &lang_config.self_keyword {
             ctx.stack.borrow_mut().define_symbol(kw.clone(), q.clone());
         }
-    } else if let TypeRef::Generic { ref base, .. } = ib.impl_for {
-        if let TypeRef::ResolutionQuery(ref q) = **base {
-            self_query = Some(q.clone());
-            if let Some(kw) = &lang_config.self_keyword {
-                ctx.stack.borrow_mut().define_symbol(kw.clone(), q.clone());
-            }
+    } else if let TypeRef::Generic { ref base, .. } = ib.impl_for
+        && let TypeRef::ResolutionQuery(ref q) = **base
+    {
+        self_query = Some(q.clone());
+        if let Some(kw) = &lang_config.self_keyword {
+            ctx.stack.borrow_mut().define_symbol(kw.clone(), q.clone());
         }
     }
     ib.implements_trait = ib.implements_trait.map(|t| substitute_type(ctx, t, false));

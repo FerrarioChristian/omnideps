@@ -126,7 +126,7 @@ pub fn is_free_variable(node: Node) -> bool {
         return false;
     }
     let kind = node.kind();
-    
+
     let mut is_decl = false;
     if kind == "declaration" || kind == "variable_declaration" {
         // In C/C++, exclude function declarations (they contain a function_declarator)
@@ -137,7 +137,12 @@ pub fn is_free_variable(node: Node) -> bool {
         let mut parent = node.parent();
         while let Some(p) = parent {
             let pk = p.kind();
-            if pk.contains("function") || pk.contains("method") || pk.contains("body") || pk == "compound_statement" || pk == "block" {
+            if pk.contains("function")
+                || pk.contains("method")
+                || pk.contains("body")
+                || pk == "compound_statement"
+                || pk == "block"
+            {
                 return false;
             }
             parent = p.parent();
@@ -145,7 +150,10 @@ pub fn is_free_variable(node: Node) -> bool {
         is_decl = true;
     }
 
-    kind == "static_item" || kind == "const_item" || kind == "global_variable_declaration" || is_decl
+    kind == "static_item"
+        || kind == "const_item"
+        || kind == "global_variable_declaration"
+        || is_decl
 }
 
 /// Identifies type aliases (e.g. typedef, using, type = ...).

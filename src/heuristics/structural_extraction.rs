@@ -69,12 +69,12 @@ pub fn extract_fields(
             let mut child_active_self_kw = active_self_kw.clone();
             let is_func = crate::heuristics::classifiers::is_function(child);
 
-            if is_func && implicit_first_param {
-                if let Some(func) = super::parsers::try_parse_function(child, src) {
-                    if let Some(first_param) = func.signature.parameters.first() {
-                        child_active_self_kw = first_param.name.clone();
-                    }
-                }
+            if is_func
+                && implicit_first_param
+                && let Some(func) = super::parsers::try_parse_function(child, src)
+                && let Some(first_param) = func.signature.parameters.first()
+            {
+                child_active_self_kw = first_param.name.clone();
             }
 
             if matches!(
@@ -221,10 +221,11 @@ fn sanitize_parameter_type(ty: crate::model::TypeRef, param_name: &str) -> crate
     // Se il tipo estratto corrisponde esattamente al nome del parametro,
     // significa che è stato erroneamente estratto dal fallback per identificatori.
     // I parametri senza tipo (come `self` in Python) ricadono in questo caso.
-    if let crate::model::TypeRef::Unresolved(ref path) = ty {
-        if path.len() == 1 && path[0] == param_name {
-            return crate::model::TypeRef::Failed(vec![]);
-        }
+    if let crate::model::TypeRef::Unresolved(ref path) = ty
+        && path.len() == 1
+        && path[0] == param_name
+    {
+        return crate::model::TypeRef::Failed(vec![]);
     }
     ty
 }
@@ -233,17 +234,17 @@ fn sanitize_parameter_type(ty: crate::model::TypeRef, param_name: &str) -> crate
 pub fn extract_parameters(node: Node, source: &str) -> Vec<Parameter> {
     let mut params = vec![];
     let mut params_node_opt = node.child_by_field_name("parameters");
-    
+
     // If not found, look inside the declarator (for C/C++)
-    if params_node_opt.is_none() {
-        if let Some(declarator) = node.child_by_field_name("declarator") {
-            params_node_opt = declarator.child_by_field_name("parameters");
-            // Sometimes it's nested even deeper (e.g., pointer_declarator -> function_declarator)
-            if params_node_opt.is_none() {
-                if let Some(inner) = declarator.child_by_field_name("declarator") {
-                    params_node_opt = inner.child_by_field_name("parameters");
-                }
-            }
+    if params_node_opt.is_none()
+        && let Some(declarator) = node.child_by_field_name("declarator")
+    {
+        params_node_opt = declarator.child_by_field_name("parameters");
+        // Sometimes it's nested even deeper (e.g., pointer_declarator -> function_declarator)
+        if params_node_opt.is_none()
+            && let Some(inner) = declarator.child_by_field_name("declarator")
+        {
+            params_node_opt = inner.child_by_field_name("parameters");
         }
     }
 
@@ -283,7 +284,9 @@ pub fn extract_return_type(node: Node, source: &str) -> TypeRef {
         let ret_type: String = after
             .chars()
             .filter(|c| *c != '\'' && *c != '"') // Remove quotes entirely
-            .take_while(|c| c.is_alphanumeric() || *c == '_' || *c == ':' || *c == '[' || *c == ']' || *c == '.')
+            .take_while(|c| {
+                c.is_alphanumeric() || *c == '_' || *c == ':' || *c == '[' || *c == ']' || *c == '.'
+            })
             .collect();
         if !ret_type.is_empty() {
             return TypeRef::Unresolved(split_qualified_name(&ret_type));
@@ -340,12 +343,11 @@ pub fn extract_super_types(node: Node, source: &str) -> Vec<TypeRef> {
                     | "generic_type"
                     | "subscript"
             ) {
-                if kind == "subscript" {
-                    if let Some(val) = child.child_by_field_name("value") {
-                        if node_text(val, source).trim() == "Generic" {
-                            continue;
-                        }
-                    }
+                if kind == "subscript"
+                    && let Some(val) = child.child_by_field_name("value")
+                    && node_text(val, source).trim() == "Generic"
+                {
+                    continue;
                 }
                 supers.push(extract_type_ref(child, source));
             } else if kind == "type_list" {
@@ -448,12 +450,10 @@ fn extract_direct_type_parameters(node: Node, source: &str) -> Vec<TypeParameter
         if matches!(
             child.kind(),
             "type_parameter" | "type_parameter_declaration" | "parameter_declaration"
-        ) {
-            if let Some(tp) = extract_single_type_parameter(child, source) {
-                if !params.iter().any(|p: &TypeParameter| p.name == tp.name) {
-                    params.push(tp);
-                }
-            }
+        ) && let Some(tp) = extract_single_type_parameter(child, source)
+            && !params.iter().any(|p: &TypeParameter| p.name == tp.name)
+        {
+            params.push(tp);
         }
     }
     params
@@ -464,10 +464,10 @@ fn find_type_parameter_container(node: Node) -> Option<Node> {
     if let Some(tp) = node.child_by_field_name("type_parameters") {
         return Some(tp);
     }
-    if let Some(p) = node.child_by_field_name("parameters") {
-        if p.kind().contains("template") || p.kind().contains("type") {
-            return Some(p);
-        }
+    if let Some(p) = node.child_by_field_name("parameters")
+        && (p.kind().contains("template") || p.kind().contains("type"))
+    {
+        return Some(p);
     }
 
     let mut cursor = node.walk();
@@ -515,9 +515,8 @@ fn extract_single_type_parameter(node: Node, source: &str) -> Option<TypeParamet
 
     let bounds_node = node.child_by_field_name("bounds").or_else(|| {
         let mut cursor = node.walk();
-        node.children(&mut cursor).find(|c| {
-            matches!(c.kind(), "trait_bounds" | "type_bound" | "type_bounds")
-        })
+        node.children(&mut cursor)
+            .find(|c| matches!(c.kind(), "trait_bounds" | "type_bound" | "type_bounds"))
     });
 
     let bounds = bounds_node
@@ -579,9 +578,9 @@ fn merge_clause_bounds(params: &mut Vec<TypeParameter>, node: Node, source: &str
 
         let bounds_node = child.child_by_field_name("bounds").or_else(|| {
             let mut c2 = child.walk();
-            child.children(&mut c2).find(|c| {
-                matches!(c.kind(), "trait_bounds" | "type_bound" | "type_bounds")
-            })
+            child
+                .children(&mut c2)
+                .find(|c| matches!(c.kind(), "trait_bounds" | "type_bound" | "type_bounds"))
         });
 
         let extra_bounds = bounds_node

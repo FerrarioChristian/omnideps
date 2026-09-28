@@ -1,18 +1,33 @@
 use anyhow::{Context, Result};
 use omnideps::{
-    analyzer::{analyze_project, parse_source},
+    analyzer::analyze_project,
     config::AnalyzerConfig,
-    language::SupportedLanguage,
     model::{Component, DependencyGraph, TestManifest, TestReport, TestReportEdge, TestReportNode},
-    resolver::primitives::PrimitiveRegistry,
 };
 use std::collections::{HashMap, HashSet};
 use std::fs::{self, OpenOptions};
 use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};
-use walkdir::WalkDir;
 
-pub fn execute_run(testdir: &Path, output: Option<&Path>, config: &AnalyzerConfig) -> Result<()> {
+/// Executes a benchmark run for a single target directory against its `test.yml` specification,
+/// loading the configuration from an optional file path or using defaults.
+pub fn execute_run(
+    testdir: &Path,
+    output: Option<&Path>,
+    config_path: Option<&Path>,
+) -> Result<()> {
+    let config = AnalyzerConfig::load_or_default(config_path)?;
+    execute_run_with_config(testdir, output, &config)
+}
+
+/// Executes a benchmark run with a pre-configured [`AnalyzerConfig`].
+///
+/// Produces `report.md` and `report.json` in the specified output directory and prints node/edge statistics.
+pub fn execute_run_with_config(
+    testdir: &Path,
+    output: Option<&Path>,
+    config: &AnalyzerConfig,
+) -> Result<()> {
     let manifest_path = testdir.join("test.yml");
     if !manifest_path.exists() {
         anyhow::bail!("test.yml not found in {}", testdir.display());
@@ -56,7 +71,17 @@ pub fn execute_run(testdir: &Path, output: Option<&Path>, config: &AnalyzerConfi
     Ok(())
 }
 
-pub fn execute_all(output: Option<&Path>, config: &AnalyzerConfig) -> Result<()> {
+/// Discovers and executes all language benchmark suites under `tests/benchmarks/`.
+///
+/// Aggregates validation scores across C, C++, Java, Rust, and Python, prints summary tables,
+/// and appends timestamped records to `results.csv`.
+pub fn execute_all(output: Option<&Path>, config_path: Option<&Path>) -> Result<()> {
+    let config = AnalyzerConfig::load_or_default(config_path)?;
+    execute_all_with_config(output, &config)
+}
+
+/// Discovers and executes all language benchmark suites with a pre-configured [`AnalyzerConfig`].
+pub fn execute_all_with_config(output: Option<&Path>, config: &AnalyzerConfig) -> Result<()> {
     let benchmarks_dir = Path::new("tests/benchmarks");
 
     if !benchmarks_dir.exists() {
@@ -81,12 +106,16 @@ pub fn execute_all(output: Option<&Path>, config: &AnalyzerConfig) -> Result<()>
                 println!("Running benchmark for {}...", lang);
 
                 let sub_out_dir = output.map(|p| p.join(dir_name.as_ref()));
-                if let Err(e) = execute_run(&path, sub_out_dir.as_deref(), config) {
+                if let Err(e) = execute_run_with_config(&path, sub_out_dir.as_deref(), config) {
                     log::warn!(" benchmark run failed on {:?}: {}", path, e);
                 }
 
                 let report_path = sub_out_dir.unwrap_or_else(|| path.join("report.json"));
-                let report_path = if report_path.is_dir() { report_path.join("report.json") } else { report_path };
+                let report_path = if report_path.is_dir() {
+                    report_path.join("report.json")
+                } else {
+                    report_path
+                };
                 if report_path.exists() {
                     let content = fs::read_to_string(&report_path)?;
                     let report: omnideps::model::TestReport = serde_json::from_str(&content)?;
@@ -146,34 +175,18 @@ pub fn execute_all(output: Option<&Path>, config: &AnalyzerConfig) -> Result<()>
     Ok(())
 }
 
-fn analyze_directory(dir: &std::path::Path, config: &AnalyzerConfig) -> Result<DependencyGraph> {
-    let mut all_modules = vec![];
-    let mut combined_primitives = PrimitiveRegistry::empty();
-
+/// Analyzes the `src` directory within a benchmark test suite and builds its dependency graph.
+fn analyze_directory(dir: &Path, config: &AnalyzerConfig) -> Result<DependencyGraph> {
     let src_dir = dir.join("src");
     if !src_dir.exists() {
         anyhow::bail!("src directory not found in {}", dir.display());
     }
 
-    for entry in WalkDir::new(&src_dir).into_iter().filter_map(|e| e.ok()) {
-        if entry.file_type().is_file()
-            && let Some(lang) = SupportedLanguage::from_path(entry.path())
-            && let Ok(source) = fs::read_to_string(entry.path())
-        {
-            let rel_path = entry.path().strip_prefix(&src_dir).unwrap_or(entry.path());
-            if let Ok((mut file_modules, file_primitives)) =
-                parse_source(lang, &source, rel_path, config)
-            {
-                all_modules.append(&mut file_modules);
-                combined_primitives.merge(file_primitives);
-            }
-        }
-    }
-
-    let (_, graph, _) = analyze_project(all_modules, combined_primitives, config);
+    let (_, graph) = analyze_project(&src_dir, config)?;
     Ok(graph)
 }
 
+/// Flattens a qualified component name slice into a dot-separated string, omitting any synthetic `root` prefix.
 fn flatten_name(name: &[String]) -> String {
     if name.first().map(|s| s.as_str()) == Some("root") {
         name[1..].join(".")
@@ -182,6 +195,7 @@ fn flatten_name(name: &[String]) -> String {
     }
 }
 
+/// Verifies that the extracted [`DependencyGraph`] satisfies all expected nodes and edges defined in [`TestManifest`].
 fn verify_graph_adherence(graph: &DependencyGraph, manifest: &TestManifest) -> TestReport {
     let mut nodes_map: HashMap<String, &Component> = HashMap::new();
     for node in &graph.nodes {

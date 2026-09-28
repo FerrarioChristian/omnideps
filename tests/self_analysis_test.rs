@@ -1,6 +1,5 @@
-use omnideps::analyzer::{analyze_project, parse_source};
+use omnideps::analyzer::analyze_project;
 use omnideps::config::AnalyzerConfig;
-use omnideps::language::SupportedLanguage;
 use std::fs;
 use std::path::Path;
 use walkdir::WalkDir;
@@ -26,20 +25,14 @@ fn test_self_analysis() {
 
             // Analyze only Rust files in the src directory
             if ext == "rs" {
-                let lang = SupportedLanguage::Rust;
-                let source =
-                    fs::read_to_string(path).expect("Unable to read source file for testing");
-
-                let parse_result = parse_source(lang, &source, path, &config);
+                let analysis_result = analyze_project(path, &config);
                 assert!(
-                    parse_result.is_ok(),
+                    analysis_result.is_ok(),
                     "Self-analysis failed for file {:?}",
                     path
                 );
 
-                let (modules, primitives) = parse_result.unwrap();
-                let (_resolved_modules, graph, _summary) =
-                    analyze_project(modules, primitives, &config);
+                let (_resolved_modules, graph) = analysis_result.unwrap();
                 all_graphs.push(graph);
             }
         }

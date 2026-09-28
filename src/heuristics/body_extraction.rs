@@ -63,12 +63,14 @@ pub fn extract_block(node: Node, source: &str) -> crate::model::Block {
                 | "catch_clause"
         );
 
-        if kind == "assignment" {
-            if let Some(left) = child.child_by_field_name("left") {
-                if matches!(left.kind(), "attribute" | "field_expression" | "subscript_expression" | "member_expression") {
-                    is_declaration = false;
-                }
-            }
+        if kind == "assignment"
+            && let Some(left) = child.child_by_field_name("left")
+            && matches!(
+                left.kind(),
+                "attribute" | "field_expression" | "subscript_expression" | "member_expression"
+            )
+        {
+            is_declaration = false;
         }
 
         // 1. Variable Declarations
@@ -295,7 +297,11 @@ fn find_behavioral_deps(
     // Do not recurse into compound identifiers or types to avoid spurious accesses for their parts
     if matches!(
         kind,
-        "scoped_identifier" | "qualified_identifier" | "field_access" | "member_expression" | "attribute"
+        "scoped_identifier"
+            | "qualified_identifier"
+            | "field_access"
+            | "member_expression"
+            | "attribute"
     ) {
         return;
     }
@@ -303,15 +309,13 @@ fn find_behavioral_deps(
     let mut cursor = node.walk();
     for child in node.children(&mut cursor) {
         // Skip recursing into the 'function' part of a call, because we already extracted it as a Call.
-        if matches!(kind, "call_expression" | "call" | "method_invocation") {
-            if let Some(f_node) = node
+        if matches!(kind, "call_expression" | "call" | "method_invocation")
+            && let Some(f_node) = node
                 .child_by_field_name("function")
                 .or_else(|| node.child_by_field_name("name"))
-            {
-                if child.id() == f_node.id() {
-                    continue;
-                }
-            }
+            && child.id() == f_node.id()
+        {
+            continue;
         }
 
         find_behavioral_deps(child, source, calls, instantiates, accesses, type_casts);
@@ -341,15 +345,15 @@ pub fn infer_variable_type(node: Node, source: &str) -> TypeRef {
             // In languages like Python, object creation is just a call node (e.g. `Admin(...)`)
             if let Some(f_node) = val.child_by_field_name("function") {
                 let extracted = extract_type_ref(f_node, source);
-                if let crate::model::TypeRef::Unresolved(path) = &extracted {
-                    if !path.is_empty() {
-                        let mut curr = crate::model::Query::Find(path[0].clone());
-                        for part in &path[1..] {
-                            curr = crate::model::Query::Extract(Box::new(curr), part.clone());
-                        }
-                        let query = crate::model::Query::Call(Box::new(curr));
-                        return crate::model::TypeRef::ResolutionQuery(query);
+                if let crate::model::TypeRef::Unresolved(path) = &extracted
+                    && !path.is_empty()
+                {
+                    let mut curr = crate::model::Query::Find(path[0].clone());
+                    for part in &path[1..] {
+                        curr = crate::model::Query::Extract(Box::new(curr), part.clone());
                     }
+                    let query = crate::model::Query::Call(Box::new(curr));
+                    return crate::model::TypeRef::ResolutionQuery(query);
                 }
                 return extracted;
             }
@@ -377,21 +381,21 @@ pub fn infer_variable_type(node: Node, source: &str) -> TypeRef {
             if let Some(name_node) = child.child_by_field_name("name") {
                 return extract_type_ref(name_node, source);
             }
-        } else if kind == "call" {
-            if let Some(f_node) = child.child_by_field_name("function") {
-                let extracted = extract_type_ref(f_node, source);
-                if let crate::model::TypeRef::Unresolved(path) = &extracted {
-                    if !path.is_empty() {
-                        let mut curr = crate::model::Query::Find(path[0].clone());
-                        for part in &path[1..] {
-                            curr = crate::model::Query::Extract(Box::new(curr), part.clone());
-                        }
-                        let query = crate::model::Query::Call(Box::new(curr));
-                        return crate::model::TypeRef::ResolutionQuery(query);
-                    }
+        } else if kind == "call"
+            && let Some(f_node) = child.child_by_field_name("function")
+        {
+            let extracted = extract_type_ref(f_node, source);
+            if let crate::model::TypeRef::Unresolved(path) = &extracted
+                && !path.is_empty()
+            {
+                let mut curr = crate::model::Query::Find(path[0].clone());
+                for part in &path[1..] {
+                    curr = crate::model::Query::Extract(Box::new(curr), part.clone());
                 }
-                return extracted;
+                let query = crate::model::Query::Call(Box::new(curr));
+                return crate::model::TypeRef::ResolutionQuery(query);
             }
+            return extracted;
         }
     }
     TypeRef::Failed(vec![])
@@ -432,21 +436,17 @@ fn extract_call_path(node: Node, source: &str) -> Vec<String> {
     match node.kind() {
         "identifier" | "field_identifier" | "type_identifier" => {
             let t = node_text(node, source).trim().to_string();
-            if t.is_empty() {
-                vec![]
-            } else {
-                vec![t]
-            }
+            if t.is_empty() { vec![] } else { vec![t] }
         }
         "scoped_identifier" | "qualified_identifier" => {
             split_qualified_name(&node_text(node, source))
         }
         "parenthesized_expression" => {
-            let mut cursor = node.walk();
-            for child in node.named_children(&mut cursor) {
-                return extract_call_path(child, source);
+            if let Some(child) = node.named_child(0) {
+                extract_call_path(child, source)
+            } else {
+                vec![]
             }
-            vec![]
         }
         "field_expression" | "member_expression" | "attribute" => {
             let mut path = vec![];
@@ -516,9 +516,7 @@ fn parse_token_tree_macro(
             calls.push(TypeRef::Unresolved(current_path.clone()));
             // Path does not break on method calls if followed by .
         } else {
-            if current_path.len() > 1 {
-                accesses.push(TypeRef::Unresolved(current_path.clone()));
-            } else if current_path.len() == 1 {
+            if !current_path.is_empty() {
                 accesses.push(TypeRef::Unresolved(current_path.clone()));
             }
 

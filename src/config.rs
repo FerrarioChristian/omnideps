@@ -169,4 +169,15 @@ impl AnalyzerConfig {
     pub fn get_for(&self, lang: &str) -> &LanguageConfig {
         self.languages.get(lang).unwrap_or(&self.default_config)
     }
+
+    /// Loads configuration from an optional JSON file path, or returns default strategies.
+    pub fn load_or_default(path: Option<&std::path::Path>) -> anyhow::Result<Self> {
+        match path {
+            Some(p) => {
+                let content = std::fs::read_to_string(p)?;
+                Ok(serde_json::from_str(&content)?)
+            }
+            None => Ok(Self::default()),
+        }
+    }
 }

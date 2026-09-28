@@ -367,10 +367,10 @@ fn try_parse_assignment_type_alias(node: Node, source: &str) -> Option<crate::mo
     let name = extract_identifier(left, source)?;
 
     // Check if right side is a TypeVar factory call: e.g. TypeVar('T', bound=User)
-    if right.kind() == "call" {
-        if let Some(type_var) = try_extract_type_var_call(name.clone(), right, source) {
-            return Some(type_var);
-        }
+    if right.kind() == "call"
+        && let Some(type_var) = try_extract_type_var_call(name.clone(), right, source)
+    {
+        return Some(type_var);
     }
 
     // Otherwise, standard assignment type alias: e.g. MyType = List[int]
