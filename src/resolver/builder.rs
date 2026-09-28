@@ -177,6 +177,18 @@ fn build_function_queries(
             if let Some(name) = &p.name {
                 if is_first && implicit_first_param_as_self {
                     if let Some(sq) = &self_query {
+                        let is_self_type = match &p.ty {
+                            TypeRef::Failed(_) => true,
+                            TypeRef::Unresolved(path)
+                                if path.len() == 1 && (path[0] == "Self" || path[0] == "self") =>
+                            {
+                                true
+                            }
+                            _ => false,
+                        };
+                        if is_self_type {
+                            p.ty = TypeRef::ResolutionQuery(sq.clone());
+                        }
                         ctx.stack
                             .borrow_mut()
                             .define_symbol(name.clone(), sq.clone());

@@ -25,10 +25,15 @@ pub fn apply_directory_strategy(
         path_components.remove(0);
     }
 
-    if let Some(last) = path_components.last_mut()
+    if let Some(last) = path_components.last()
         && let Some(stem) = Path::new(last).file_stem()
     {
-        *last = stem.to_string_lossy().to_string();
+        let stem_str = stem.to_string_lossy().to_string();
+        if (stem_str == "mod" || stem_str == "__init__") && path_components.len() > 1 {
+            path_components.pop();
+        } else {
+            *path_components.last_mut().unwrap() = stem_str;
+        }
     }
 
     if modules.is_empty() || path_components.is_empty() {

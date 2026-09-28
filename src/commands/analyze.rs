@@ -19,9 +19,11 @@ use std::path::Path;
 /// 5. Optionally exports analysis summaries to CSV format.
 pub fn execute(
     path: &Path,
-    json_out: Option<&Path>,
+    output: Option<&Path>,
+    raw: bool,
     csv_out: Option<&Path>,
     debug_refs: bool,
+    failed_only: bool,
     config_path: Option<&Path>,
     summary: bool,
 ) -> Result<()> {
@@ -38,8 +40,9 @@ pub fn execute(
         &resolved_modules,
         path,
         debug_refs,
+        failed_only,
     );
-    export_results(&graph, analysis_summary.as_ref(), json_out, csv_out)?;
+    export_results(&graph, analysis_summary.as_ref(), output, raw, csv_out)?;
 
     Ok(())
 }
@@ -50,6 +53,7 @@ fn print_report(
     resolved_modules: &[Module],
     path: &Path,
     debug_refs: bool,
+    failed_only: bool,
 ) {
     let target_kind = if path.is_dir() { "CARTELLA " } else { "" };
     println!("=== ANALYSIS {}{} ===", target_kind, path.display());
@@ -57,8 +61,8 @@ fn print_report(
         print_summary(s);
     }
 
-    if debug_refs {
-        print_references(resolved_modules);
+    if debug_refs || failed_only {
+        print_references(resolved_modules, failed_only);
     }
 }
 
@@ -66,28 +70,47 @@ fn print_report(
 fn export_results(
     graph: &DependencyGraph,
     summary: Option<&AnalysisSummary>,
-    json_out: Option<&Path>,
+    output: Option<&Path>,
+    raw: bool,
     csv_out: Option<&Path>,
 ) -> Result<()> {
-    if let Some(out) = json_out {
-        let json = serde_json::to_string_pretty(graph)?;
-        fs::write(out, json)?;
-        println!("Graph saved to {}", out.display());
-
+    if let Some(out) = output {
         if let Some(parent) = out.parent() {
+            fs::create_dir_all(parent)?;
+        }
+        omnideps::export::cytoscape::export_graphs(std::slice::from_ref(graph), out)?;
+        println!("Cytoscape graph saved to {}", out.display());
+
+        if raw {
+            let parent = out.parent().unwrap_or_else(|| Path::new(""));
             let file_name = out
                 .file_name()
                 .and_then(|n| n.to_str())
                 .unwrap_or("graph.json");
-            let cyto_path = parent.join(format!("cyto_{}", file_name));
-            omnideps::export::cytoscape::export_graphs(std::slice::from_ref(graph), &cyto_path)?;
-            println!("Cytoscape graph saved to {}", cyto_path.display());
+            let raw_path = parent.join(format!("raw_{}", file_name));
+
+            if let Some(p) = raw_path.parent() {
+                fs::create_dir_all(p)?;
+            }
+            let file = fs::File::create(&raw_path)?;
+            let writer = std::io::BufWriter::new(file);
+            serde_json::to_writer(writer, graph)?;
+            println!("Raw graph saved to {}", raw_path.display());
         }
+    } else if raw {
+        let raw_path = Path::new("raw_graph.json");
+        let file = fs::File::create(raw_path)?;
+        let writer = std::io::BufWriter::new(file);
+        serde_json::to_writer(writer, graph)?;
+        println!("Raw graph saved to {}", raw_path.display());
     }
 
     if let Some(csv) = csv_out
         && let Some(s) = summary
     {
+        if let Some(parent) = csv.parent() {
+            fs::create_dir_all(parent)?;
+        }
         save_summary_csv(s, csv)?;
     }
 

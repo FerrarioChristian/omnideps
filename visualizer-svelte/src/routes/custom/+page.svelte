@@ -22,7 +22,17 @@
             }
             try {
                 const text = await selectedJsonFile.text();
-                elements = JSON.parse(text);
+                const parsed = JSON.parse(text);
+                if (Array.isArray(parsed)) {
+                    elements = parsed;
+                } else if (parsed && Array.isArray(parsed.elements)) {
+                    elements = parsed.elements;
+                } else if (parsed && parsed.nodes && parsed.edges) {
+                    statusMessage = "Notice: Selected file is in raw format. Use the default graph output (or convert via 'omnideps export-cyto').";
+                    return;
+                } else {
+                    elements = [];
+                }
                 rawOutput = null; // No raw output when importing cytoscape json directly
                 statusMessage = "Loaded " + selectedJsonFile.name + " successfully";
             } catch (err) {

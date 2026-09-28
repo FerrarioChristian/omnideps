@@ -46,6 +46,10 @@ pub fn determine_structured_kind(kind: &str, text: &str) -> StructuredTypeKind {
 pub fn extract_type_ref(node: Node, source: &str) -> TypeRef {
     let kind = node.kind();
 
+    if super::classifiers::is_closure(node) {
+        return TypeRef::Failed(vec![]);
+    }
+
     // 0.2. Unwrap wrapper `type` nodes (e.g. in Python)
     if kind == "type"
         && node.child_count() == 1
@@ -77,9 +81,14 @@ pub fn extract_type_ref(node: Node, source: &str) -> TypeRef {
             | "field_access"
             | "primitive_type"
             | "predefined_type"
+            | "integral_type"
+            | "floating_point_type"
+            | "boolean_type"
             | "template_type"
             | "type"
             | "string"
+            | "void_type"
+            | "none"
     ) {
         let text = node_text(node, source);
         let text = text.replace(['\'', '"'], "");
@@ -102,7 +111,14 @@ pub fn extract_type_ref(node: Node, source: &str) -> TypeRef {
         let child_kind = child.kind();
         if matches!(
             child_kind,
-            "type_identifier" | "primitive_type" | "identifier" | "type"
+            "type_identifier"
+                | "primitive_type"
+                | "integral_type"
+                | "floating_point_type"
+                | "boolean_type"
+                | "identifier"
+                | "type"
+                | "none"
         ) {
             let text = node_text(child, source);
             if !text.is_empty() && !text.contains(' ') {
@@ -142,6 +158,7 @@ fn try_extract_from_type_field(node: Node, source: &str) -> Option<TypeRef> {
         .or_else(|| node.child_by_field_name("return_type"))
         .or_else(|| node.child_by_field_name("field_type"))
         .or_else(|| node.child_by_field_name("value_type"))
+        .or_else(|| node.child_by_field_name("element"))
         .or_else(|| node.child_by_field_name("right"))
         .map(|type_node| extract_type_ref(type_node, source))
 }
@@ -271,12 +288,15 @@ pub fn parse_type_from_text(text: &str) -> TypeRef {
     if let Some(generic_ref) = parse_generic_from_text(text) {
         return generic_ref;
     }
-    if text.contains('|') {
-        let types: Vec<TypeRef> = text
-            .split('|')
-            .map(|part| parse_type_from_text(part.trim()))
-            .collect();
-        return TypeRef::Union(types);
+    if text.contains('|') && !text.starts_with('|') && !text.ends_with('|') {
+        let parts: Vec<&str> = text.split('|').map(str::trim).collect();
+        if parts.len() > 1 && parts.iter().all(|p| !p.is_empty()) {
+            let types: Vec<TypeRef> = parts
+                .into_iter()
+                .map(parse_type_from_text)
+                .collect();
+            return TypeRef::Union(types);
+        }
     }
     TypeRef::Unresolved(split_qualified_name(text))
 }

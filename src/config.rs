@@ -71,7 +71,7 @@ impl AnalyzerConfig {
                     namespace_based: false,
                     inline_mod_based: true,
                 },
-                transitive_imports: false,
+                transitive_imports: true,
                 self_keyword: Some("self".to_string()),
                 self_type_keyword: Some("Self".to_string()),
                 implicit_first_param_as_self: false,

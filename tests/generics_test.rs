@@ -33,6 +33,15 @@ fn has_edge(
         .any(|e| ends_with(&e.from, from_suffix) && ends_with(&e.to, to_suffix) && e.kind == kind)
 }
 
+fn has_node(graph: &DependencyGraph, name_suffix: &[&str]) -> bool {
+    graph.nodes.iter().any(|n| match n {
+        Component::StructuredType(st) => ends_with(&st.name, name_suffix),
+        Component::Function(f) => ends_with(&f.name, name_suffix),
+        Component::Module(m) => ends_with(&m.name, name_suffix),
+        _ => false,
+    })
+}
+
 // =========================================================================
 // RUST TESTS
 // =========================================================================
@@ -939,5 +948,289 @@ fn test_c_function_pointer_cast_and_invocation() {
             DependencyEdgeKind::CastsTo
         ),
         "Expected test_fp -> Callback (CastsTo)"
+    );
+}
+
+#[test]
+fn test_c_local_struct_ast() {
+    let code = r#"
+void factory() {
+    struct LocalProduct {
+        int id;
+    };
+    struct LocalProduct p = {1};
+}
+"#;
+    let mut parser = tree_sitter::Parser::new();
+    parser.set_language(&tree_sitter_c::LANGUAGE.into()).unwrap();
+    let tree = parser.parse(code, None).unwrap();
+    println!("C AST: {}", tree.root_node().to_sexp());
+}
+
+#[test]
+fn test_c_macro_ast() {
+    let code = r#"
+#define MAX_BUFFER 1024
+#define SQUARE(x) ((x) * (x))
+#define LOG_NODE(n) printf("Node ID: %d", n->id)
+"#;
+    let mut parser = tree_sitter::Parser::new();
+    parser.set_language(&tree_sitter_c::LANGUAGE.into()).unwrap();
+    let tree = parser.parse(code, None).unwrap();
+    println!("C AST: {}", tree.root_node().to_sexp());
+}
+
+#[test]
+
+fn test_rust_closure() {
+    let code = r#"
+        struct TargetStruct {
+            x: i32,
+        }
+        impl TargetStruct {
+            fn target_method() {}
+        }
+        fn test_func() {
+            let f = |x| x + 1;
+            let g = |y: i32| {
+                TargetStruct::target_method();
+                y + 2
+            };
+        }
+    "#;
+
+    let graph = analyze_snippet(SupportedLanguage::Rust, code, "src/closure.rs");
+
+    assert!(
+        has_edge(
+            &graph,
+            &["test_func"],
+            &["TargetStruct", "target_method"],
+            DependencyEdgeKind::Calls
+        ),
+        "Expected test_func -> TargetStruct::target_method (Calls)"
+    );
+    assert!(
+        !graph.edges.iter().any(|e| ends_with(&e.from, &["test_func"]) && e.to == &["x"]),
+        "Closure parameter 'x' should not be emitted as an edge from test_func"
+    );
+    assert!(
+        !graph.edges.iter().any(|e| ends_with(&e.from, &["test_func"]) && e.to == &["y"]),
+        "Closure parameter 'y' should not be emitted as an edge from test_func"
+    );
+    assert!(
+        !graph.nodes.iter().any(|n| match n {
+            Component::External(qn) => qn == &["x"] || qn == &["y"],
+            _ => false,
+        }),
+        "External nodes for closure parameters 'x' or 'y' should not exist"
+    );
+}
+
+#[test]
+fn test_python_lambda() {
+    let code = r#"
+class TargetClass:
+    @staticmethod
+    def static_method(val):
+        pass
+
+def test_func():
+    f = lambda x: TargetClass.static_method(x)
+"#;
+
+    let graph = analyze_snippet(SupportedLanguage::Python, code, "src/closure.py");
+    assert!(
+        has_edge(
+            &graph,
+            &["test_func"],
+            &["TargetClass", "static_method"],
+            DependencyEdgeKind::Calls
+        ),
+        "Expected test_func -> TargetClass::static_method (Calls)"
+    );
+    assert!(
+        !graph.edges.iter().any(|e| ends_with(&e.to, &["x"])),
+        "Lambda parameter 'x' should not be emitted as an edge"
+    );
+    assert!(
+        !graph.nodes.iter().any(|n| match n {
+            Component::External(qn) => ends_with(qn, &["x"]),
+            _ => false,
+        }),
+        "External node for lambda parameter 'x' should not exist"
+    );
+}
+
+#[test]
+fn test_java_lambda() {
+    let code = r#"
+class TargetClass {
+    public static void staticMethod() {}
+}
+
+class Main {
+    void testFunc() {
+        Runnable r = () -> {
+            TargetClass.staticMethod();
+        };
+    }
+}
+"#;
+
+    let graph = analyze_snippet(SupportedLanguage::Java, code, "src/Main.java");
+    assert!(
+        has_edge(
+            &graph,
+            &["testFunc"],
+            &["TargetClass", "staticMethod"],
+            DependencyEdgeKind::Calls
+        ),
+        "Expected testFunc -> TargetClass::staticMethod (Calls)"
+    );
+}
+
+#[test]
+fn test_cpp_lambda() {
+    let code = r#"
+class TargetClass {
+public:
+    static void static_method() {}
+};
+
+void test_func() {
+    auto f = [](int x) {
+        TargetClass::static_method();
+        return x + 1;
+    };
+}
+"#;
+
+    let graph = analyze_snippet(SupportedLanguage::Cpp, code, "src/main.cpp");
+    assert!(
+        has_edge(
+            &graph,
+            &["test_func"],
+            &["TargetClass", "static_method"],
+            DependencyEdgeKind::Calls
+        ),
+        "Expected test_func -> TargetClass::static_method (Calls)"
+    );
+}
+
+#[test]
+fn test_rust_local_variable_constructor_type_inference() {
+    let code = r#"
+struct Point {
+    x: i32,
+}
+impl Point {
+    fn new() -> Self {
+        Point { x: 0 }
+    }
+    fn display(&self) {}
+}
+fn test_func() {
+    let p = Point::new();
+    p.display();
+}
+"#;
+
+    let graph = analyze_snippet(SupportedLanguage::Rust, code, "src/main.rs");
+    println!("Graph edges: {:?}", graph.edges);
+    assert!(
+        has_edge(
+            &graph,
+            &["test_func"],
+            &["Point", "new"],
+            DependencyEdgeKind::Calls
+        ),
+        "Expected test_func -> Point::new (Calls)"
+    );
+    assert!(
+        has_edge(
+            &graph,
+            &["test_func"],
+            &["Point", "display"],
+            DependencyEdgeKind::Calls
+        ),
+        "Expected test_func -> Point::display (Calls)"
+    );
+}
+
+#[test]
+fn test_java_chained_method_call_and_constructor() {
+    let code = r#"
+        class Engine {
+            public void start() {}
+        }
+
+        class Car {
+            private Engine engine = new Engine();
+            public Engine getEngine() { return engine; }
+        }
+
+        class Garage {
+            private Car car = new Car();
+            public void testChain() {
+                car.getEngine().start();
+                new Car().getEngine().start();
+            }
+        }
+    "#;
+
+    let graph = analyze_snippet(SupportedLanguage::Java, code, "src/Garage.java");
+
+    assert!(
+        has_edge(
+            &graph,
+            &["Garage", "testChain"],
+            &["Car", "getEngine"],
+            DependencyEdgeKind::Calls
+        ),
+        "Expected Garage.testChain -> Car.getEngine (Calls)"
+    );
+    assert!(
+        has_edge(
+            &graph,
+            &["Garage", "testChain"],
+            &["Engine", "start"],
+            DependencyEdgeKind::Calls
+        ),
+        "Expected Garage.testChain -> Engine.start (Calls)"
+    );
+}
+
+#[test]
+fn test_python_nested_closure_call_and_local_class() {
+    let code = r#"
+class Target:
+    def execute(self) -> None:
+        pass
+
+def my_decorator(target: Target):
+    def wrapper():
+        target.execute()
+    return wrapper
+
+def factory():
+    class LocalClass:
+        pass
+    return LocalClass()
+"#;
+
+    let graph = analyze_snippet(SupportedLanguage::Python, code, "src/test.py");
+    assert!(
+        has_edge(
+            &graph,
+            &["my_decorator"],
+            &["Target", "execute"],
+            DependencyEdgeKind::Calls
+        ),
+        "Expected my_decorator -> Target.execute (Calls)"
+    );
+    assert!(
+        has_node(&graph, &["LocalClass"]),
+        "Expected local class LocalClass to exist in graph"
     );
 }

@@ -1,6 +1,6 @@
 pub mod strategies;
 
-use anyhow::{Result, anyhow, bail};
+use anyhow::{Result, bail};
 use std::fs;
 use std::path::Path;
 use tree_sitter::{Language, Node, Parser};
@@ -192,9 +192,29 @@ pub fn extract_from_cst(
     let mut parser = Parser::new();
     parser.set_language(&lang).unwrap();
 
-    let tree = parser
-        .parse(source, None)
-        .ok_or_else(|| anyhow!("parse failed"))?;
+    let start = std::time::Instant::now();
+    let mut progress = |_state: &tree_sitter::ParseState| {
+        if start.elapsed() > std::time::Duration::from_secs(3) {
+            std::ops::ControlFlow::Break(())
+        } else {
+            std::ops::ControlFlow::Continue(())
+        }
+    };
+    let options = tree_sitter::ParseOptions::new().progress_callback(&mut progress);
+
+    let bytes = source.as_bytes();
+    let len = bytes.len();
+    let tree = match parser.parse_with_options(
+        &mut |i, _| (i < len).then(|| &bytes[i..]).unwrap_or_default(),
+        None,
+        Some(options),
+    ) {
+        Some(t) => t,
+        None => {
+            log::warn!("Parsing timed out or failed for file: {:?}", file_path);
+            return Ok((vec![], None));
+        }
+    };
     let root = tree.root_node();
 
     let mut package_path = None;
@@ -218,6 +238,7 @@ pub fn extract_from_cst(
         lang_name,
         file_path,
         config,
+        false,
     );
     Ok((modules, package_path))
 }
@@ -233,6 +254,7 @@ fn walk_cst(
     lang_name: &str,
     file_path: Option<String>,
     config: &AnalyzerConfig,
+    inside_function: bool,
 ) {
     if let Some(comp) = dispatch_node(node, source, lang_name, config) {
         if modules.is_empty() {
@@ -263,6 +285,7 @@ fn walk_cst(
                         lang_name,
                         file_path.clone(),
                         config,
+                        false,
                     );
                 }
                 modules[0].sub_modules.push(new_modules.remove(0));
@@ -272,11 +295,16 @@ fn walk_cst(
                 modules[0].structured_types.push(st);
             }
             ParsedItem::Component(Component::Function(mut ff)) => {
-                ff.annotations.append(pending_attributes);
-                modules[0].free_functions.push(ff);
+                if !inside_function {
+                    ff.annotations.append(pending_attributes);
+                    modules[0].free_functions.push(ff);
+                }
                 let mut cursor = node.walk();
                 for child in node.children(&mut cursor) {
-                    if child.kind().contains("body") || child.kind().contains("block") {
+                    if child.kind().contains("body")
+                        || child.kind().contains("block")
+                        || child.kind() == "compound_statement"
+                    {
                         walk_cst(
                             child,
                             source,
@@ -285,12 +313,13 @@ fn walk_cst(
                             lang_name,
                             file_path.clone(),
                             config,
+                            true,
                         );
                     }
                 }
             }
             ParsedItem::Component(Component::Field(name, ty)) => {
-                if let Some(n) = name.last() {
+                if !inside_function && let Some(n) = name.last() {
                     let annotations = std::mem::take(pending_attributes);
                     modules[0].free_variables.push(Field {
                         name: n.clone(),
@@ -314,6 +343,11 @@ fn walk_cst(
         return;
     }
 
+    let kind = node.kind();
+    if kind == "initializer_list" || kind == "array" || kind == "binary_expression" {
+        return;
+    }
+
     let mut cursor = node.walk();
     for child in node.children(&mut cursor) {
         walk_cst(
@@ -324,6 +358,7 @@ fn walk_cst(
             lang_name,
             file_path.clone(),
             config,
+            inside_function,
         );
     }
 }

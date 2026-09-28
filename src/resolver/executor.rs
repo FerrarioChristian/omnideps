@@ -179,8 +179,14 @@ fn execute_impl_block(
         _ => "".to_string(),
     };
 
-    let scope_id =
-        find_child_scope(ctx.tree, parent_scope, &target_name, false).unwrap_or(parent_scope);
+    let scope_id = find_child_scope(ctx.tree, parent_scope, &target_name, false)
+        .or_else(|| {
+            ctx.tree
+                .type_scopes_by_name
+                .get(&target_name)
+                .and_then(|ids| ids.first().copied())
+        })
+        .unwrap_or(parent_scope);
 
     ib.methods = ib
         .methods
@@ -207,13 +213,11 @@ fn execute_impl_block(
 fn execute_function(ctx: &ExecutorContext, mut f: Function, parent_scope: ScopeId) -> Function {
     let name = f.name.last().cloned().unwrap_or_default();
 
-    let mut func_scope_id = parent_scope;
-    for child in &ctx.tree.arena {
-        if child.parent == Some(parent_scope) && child.name == name {
-            func_scope_id = child.id;
-            break;
-        }
-    }
+    let func_scope_id = ctx.tree.arena[parent_scope]
+        .children_by_name
+        .get(&name)
+        .and_then(|ids| ids.first().copied())
+        .unwrap_or(parent_scope);
 
     f.signature.parameters = f
         .signature
@@ -255,13 +259,11 @@ fn execute_block(
     index: usize,
 ) -> Block {
     let block_name = format!("block_{}", index);
-    let mut block_scope_id = parent_scope;
-    for child in &ctx.tree.arena {
-        if child.parent == Some(parent_scope) && child.name == block_name {
-            block_scope_id = child.id;
-            break;
-        }
-    }
+    let block_scope_id = ctx.tree.arena[parent_scope]
+        .children_by_name
+        .get(&block_name)
+        .and_then(|ids| ids.first().copied())
+        .unwrap_or(parent_scope);
 
     b.declarations = b
         .declarations
@@ -346,13 +348,11 @@ fn find_symbol_by_path<'a>(tree: &'a ScopeTree, path: &[String]) -> Option<&'a S
             curr = *id;
             continue;
         }
-        if let Some(child_scope) = tree
-            .arena
-            .iter()
-            .find(|s| s.parent == Some(curr) && &s.name == part)
-        {
-            curr = child_scope.id;
-            continue;
+        if let Some(ids) = tree.arena[curr].children_by_name.get(part) {
+            if let Some(&child_id) = ids.first() {
+                curr = child_id;
+                continue;
+            }
         }
         return None;
     }
@@ -364,6 +364,11 @@ fn is_type_or_alias(ctx: &ExecutorContext, tr: &TypeRef) -> bool {
         TypeRef::Primitive(_) => true,
         TypeRef::Resolved(path) | TypeRef::External(path) => {
             if path.len() == 1 && ctx.primitives.is_primitive(&path[0]) {
+                return true;
+            }
+            if ctx.primitives.is_primitive(&path.join("::"))
+                || ctx.primitives.is_primitive(&path.join("."))
+            {
                 return true;
             }
             if let Some(sym) = find_symbol_by_path(ctx.tree, path) {
@@ -384,12 +389,14 @@ fn redirect_to_constructor(ctx: &ExecutorContext, tr: TypeRef) -> TypeRef {
     match &tr {
         TypeRef::Resolved(path) => {
             if let Some(scope_id) = find_scope_for_type(ctx.tree, &tr) {
-                let ctor_names = ["__init__", "constructor", path.last().unwrap().as_str()];
-                for cname in ctor_names {
-                    if ctx.tree.arena[scope_id].symbols.contains_key(cname) {
-                        let mut new_path = path.clone();
-                        new_path.push(cname.to_string());
-                        return TypeRef::Resolved(new_path);
+                if let Some(last_name) = path.last() {
+                    let ctor_names = ["__init__", "constructor", last_name.as_str()];
+                    for cname in ctor_names {
+                        if ctx.tree.arena[scope_id].symbols.contains_key(cname) {
+                            let mut new_path = path.clone();
+                            new_path.push(cname.to_string());
+                            return TypeRef::Resolved(new_path);
+                        }
                     }
                 }
             }
@@ -494,6 +501,19 @@ pub fn extract_base_name(query: &Query) -> String {
         Query::Find(name) => name.clone(),
         Query::Extract(parent, member) => format!("{}::{}", extract_base_name(parent), member),
         Query::Call(parent) => format!("{}()", extract_base_name(parent)),
+    }
+}
+
+/// Extracts the qualified path components of a `Query`, if it represents a static path.
+pub fn query_to_path(query: &Query) -> Option<Vec<String>> {
+    match query {
+        Query::Find(name) => Some(vec![name.clone()]),
+        Query::Extract(parent, member) => {
+            let mut p = query_to_path(parent)?;
+            p.push(member.clone());
+            Some(p)
+        }
+        Query::Call(parent) => query_to_path(parent),
     }
 }
 
@@ -666,25 +686,51 @@ fn resolve_super_keyword(
     resolve_type: bool,
     visited: &mut std::collections::HashSet<String>,
 ) -> Option<TypeRef> {
-    let mut curr = Some(scope_id);
-    while let Some(id) = curr {
-        let scope = &ctx.tree.arena[id];
-        if !scope.super_types.is_empty() {
-            let st = &scope.super_types[0];
-            return match st {
-                TypeRef::ResolutionQuery(q) => {
-                    evaluate_query(ctx, q, id, resolve_type, visited).or(Some(st.clone()))
-                }
-                TypeRef::Unresolved(qn) => {
-                    let query = Query::Find(qn.last().cloned().unwrap_or_default());
-                    evaluate_query(ctx, &query, id, resolve_type, visited).or(Some(st.clone()))
-                }
-                _ => Some(st.clone()),
-            };
-        }
-        curr = scope.parent;
+    let super_key = format!("super:{}", scope_id);
+    if !visited.insert(super_key.clone()) {
+        return None;
     }
-    None
+
+    let result = (|| {
+        let mut curr = Some(scope_id);
+        while let Some(id) = curr {
+            let scope = &ctx.tree.arena[id];
+            if !scope.super_types.is_empty() {
+                let st = &scope.super_types[0];
+                return match st {
+                    TypeRef::ResolutionQuery(q) => {
+                        evaluate_query(ctx, q, id, resolve_type, visited).or(Some(st.clone()))
+                    }
+                    TypeRef::Unresolved(qn) => {
+                        let query = Query::Find(qn.last().cloned().unwrap_or_default());
+                        evaluate_query(ctx, &query, id, resolve_type, visited).or(Some(st.clone()))
+                    }
+                    _ => Some(st.clone()),
+                };
+            }
+            curr = scope.parent;
+        }
+
+        // If no super_types were found (e.g. Rust module `super::`),
+        // resolve to the parent module in the module hierarchy
+        let mut mod_curr = Some(scope_id);
+        while let Some(id) = mod_curr {
+            let scope = &ctx.tree.arena[id];
+            if scope.is_module {
+                if let Some(parent_id) = scope.parent {
+                    let parent_path = build_path_from_scope(ctx.tree, parent_id);
+                    return Some(TypeRef::Resolved(parent_path));
+                }
+                break;
+            }
+            mod_curr = scope.parent;
+        }
+
+        None
+    })();
+
+    visited.remove(&super_key);
+    result
 }
 
 /// Helper function to resolve the "Self" keyword dynamically.
@@ -710,6 +756,97 @@ fn resolve_self_keyword(ctx: &ExecutorContext, scope_id: ScopeId) -> Option<Type
         curr = scope.parent;
     }
     None
+}
+
+/// Resolves an import path taking into account the declaring scope (for relative imports).
+/// Handles `super::`, `self::`, sibling submodules, and falls back to global lookup.
+fn resolve_import_path(
+    ctx: &ExecutorContext,
+    scope_id: ScopeId,
+    path: &[String],
+    visited: &mut std::collections::HashSet<String>,
+) -> Option<TypeRef> {
+    if path.is_empty() {
+        return None;
+    }
+
+    let cycle_key = format!("imp_path:{}:{}", scope_id, path.join("::"));
+    if !visited.insert(cycle_key.clone()) {
+        return None;
+    }
+
+    let result = (|| {
+        // 1. If path starts with "super", climb up the module hierarchy
+        if path[0] == "super" {
+            let mut curr_scope = scope_id;
+            let mut skip = 0;
+            for part in path {
+                if part == "super" {
+                    let mut climbed = false;
+                    let mut check = Some(curr_scope);
+                    while let Some(sid) = check {
+                        let sc = &ctx.tree.arena[sid];
+                        if sc.is_module {
+                            if let Some(parent) = sc.parent {
+                                curr_scope = parent;
+                                climbed = true;
+                                skip += 1;
+                            }
+                            break;
+                        }
+                        check = sc.parent;
+                    }
+                    if !climbed {
+                        break;
+                    }
+                } else {
+                    break;
+                }
+            }
+            if skip > 0 {
+                let mut full_path = build_path_from_scope(ctx.tree, curr_scope);
+                full_path.extend_from_slice(&path[skip..]);
+                return find_global_internal(ctx, &full_path, visited);
+            }
+        }
+
+        // 2. If path starts with "self", resolve relative to current enclosing module
+        if path[0] == "self" {
+            let mut check = Some(scope_id);
+            while let Some(sid) = check {
+                let sc = &ctx.tree.arena[sid];
+                if sc.is_module {
+                    let mut full_path = build_path_from_scope(ctx.tree, sid);
+                    full_path.extend_from_slice(&path[1..]);
+                    return find_global_internal(ctx, &full_path, visited);
+                }
+                check = sc.parent;
+            }
+        }
+
+        // 3. Check if path[0] is a symbol (e.g. child submodule) in the current enclosing module
+        let mut check = Some(scope_id);
+        while let Some(sid) = check {
+            let sc = &ctx.tree.arena[sid];
+            if sc.is_module {
+                if sc.symbols.contains_key(&path[0]) {
+                    let mut full_path = build_path_from_scope(ctx.tree, sid);
+                    full_path.extend_from_slice(path);
+                    if let Some(res) = find_global_internal(ctx, &full_path, visited) {
+                        return Some(res);
+                    }
+                }
+                break;
+            }
+            check = sc.parent;
+        }
+
+        // 4. Fallback: try global resolution from root (e.g. crate::... or root module)
+        find_global_internal(ctx, path, visited)
+    })();
+
+    visited.remove(&cycle_key);
+    result
 }
 
 /// Helper function to evaluate `Query::Find`. Performs lexical climbing up the scope tree.
@@ -738,7 +875,7 @@ fn evaluate_query_find(
         for imp in &ctx.tree.arena[id].imports {
             if let Some(last) = imp.path.last() {
                 if last == name {
-                    if let Some(resolved) = find_global(ctx, &imp.path) {
+                    if let Some(resolved) = resolve_import_path(ctx, id, &imp.path, visited) {
                         return Some(resolved);
                     } else {
                         // If not found in the tree, it might be an external library
@@ -751,7 +888,7 @@ fn evaluate_query_find(
                     }
                     specific_path.push(name.to_string());
 
-                    if let Some(resolved) = find_global(ctx, &specific_path) {
+                    if let Some(resolved) = resolve_import_path(ctx, id, &specific_path, visited) {
                         return Some(resolved);
                     }
 
@@ -760,7 +897,7 @@ fn evaluate_query_find(
                     if last == "*" {
                         base_path.pop();
                     }
-                    if find_global(ctx, &base_path).is_none() {
+                    if resolve_import_path(ctx, id, &base_path, visited).is_none() {
                         return Some(TypeRef::External(specific_path));
                     }
                 }
@@ -782,7 +919,26 @@ fn evaluate_query_extract(
     resolve_type: bool,
     visited: &mut std::collections::HashSet<String>,
 ) -> Option<TypeRef> {
-    let parent_ty = evaluate_query(ctx, parent_q, scope_id, true, visited)?;
+    let parent_ty = match evaluate_query(ctx, parent_q, scope_id, true, visited) {
+        Some(ty) => ty,
+        None => {
+            if let Some(mut full_path) = query_to_path(parent_q) {
+                full_path.push(member.to_string());
+                let joined_colon = full_path.join("::");
+                if ctx.primitives.is_primitive(&joined_colon) {
+                    return Some(TypeRef::Primitive(joined_colon));
+                }
+                let joined_dot = full_path.join(".");
+                if ctx.primitives.is_primitive(&joined_dot) {
+                    return Some(TypeRef::Primitive(joined_dot));
+                }
+                if let Some(res) = find_global_internal(ctx, &full_path, visited) {
+                    return Some(res);
+                }
+            }
+            return None;
+        }
+    };
     let mut resolved_parent_ty = parent_ty.clone();
 
     // If it's an EvaluatedAccess, unwrap the resolved type for further lookup,
@@ -795,13 +951,23 @@ fn evaluate_query_extract(
     };
 
     // If it's Unresolved, to ensure find_scope_for_type works
-    if let TypeRef::Unresolved(_) | TypeRef::ResolutionQuery(_) = resolved_parent_ty {
+    if matches!(
+        resolved_parent_ty,
+        TypeRef::Unresolved(_) | TypeRef::ResolutionQuery(_) | TypeRef::Generic { .. }
+    ) {
         resolved_parent_ty =
             evaluate_typeref_inner(ctx, resolved_parent_ty, scope_id, true, visited);
     }
 
     let candidate_scopes = find_candidate_scopes_for_type(ctx.tree, &resolved_parent_ty);
     for target_scope in candidate_scopes {
+        if member == "super" && ctx.tree.arena[target_scope].is_module {
+            if let Some(parent_id) = ctx.tree.arena[target_scope].parent {
+                let parent_path = build_path_from_scope(ctx.tree, parent_id);
+                return Some(TypeRef::Resolved(parent_path));
+            }
+        }
+
         if let Some(mut res) =
             find_symbol_in_scope_and_supers(ctx, target_scope, member, resolve_type, visited)
         {
@@ -851,15 +1017,122 @@ fn evaluate_query_extract(
                 Box::new(TypeRef::Unresolved(path)),
             ))
         }
-        TypeRef::EvaluatedAccess(base, inner) => {
-            if let TypeRef::Resolved(mut path) = *inner {
+        TypeRef::Primitive(prim) => {
+            let path = vec![prim.clone(), member.to_string()];
+            Some(TypeRef::EvaluatedAccess(
+                Box::new(TypeRef::Primitive(prim)),
+                Box::new(TypeRef::External(path)),
+            ))
+        }
+        TypeRef::Generic { base, .. } => match *base {
+            TypeRef::Resolved(mut path) => {
+                let b = path.clone();
                 path.push(member.to_string());
                 Some(TypeRef::EvaluatedAccess(
-                    base,
+                    Box::new(TypeRef::Resolved(b)),
                     Box::new(TypeRef::Resolved(path)),
                 ))
-            } else {
-                None
+            }
+            TypeRef::External(mut path) => {
+                let b = path.clone();
+                path.push(member.to_string());
+                Some(TypeRef::EvaluatedAccess(
+                    Box::new(TypeRef::External(b)),
+                    Box::new(TypeRef::External(path)),
+                ))
+            }
+            TypeRef::Unresolved(mut path) => {
+                let b = path.clone();
+                path.push(member.to_string());
+                Some(TypeRef::EvaluatedAccess(
+                    Box::new(TypeRef::Unresolved(b)),
+                    Box::new(TypeRef::Unresolved(path)),
+                ))
+            }
+            TypeRef::Failed(mut path) => {
+                let b = path.clone();
+                path.push(member.to_string());
+                Some(TypeRef::EvaluatedAccess(
+                    Box::new(TypeRef::External(b)),
+                    Box::new(TypeRef::External(path)),
+                ))
+            }
+            TypeRef::Primitive(prim) => {
+                let path = vec![prim.clone(), member.to_string()];
+                Some(TypeRef::EvaluatedAccess(
+                    Box::new(TypeRef::Primitive(prim)),
+                    Box::new(TypeRef::External(path)),
+                ))
+            }
+            _ => None,
+        },
+        TypeRef::EvaluatedAccess(base, inner) => {
+            let curr_base = base;
+            let mut curr_inner = *inner;
+            while let TypeRef::EvaluatedAccess(_, next_inner) = curr_inner {
+                curr_inner = *next_inner;
+            }
+            match curr_inner {
+                TypeRef::Resolved(mut path) => {
+                    path.push(member.to_string());
+                    Some(TypeRef::EvaluatedAccess(
+                        curr_base,
+                        Box::new(TypeRef::Resolved(path)),
+                    ))
+                }
+                TypeRef::External(mut path) => {
+                    path.push(member.to_string());
+                    Some(TypeRef::EvaluatedAccess(
+                        curr_base,
+                        Box::new(TypeRef::External(path)),
+                    ))
+                }
+                TypeRef::Unresolved(mut path) => {
+                    path.push(member.to_string());
+                    Some(TypeRef::EvaluatedAccess(
+                        curr_base,
+                        Box::new(TypeRef::Unresolved(path)),
+                    ))
+                }
+                TypeRef::Primitive(prim) => {
+                    let path = vec![prim, member.to_string()];
+                    Some(TypeRef::EvaluatedAccess(
+                        curr_base,
+                        Box::new(TypeRef::External(path)),
+                    ))
+                }
+                TypeRef::Generic { base: gen_base, .. } => match *gen_base {
+                    TypeRef::Resolved(mut path) => {
+                        path.push(member.to_string());
+                        Some(TypeRef::EvaluatedAccess(
+                            curr_base,
+                            Box::new(TypeRef::Resolved(path)),
+                        ))
+                    }
+                    TypeRef::External(mut path) => {
+                        path.push(member.to_string());
+                        Some(TypeRef::EvaluatedAccess(
+                            curr_base,
+                            Box::new(TypeRef::External(path)),
+                        ))
+                    }
+                    TypeRef::Unresolved(mut path) => {
+                        path.push(member.to_string());
+                        Some(TypeRef::EvaluatedAccess(
+                            curr_base,
+                            Box::new(TypeRef::Unresolved(path)),
+                        ))
+                    }
+                    TypeRef::Primitive(prim) => {
+                        let path = vec![prim, member.to_string()];
+                        Some(TypeRef::EvaluatedAccess(
+                            curr_base,
+                            Box::new(TypeRef::External(path)),
+                        ))
+                    }
+                    _ => None,
+                },
+                _ => None,
             }
         }
         _ => None,
@@ -1001,13 +1274,11 @@ pub fn find_scope_for_type(tree: &ScopeTree, ty: &TypeRef) -> Option<ScopeId> {
                     curr = *id;
                     continue;
                 }
-                if let Some(child_scope) = tree
-                    .arena
-                    .iter()
-                    .find(|s| s.parent == Some(curr) && &s.name == part)
-                {
-                    curr = child_scope.id;
-                    continue;
+                if let Some(ids) = tree.arena[curr].children_by_name.get(part) {
+                    if let Some(&child_id) = ids.first() {
+                        curr = child_id;
+                        continue;
+                    }
                 }
                 return None;
             }
@@ -1061,6 +1332,16 @@ pub fn find_global_internal(
     if path.len() == 1 && ctx.primitives.is_primitive(&path[0]) {
         visited.remove(&path_key);
         return Some(TypeRef::Primitive(path[0].clone()));
+    }
+    let joined_colon = path.join("::");
+    if ctx.primitives.is_primitive(&joined_colon) {
+        visited.remove(&path_key);
+        return Some(TypeRef::Primitive(joined_colon));
+    }
+    let joined_dot = path.join(".");
+    if ctx.primitives.is_primitive(&joined_dot) {
+        visited.remove(&path_key);
+        return Some(TypeRef::Primitive(joined_dot));
     }
 
     for (i, part) in path.iter().enumerate() {
@@ -1128,7 +1409,7 @@ fn resolve_via_transitive_imports(
             for imp in &node.imports {
                 if let Some(last) = imp.path.last() {
                     if last == member {
-                        if let Some(resolved) = find_global_internal(ctx, &imp.path, visited) {
+                        if let Some(resolved) = resolve_import_path(ctx, scope_id, &imp.path, visited) {
                             result = Some(resolved);
                             break;
                         } else {
@@ -1142,7 +1423,7 @@ fn resolve_via_transitive_imports(
                         }
                         target_path.push(member.to_string());
 
-                        if let Some(resolved) = find_global_internal(ctx, &target_path, visited) {
+                        if let Some(resolved) = resolve_import_path(ctx, scope_id, &target_path, visited) {
                             result = Some(resolved);
                             break;
                         }

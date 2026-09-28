@@ -80,6 +80,7 @@ pub struct Block {
 pub struct Function {
     pub name: QualifiedName,
     pub signature: Signature,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
     pub body: Option<Block>,
     pub is_constructor: bool,
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
