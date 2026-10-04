@@ -12,7 +12,6 @@ use crate::heuristics::parsers::try_parse_package_declaration;
 use crate::heuristics::{ParsedItem, dispatch_node};
 use crate::language::SupportedLanguage;
 use crate::model::{Component, Field, Module, TypeRef};
-use crate::resolver::primitives::PrimitiveRegistry;
 use strategies::{apply_directory_strategy, apply_package_strategy, link_out_of_line_methods};
 
 /// Phase 1 Entry Point: Traverses a file or directory path and extracts all IR modules ($\varepsilon : \mathcal{W} \to \mathcal{D}$).
@@ -28,13 +27,11 @@ use strategies::{apply_directory_strategy, apply_package_strategy, link_out_of_l
 /// * `config` - The global [`AnalyzerConfig`].
 ///
 /// # Returns
-/// A tuple containing:
 /// * `Vec<Module>`: Complete unresolved IR module forest $\mathcal{D}$.
-/// * `PrimitiveRegistry`: Merged registry of primitive types recognized across all parsed files.
 pub fn extract_ir(
     path: &Path,
     config: &AnalyzerConfig,
-) -> Result<(Vec<Module>, PrimitiveRegistry)> {
+) -> Result<Vec<Module>> {
     if !path.exists() {
         bail!("Path not found: {}", path.display());
     }
@@ -61,8 +58,8 @@ pub fn extract_ir(
     // 2. Parallel Extraction: concurrent parsing across worker threads
     let parse_results = extract_ir_parallel(files, root_dir, config);
 
-    // 3. Aggregation: combine extracted modules and primitive registries
-    let (mut all_modules, combined_primitives) = aggregate_extracted_components(parse_results);
+    // 3. Aggregation: combine extracted modules into a unified module forest
+    let mut all_modules = aggregate_extracted_components(parse_results);
 
     if all_modules.is_empty() {
         bail!(
@@ -74,7 +71,7 @@ pub fn extract_ir(
     // 4. Post-extraction reconciliation: link out-of-line method definitions across workspace modules
     link_out_of_line_methods(&mut all_modules);
 
-    Ok((all_modules, combined_primitives))
+    Ok(all_modules)
 }
 
 /// Discovers all source files within a target path that match supported languages.
@@ -103,13 +100,13 @@ fn discover_supported_source_files(path: &Path) -> Vec<(PathBuf, SupportedLangua
     files
 }
 
-/// Parses a single source file from disk into an IR module tree and primitive registry.
+/// Parses a single source file from disk into an IR module tree.
 fn parse_source_file(
     file_path: &Path,
     lang: SupportedLanguage,
     root_dir: &Path,
     config: &AnalyzerConfig,
-) -> Option<(Vec<Module>, PrimitiveRegistry)> {
+) -> Option<Vec<Module>> {
     let source = fs::read_to_string(file_path).ok()?;
     let rel_path = file_path.strip_prefix(root_dir).unwrap_or(file_path);
     parse_source(lang, &source, rel_path, config).ok()
@@ -120,26 +117,24 @@ fn extract_ir_parallel(
     files: Vec<(PathBuf, SupportedLanguage)>,
     root_dir: &Path,
     config: &AnalyzerConfig,
-) -> Vec<(Vec<Module>, PrimitiveRegistry)> {
+) -> Vec<Vec<Module>> {
     files
         .into_par_iter()
         .filter_map(|(file_path, lang)| parse_source_file(&file_path, lang, root_dir, config))
         .collect()
 }
 
-/// Aggregates individual file extraction results into a unified module forest and merged primitive registry.
+/// Aggregates individual file extraction results into a unified module forest.
 fn aggregate_extracted_components(
-    results: Vec<(Vec<Module>, PrimitiveRegistry)>,
-) -> (Vec<Module>, PrimitiveRegistry) {
+    results: Vec<Vec<Module>>,
+) -> Vec<Module> {
     let mut all_modules = Vec::with_capacity(results.len());
-    let mut combined_primitives = PrimitiveRegistry::empty();
 
-    for (mut file_modules, file_primitives) in results {
+    for mut file_modules in results {
         all_modules.append(&mut file_modules);
-        combined_primitives.merge(file_primitives);
     }
 
-    (all_modules, combined_primitives)
+    all_modules
 }
 
 /// Extracts Intermediate Representation (IR) modules from a single source file or code snippet.
@@ -155,15 +150,13 @@ fn aggregate_extracted_components(
 /// * `config` - Global [`AnalyzerConfig`].
 ///
 /// # Returns
-/// A tuple of:
 /// * `Vec<Module>`: The extracted module tree (rooted in a top-level module).
-/// * `PrimitiveRegistry`: Language-specific primitive types loaded from configuration.
 pub fn parse_source(
     lang: SupportedLanguage,
     source: &str,
     path: &Path,
     config: &AnalyzerConfig,
-) -> Result<(Vec<Module>, PrimitiveRegistry)> {
+) -> Result<Vec<Module>> {
     let file_path_str = path.to_string_lossy().to_string();
     let (mut modules, package_path) = extract_from_cst(
         lang.to_tree_sitter_lang(),
@@ -225,11 +218,7 @@ pub fn parse_source(
     // Link out-of-line method definitions within this file's extracted module
     link_out_of_line_methods(&mut modules);
 
-    // Load primitives from external registry
-    let prim_registry =
-        PrimitiveRegistry::load(lang.name()).unwrap_or_else(|_| PrimitiveRegistry::empty());
-
-    Ok((modules, prim_registry))
+    Ok(modules)
 }
 
 /// Parses source code using Tree-sitter and extracts IR components via the heuristics dispatcher.

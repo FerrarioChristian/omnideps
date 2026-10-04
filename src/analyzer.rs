@@ -29,7 +29,10 @@ pub fn analyze_project(
     config: &AnalyzerConfig,
 ) -> Result<(Vec<Module>, DependencyGraph)> {
     // Phase 1: Syntactic Extraction from filesystem (epsilon)
-    let (modules, prim_registry) = extract_ir(path, config)?;
+    let modules = extract_ir(path, config)?;
+
+    // Load Primitive Registry across all supported languages (P)
+    let prim_registry = crate::resolver::primitives::PrimitiveRegistry::load_all()?;
 
     // Phase 2: Symbolic Reference Resolution (rho)
     let resolved = resolve_type_refs(modules, &prim_registry, config);
@@ -57,7 +60,10 @@ pub fn analyze_code_snippet(
     let path = Path::new(virtual_filename);
 
     // Phase 1: Syntactic Extraction (epsilon)
-    let (modules, prim_registry) = parse_source(lang, source, path, config)?;
+    let modules = parse_source(lang, source, path, config)?;
+
+    // Load Primitive Registry (P)
+    let prim_registry = crate::resolver::primitives::PrimitiveRegistry::load_all()?;
 
     // Phase 2: Symbolic Reference Resolution (rho)
     let resolved = resolve_type_refs(modules, &prim_registry, config);

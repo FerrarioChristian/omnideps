@@ -27,6 +27,18 @@ impl PrimitiveRegistry {
         Ok(Self { lang_primitives })
     }
 
+
+    /// Loads all primitives defined across all supported languages in `primitives.json`.
+    pub fn load_all() -> anyhow::Result<Self> {
+        let primitives_json = include_str!("../../primitives.json");
+        let registry: HashMap<String, Vec<String>> = serde_json::from_str(primitives_json)?;
+        let mut lang_primitives = HashSet::new();
+        for prims in registry.values() {
+            lang_primitives.extend(prims.iter().cloned());
+        }
+        Ok(Self { lang_primitives })
+    }
+
     /// Creates an empty registry (used as fallback).
     pub fn empty() -> Self {
         Self {
