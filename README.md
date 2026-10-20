@@ -1,4 +1,4 @@
-# Omnideps (formerly Language Agnostic Analyzer)
+# Omnideps
 
 A language-agnostic architectural dependency analyzer designed to extract source code dependency graphs using Tree-sitter.
 Omnideps extracts components and structural or behavioral relationships (for languages like Rust, Java, Python, C, C++) and resolves types to trace actual code dependencies.
