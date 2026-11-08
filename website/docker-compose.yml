@@ -1,0 +1,13 @@
+services:
+  omnideps-website:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: omnideps-website
+    image: omnideps-website:latest
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - PORT=3000
+      - HOST=0.0.0.0
