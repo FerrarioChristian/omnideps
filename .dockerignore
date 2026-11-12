@@ -1,0 +1,9 @@
+target/
+.git/
+.DS_Store
+website/node_modules/
+website/.svelte-kit/
+website/build/
+visualizer-svelte/node_modules/
+visualizer-svelte/.svelte-kit/
+visualizer-svelte/build/
