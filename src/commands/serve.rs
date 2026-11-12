@@ -57,7 +57,7 @@ struct DocsNode {
     children: Option<Vec<DocsNode>>,
 }
 
-pub fn execute(port: u16) -> Result<()> {
+pub fn execute(host: Option<&str>, port: u16) -> Result<()> {
     tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()
@@ -72,13 +72,22 @@ pub fn execute(port: u16) -> Result<()> {
                 .route("/api/docs/content", get(api_docs_content))
                 .fallback(static_handler);
 
-            let addr = SocketAddr::from(([127, 0, 0, 1], port));
-            let url = format!("http://{}", addr);
-            println!("Starting Web Visualizer at {}", url);
+            let host_str = host
+                .map(|s| s.to_string())
+                .or_else(|| std::env::var("HOST").ok())
+                .unwrap_or_else(|| "0.0.0.0".to_string());
+            let ip: std::net::IpAddr = host_str
+                .parse()
+                .unwrap_or(std::net::IpAddr::V4(std::net::Ipv4Addr::new(0, 0, 0, 0)));
+            let addr = SocketAddr::from((ip, port));
+            let display_url = format!("http://localhost:{}", port);
+            println!("Starting Web Visualizer at http://{}:{}", ip, port);
 
-            // Tenta di aprire il browser automaticamente
-            if let Err(e) = open::that(&url) {
-                log::warn!("Could not open browser automatically: {}", e);
+            // Tenta di aprire il browser automaticamente solo se loopback
+            if ip.is_loopback() {
+                if let Err(e) = open::that(&display_url) {
+                    log::warn!("Could not open browser automatically: {}", e);
+                }
             }
 
             let listener = tokio::net::TcpListener::bind(addr).await.unwrap();

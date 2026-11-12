@@ -72,8 +72,8 @@ fn run() -> Result<()> {
         Commands::ExportCyto { input, output } => {
             commands::cyto_export::execute(input, output)?;
         }
-        Commands::Serve { port } => {
-            commands::serve::execute(*port)?;
+        Commands::Serve { host, port } => {
+            commands::serve::execute(Some(host.as_str()), *port)?;
         }
         Commands::Config { cmd } => match cmd {
             ConfigCommands::Init { output } => {

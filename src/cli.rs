@@ -81,6 +81,10 @@ pub enum Commands {
     },
     /// Serve the interactive Web Visualizer
     Serve {
+        /// Host address to bind to (default: 0.0.0.0)
+        #[arg(long, default_value = "0.0.0.0")]
+        host: String,
+
         /// Port to listen on (default: 3000)
         #[arg(short, long, default_value_t = 3000)]
         port: u16,
