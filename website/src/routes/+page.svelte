@@ -23,6 +23,7 @@
 	import MonitorIcon from "@lucide/svelte/icons/monitor";
 	import FileTextIcon from "@lucide/svelte/icons/file-text";
 	import RefreshCwIcon from "@lucide/svelte/icons/refresh-cw";
+	import PlayIcon from "@lucide/svelte/icons/play";
 	import { fetchLatestRelease, FALLBACK_VERSION, FALLBACK_RELEASE_URL } from "$lib/docs/version.js";
 
 	// State for copy buttons and preview tabs
@@ -336,6 +337,10 @@
 		<!-- Desktop Nav Links -->
 		<nav class="hidden items-center gap-6 text-sm font-medium md:flex">
 			<a href="/docs" class="text-muted-foreground hover:text-foreground transition-colors">Documentation</a>
+			<a href="/demo" class="text-foreground flex items-center gap-1.5 font-semibold transition-colors">
+				<span class="size-1.5 rounded-full bg-emerald-500"></span>
+				Playground
+			</a>
 			<a href="/docs/cli/analyze" class="text-muted-foreground hover:text-foreground transition-colors">CLI</a>
 			<a href="/docs/architecture/languages" class="text-muted-foreground hover:text-foreground transition-colors">Languages</a>
 			<a href="#polyglot" class="text-muted-foreground hover:text-foreground transition-colors">Polyglot Engine</a>
@@ -481,6 +486,11 @@
 						</DropdownMenu.Content>
 					</DropdownMenu.Root>
 				</div>
+
+				<Button variant="outline" size="lg" href="/demo" class="gap-2 px-6 border-emerald-500/30 hover:border-emerald-500/60 bg-emerald-500/5 hover:bg-emerald-500/10">
+					<PlayIcon class="size-4 text-emerald-500 fill-emerald-500/20" />
+					Try Live Demo
+				</Button>
 
 				<Button variant="outline" size="lg" href="/docs" class="gap-2 px-6">
 					<BookOpenIcon class="size-4" />

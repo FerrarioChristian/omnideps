@@ -10,4 +10,6 @@ declare global {
 	}
 }
 
+declare module 'cytoscape-fcose';
+
 export {};

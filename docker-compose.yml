@@ -1,0 +1,14 @@
+services:
+  omnideps:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: omnideps:latest
+    container_name: omnideps-api
+    restart: unless-stopped
+    command: ["omnideps", "serve", "--port", "3000"]
+    # Only bind to localhost on the host machine, so external traffic must go through your Nginx reverse proxy
+    ports:
+      - "127.0.0.1:3000:3000"
+    environment:
+      - RUST_LOG=warn
