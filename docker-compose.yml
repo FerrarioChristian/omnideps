@@ -6,7 +6,7 @@ services:
     image: omnideps-api:latest
     container_name: omnideps-api
     restart: unless-stopped
-    command: ["omnideps", "serve", "--port", "3000"]
+    command: ["serve", "--port", "3000"]
     # Internal port 3000 mapped to host 127.0.0.1:5004 (demo series 5000)
     ports:
       - "127.0.0.1:5004:3000"
