@@ -24,6 +24,7 @@
 	import FileTextIcon from "@lucide/svelte/icons/file-text";
 	import RefreshCwIcon from "@lucide/svelte/icons/refresh-cw";
 	import PlayIcon from "@lucide/svelte/icons/play";
+	import LogoIcon from "$lib/components/LogoIcon.svelte";
 	import { fetchLatestRelease, FALLBACK_VERSION, FALLBACK_RELEASE_URL } from "$lib/docs/version.js";
 
 	// State for copy buttons and preview tabs
@@ -325,8 +326,8 @@
 	<div class="mx-auto flex h-14 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
 		<!-- Brand Logo -->
 		<a href="/" class="flex items-center gap-2.5 transition-opacity hover:opacity-90">
-			<div class="bg-foreground text-background flex size-7 items-center justify-center rounded-md font-mono text-sm font-bold">
-				⬡
+			<div class="bg-foreground text-background flex size-7 items-center justify-center rounded-md">
+				<LogoIcon class="size-4.5" />
 			</div>
 			<div class="flex items-center gap-2">
 				<span class="text-base font-semibold tracking-tight">omnideps</span>
@@ -1251,8 +1252,8 @@
 	<div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
 		<div class="flex flex-col items-center justify-between gap-6 md:flex-row">
 			<div class="flex items-center gap-3">
-				<div class="bg-foreground text-background flex size-6 items-center justify-center rounded font-mono text-xs font-bold">
-					⬡
+				<div class="bg-foreground text-background flex size-6 items-center justify-center rounded">
+					<LogoIcon class="size-3.5" />
 				</div>
 				<span class="font-semibold text-foreground">Omnideps</span>
 				<span class="text-muted-foreground text-xs">• MIT License</span>

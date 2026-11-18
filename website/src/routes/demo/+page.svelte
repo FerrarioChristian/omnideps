@@ -14,6 +14,7 @@
 	import CodeIcon from '@lucide/svelte/icons/code';
 	import ServerIcon from '@lucide/svelte/icons/server';
 	import SparklesIcon from '@lucide/svelte/icons/sparkles';
+	import LogoIcon from '$lib/components/LogoIcon.svelte';
 
 	interface Preset {
 		label: string;
@@ -247,8 +248,8 @@ class UserService:
 		</Button>
 		<div class="bg-border h-4 w-px"></div>
 		<div class="flex items-center gap-2">
-			<div class="bg-foreground text-background flex size-6 items-center justify-center rounded-md font-mono text-xs font-bold">
-				⬡
+			<div class="bg-foreground text-background flex size-6 items-center justify-center rounded-md">
+				<LogoIcon class="size-3.5" />
 			</div>
 			<span class="text-sm font-semibold tracking-tight">Omnideps Playground</span>
 			<Badge variant="secondary" class="font-mono text-[10px] hidden sm:inline-flex">Live Demo</Badge>

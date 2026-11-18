@@ -12,6 +12,7 @@
 	import CheckIcon from "@lucide/svelte/icons/check";
 	import SocialLinks, { type SocialLink } from "$lib/components/nav/social-links.svelte";
 	import SearchCommand from "$lib/components/search/search-command.svelte";
+	import LogoIcon from "$lib/components/LogoIcon.svelte";
 	import { fetchLatestRelease, FALLBACK_VERSION } from "$lib/docs/version.js";
 	import type { ComponentProps } from "svelte";
 
@@ -54,9 +55,9 @@
 									{...props}
 								>
 									<div
-										class="bg-sidebar-primary text-sidebar-primary-foreground flex aspect-square size-8 items-center justify-center rounded-lg font-mono font-bold"
+										class="bg-sidebar-primary text-sidebar-primary-foreground flex aspect-square size-8 items-center justify-center rounded-lg"
 									>
-										⬡
+										<LogoIcon class="size-4.5" />
 									</div>
 									<div class="flex flex-col gap-0.5 leading-none">
 										<span class="font-semibold">{docsConfig.site.title}</span>
