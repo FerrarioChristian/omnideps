@@ -1,32 +1,20 @@
 services:
-  omnideps-api:
+  omnideps:
     build:
       context: .
       dockerfile: Dockerfile
-    image: omnideps-api:latest
+    image: omnideps:latest
     container_name: omnideps-api
     restart: unless-stopped
-    command: ["serve", "--port", "3000"]
-    # Internal port 3000 mapped to host 127.0.0.1:5004 (demo series 5000)
+    command: ["omnideps", "serve", "--port", "3000"]
+    # Only bind to localhost on the host machine, so external traffic must go through your Nginx reverse proxy
     ports:
-      - "127.0.0.1:5004:3000"
+      - "127.0.0.1:3000:3000"
     environment:
       - RUST_LOG=warn
-
-  omnideps-website:
-    build:
-      context: ./website
-      dockerfile: Dockerfile
-    image: omnideps-website:latest
-    container_name: omnideps-website
-    restart: unless-stopped
-    # Documentation site and interactive demo UI mapped to host 127.0.0.1:5003
-    ports:
-      - "127.0.0.1:5003:3000"
-    environment:
-      - NODE_ENV=production
-      - PORT=3000
-      - HOST=0.0.0.0
-      - OMNIDEPS_BACKEND_URL=http://omnideps-api:3000
-    depends_on:
-      - omnideps-api
+    # Resource safety limits: prevents runaway memory/CPU on the host machine
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M

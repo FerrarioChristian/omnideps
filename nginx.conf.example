@@ -1,6 +1,9 @@
 # Nginx Reverse Proxy Configuration for Omnideps Website & Demo
 # Proxying traffic to the SvelteKit frontend (which internally routes /api/analyze to the Rust engine)
 
+# Rate Limiting Zone: 15 requests/minute per client IP with a 10MB memory zone
+limit_req_zone $binary_remote_addr zone=omnideps_limit:10m rate=15r/m;
+
 server {
     listen 80;
     server_name omnideps.ferraa.it;
@@ -8,6 +11,21 @@ server {
     # Security: Limit maximum source code payload size to 64KB
     client_max_body_size 64k;
     proxy_read_timeout 30s;
+
+    # Apply rate limiting to the analysis API endpoint
+    location /api/analyze {
+        limit_req zone=omnideps_limit burst=5 nodelay;
+        limit_req_status 429;
+
+        proxy_pass http://127.0.0.1:5003;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
 
     location / {
         proxy_pass http://127.0.0.1:5003;
